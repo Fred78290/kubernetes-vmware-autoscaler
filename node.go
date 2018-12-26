@@ -12,6 +12,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 
 	"github.com/golang/glog"
+	"github.com/vmware/govmomi/vim25/types"
 )
 
 // AutoScalerServerNodeState VM state
@@ -45,6 +46,12 @@ type AutoScalerServerNode struct {
 	Addresses        []string                  `json:"addresses"`
 	State            AutoScalerServerNodeState `json:"state"`
 	AutoProvisionned bool                      `json:"auto"`
+}
+
+func (vm *AutoScalerServerNode) getVM() *vsphereInfos {
+	vsphere := newVSphereInfos(vm.NodeName)
+
+	return vsphere
 }
 
 func (vm *AutoScalerServerNode) prepareKubelet() error {
@@ -193,6 +200,18 @@ func (vm *AutoScalerServerNode) setNodeLabels(extras *nodeCreationExtra) error {
 	return nil
 }
 
+func (vm *AutoScalerServerNode) mountPoints(extras *nodeCreationExtra) error {
+	/* 	if extras.mountPoints != nil && len(extras.mountPoints) > 0 {
+	   		for hostPath, guestPath := range extras.mountPoints {
+	   			if err = shell("AutoScaler", "mount", hostPath, fmt.Sprintf("%s:%s", vm.NodeName, guestPath)); err != nil {
+	   				glog.Warningf(errUnableToMountPath, hostPath, guestPath, vm.NodeName, err)
+	   			}
+	   		}
+	   	}
+	*/
+	return nil
+}
+
 func (vm *AutoScalerServerNode) launchVM(extras *nodeCreationExtra) error {
 	glog.V(5).Infof("AutoScalerNode::launchVM, node:%s", vm.NodeName)
 
@@ -202,79 +221,43 @@ func (vm *AutoScalerServerNode) launchVM(extras *nodeCreationExtra) error {
 	glog.Infof("Launch VM:%s for nodegroup: %s", vm.NodeName, extras.nodegroupID)
 
 	if vm.AutoProvisionned == false {
-		glog.Errorf(errVMNotProvisionnedByMe, vm.NodeName)
-	}
-
-	if vm.State != AutoScalerServerNodeStateNotCreated {
+		err = fmt.Errorf(errVMNotProvisionnedByMe, vm.NodeName)
+	} else if vm.State != AutoScalerServerNodeStateNotCreated {
 		err = fmt.Errorf(errVMAlreadyCreated, vm.NodeName)
 	} else {
-
-		var args = []string{
-			"AutoScaler",
-			"launch",
-			"--name",
-			vm.NodeName,
-		}
-
-		/*
-			Append VM attributes Memory,cpus, hard drive size....
-		*/
-		if vm.Memory > 0 {
-			args = append(args, fmt.Sprintf("--mem=%dM", vm.Memory))
-		}
-
-		if vm.CPU > 0 {
-			args = append(args, fmt.Sprintf("--cpus=%d", vm.CPU))
-		}
-
-		if vm.Disk > 0 {
-			args = append(args, fmt.Sprintf("--disk=%dM", vm.Disk))
-		}
-
-		// If an image/url image
-		if len(extras.image) > 0 {
-			args = append(args, extras.image)
-		}
+		vsphere := vm.getVM()
 
 		// Launch the VM and wait until finish launched
-		if err = shell(args...); err != nil {
-			glog.Errorf(errUnableToLaunchVM, vm.NodeName, err)
+		if err = vsphere.create(extras.image, vm.Memory, vm.CPU, vm.Disk); err != nil {
+			err = fmt.Errorf(errUnableToLaunchVM, vm.NodeName, err)
 		} else {
 			// Add mount point
-			if extras.mountPoints != nil && len(extras.mountPoints) > 0 {
-				for hostPath, guestPath := range extras.mountPoints {
-					if err = shell("AutoScaler", "mount", hostPath, fmt.Sprintf("%s:%s", vm.NodeName, guestPath)); err != nil {
-						glog.Warningf(errUnableToMountPath, hostPath, guestPath, vm.NodeName, err)
-					}
-				}
-			}
+			vm.mountPoints(extras)
 
-			if status, err = vm.statusVM(); err != nil {
-				glog.Error(err.Error())
-			} else if status == AutoScalerServerNodeStateRunning {
-				// If the VM is running call kubeadm join
-				if extras.vmprovision {
-					if err = vm.prepareKubelet(); err == nil {
-						if err = vm.kubeAdmJoin(extras); err == nil {
-							if err = vm.waitReady(extras.kubeConfig); err == nil {
-								if err = vm.setNodeLabels(extras); err != nil {
-									glog.Error(err.Error())
+			if status, err = vm.statusVM(); err == nil {
+				if status == AutoScalerServerNodeStateRunning {
+					// If the VM is running call kubeadm join
+					if extras.vmprovision {
+						if err = vm.prepareKubelet(); err == nil {
+							if err = vm.kubeAdmJoin(extras); err == nil {
+								if err = vm.waitReady(extras.kubeConfig); err == nil {
+									err = vm.setNodeLabels(extras)
 								}
 							}
 						}
 					}
+				} else {
+					err = fmt.Errorf(errKubeAdmJoinNotRunning, vm.NodeName)
 				}
-
-				if err != nil {
-					glog.Error(err.Error())
-				}
-			} else {
-				err = fmt.Errorf(errKubeAdmJoinNotRunning, vm.NodeName)
 			}
 		}
 	}
 
-	glog.Infof("Launched VM:%s for nodegroup: %s", vm.NodeName, extras.nodegroupID)
+	if err == nil {
+		glog.Infof("Launched VM:%s for nodegroup: %s", vm.NodeName, extras.nodegroupID)
+	} else {
+		glog.Errorf("Unable to launch VM:%s for nodegroup: %s. Reason: %v", vm.NodeName, extras.nodegroupID, err.Error())
+	}
 
 	return err
 }
@@ -288,42 +271,46 @@ func (vm *AutoScalerServerNode) startVM(kubeconfig string) error {
 	glog.Infof("Start VM:%s", vm.NodeName)
 
 	if vm.AutoProvisionned == false {
-		glog.Errorf(errVMNotProvisionnedByMe, vm.NodeName)
+		err = fmt.Errorf(errVMNotProvisionnedByMe, vm.NodeName)
+	} else {
+		state, err = vm.statusVM()
+
+		if err == nil {
+			if state == AutoScalerServerNodeStateStopped {
+				vsphere := vm.getVM()
+
+				if err = vsphere.powerOn(); err != nil {
+					args := []string{
+						"kubectl",
+						"uncordon",
+						vm.NodeName,
+						"--kubeconfig",
+						kubeconfig,
+					}
+
+					if err = shell(args...); err != nil {
+						glog.Errorf(errKubeCtlIgnoredError, vm.NodeName, err)
+
+						err = nil
+					}
+
+					vm.State = AutoScalerServerNodeStateRunning
+				} else {
+					err = fmt.Errorf(errStartVMFailed, vm.NodeName, err)
+				}
+			} else if state != AutoScalerServerNodeStateRunning {
+				err = fmt.Errorf(errStartVMFailed, vm.NodeName, fmt.Sprintf("Unexpected state: %d", state))
+			}
+		}
 	}
 
-	state, err = vm.statusVM()
-
-	if err != nil {
-		return err
+	if err == nil {
+		glog.Infof("Started VM:%s", vm.NodeName)
+	} else {
+		glog.Errorf("Unable to start VM:%s. Reason: %v", vm.NodeName, err)
 	}
 
-	if state == AutoScalerServerNodeStateStopped {
-		if err = shell("multipass", "start", vm.NodeName); err != nil {
-			glog.Errorf(errStartVMFailed, vm.NodeName, err)
-			return fmt.Errorf(errStartVMFailed, vm.NodeName, err)
-		}
-
-		args := []string{
-			"kubectl",
-			"uncordon",
-			vm.NodeName,
-			"--kubeconfig",
-			kubeconfig,
-		}
-
-		if err = shell(args...); err != nil {
-			glog.Errorf(errKubeCtlIgnoredError, vm.NodeName, err)
-		}
-
-		vm.State = AutoScalerServerNodeStateRunning
-	} else if state != AutoScalerServerNodeStateRunning {
-		glog.Errorf(errVMNotFound, vm.NodeName)
-		return fmt.Errorf(errVMNotFound, vm.NodeName)
-	}
-
-	glog.Infof("Started VM:%s", vm.NodeName)
-
-	return nil
+	return err
 }
 
 func (vm *AutoScalerServerNode) stopVM(kubeconfig string) error {
@@ -335,42 +322,43 @@ func (vm *AutoScalerServerNode) stopVM(kubeconfig string) error {
 	glog.Infof("Stop VM:%s", vm.NodeName)
 
 	if vm.AutoProvisionned == false {
-		glog.Errorf(errVMNotProvisionnedByMe, vm.NodeName)
+		err = fmt.Errorf(errVMNotProvisionnedByMe, vm.NodeName)
+	} else {
+		state, err = vm.statusVM()
+
+		if err == nil {
+			if state == AutoScalerServerNodeStateRunning {
+				vsphere := vm.getVM()
+				args := []string{
+					"kubectl",
+					"cordon",
+					vm.NodeName,
+					"--kubeconfig",
+					kubeconfig,
+				}
+
+				if err = shell(args...); err != nil {
+					glog.Errorf(errKubeCtlIgnoredError, vm.NodeName, err)
+				}
+
+				if err = vsphere.powerOff(); err == nil {
+					vm.State = AutoScalerServerNodeStateStopped
+				} else {
+					err = fmt.Errorf(errStopVMFailed, vm.NodeName, err)
+				}
+			} else if state != AutoScalerServerNodeStateStopped {
+				err = fmt.Errorf(errStopVMFailed, vm.NodeName, fmt.Sprintf("Unexpected state: %d", state))
+			}
+		}
 	}
 
-	state, err = vm.statusVM()
-
-	if err != nil {
-		return err
+	if err == nil {
+		glog.Infof("Stopped VM:%s", vm.NodeName)
+	} else {
+		glog.Errorf("Could not stop VM:%s. Reason: %s", vm.NodeName, err)
 	}
 
-	if state == AutoScalerServerNodeStateRunning {
-		args := []string{
-			"kubectl",
-			"cordon",
-			vm.NodeName,
-			"--kubeconfig",
-			kubeconfig,
-		}
-
-		if err = shell(args...); err != nil {
-			glog.Errorf(errKubeCtlIgnoredError, vm.NodeName, err)
-		}
-
-		if err = shell("multipass", "stop", vm.NodeName); err != nil {
-			glog.Errorf(errStopVMFailed, vm.NodeName, err)
-			return fmt.Errorf(errStopVMFailed, vm.NodeName, err)
-		}
-
-		vm.State = AutoScalerServerNodeStateStopped
-	} else if state != AutoScalerServerNodeStateStopped {
-		glog.Errorf(errVMNotFound, vm.NodeName)
-		return fmt.Errorf(errVMNotFound, vm.NodeName)
-	}
-
-	glog.Infof("Stopped VM:%s", vm.NodeName)
-
-	return nil
+	return err
 }
 
 func (vm *AutoScalerServerNode) deleteVM(kubeconfig string) error {
@@ -379,63 +367,69 @@ func (vm *AutoScalerServerNode) deleteVM(kubeconfig string) error {
 	var err error
 	var state AutoScalerServerNodeState
 
-	vsphere := vsphereInfos{
-		vmName: vm.NodeName,
-	}
+	vsphere := vm.getVM()
 
 	if vm.AutoProvisionned == false {
-		glog.Errorf(errVMNotProvisionnedByMe, vm.NodeName)
-	}
+		err = fmt.Errorf(errVMNotProvisionnedByMe, vm.NodeName)
+	} else {
+		state, err = vm.statusVM()
 
-	state, err = vm.statusVM()
+		if err == nil {
+			if state == AutoScalerServerNodeStateRunning {
+				args := []string{
+					"kubectl",
+					"drain",
+					vm.NodeName,
+					"--delete-local-data",
+					"--force",
+					"--ignore-daemonsets",
+					"--kubeconfig",
+					kubeconfig,
+				}
 
-	if err != nil {
-		return err
-	}
+				if err = shell(args...); err != nil {
+					glog.Errorf(errKubeCtlIgnoredError, vm.NodeName, err)
+				}
 
-	args := []string{
-		"kubectl",
-		"drain",
-		vm.NodeName,
-		"--delete-local-data",
-		"--force",
-		"--ignore-daemonsets",
-		"--kubeconfig",
-		kubeconfig,
-	}
+				args = []string{
+					"kubectl",
+					"delete",
+					"node",
+					vm.NodeName,
+					"--kubeconfig",
+					kubeconfig,
+				}
 
-	if err = shell(args...); err != nil {
-		glog.Errorf(errKubeCtlIgnoredError, vm.NodeName, err)
-	}
+				if err = shell(args...); err != nil {
+					glog.Errorf(errKubeCtlIgnoredError, vm.NodeName, err)
+				}
 
-	args = []string{
-		"kubectl",
-		"delete",
-		"node",
-		vm.NodeName,
-		"--kubeconfig",
-		kubeconfig,
-	}
+				if err = vsphere.powerOff(); err == nil {
+					vm.State = AutoScalerServerNodeStateStopped
 
-	if err = shell(args...); err != nil {
-		glog.Errorf(errKubeCtlIgnoredError, vm.NodeName, err)
-	}
-
-	if state == AutoScalerServerNodeStateRunning {
-		if err = vsphere.powerOff(); err != nil {
-			glog.Errorf(errStopVMFailed, vm.NodeName, err)
-			return fmt.Errorf(errStopVMFailed, vm.NodeName, err)
+					if err = vsphere.delete(); err == nil {
+						vm.State = AutoScalerServerNodeStateDeleted
+					} else {
+						err = fmt.Errorf(errDeleteVMFailed, vm.NodeName, err)
+					}
+				} else {
+					err = fmt.Errorf(errStopVMFailed, vm.NodeName, err)
+				}
+			} else if err = vsphere.delete(); err == nil {
+				vm.State = AutoScalerServerNodeStateDeleted
+			} else {
+				err = fmt.Errorf(errDeleteVMFailed, vm.NodeName, err)
+			}
 		}
 	}
 
-	if err = vsphere.delete(); err != nil {
-		glog.Errorf(errDeleteVMFailed, vm.NodeName, err)
-		return fmt.Errorf(errDeleteVMFailed, vm.NodeName, err)
+	if err == nil {
+		glog.Infof("Deleted VM:%s", vm.NodeName)
+	} else {
+		glog.Errorf("Could not delete VM:%s. Reason: %s", vm.NodeName, err)
 	}
 
-	vm.State = AutoScalerServerNodeStateDeleted
-
-	return nil
+	return err
 }
 
 func (vm *AutoScalerServerNode) statusVM() (AutoScalerServerNodeState, error) {
@@ -445,17 +439,30 @@ func (vm *AutoScalerServerNode) statusVM() (AutoScalerServerNodeState, error) {
 	var vmInfos *infoResult
 	var err error
 
-	vsphere := vsphereInfos{
-		vmName: vm.NodeName,
-	}
+	vsphere := vm.getVM()
 
 	if vmInfos, err = vsphere.status(); err != nil {
 		glog.Errorf(errGetVMInfoFailed, vm.NodeName, err)
 		return AutoScalerServerNodeStateUndefined, err
 	}
 
-	vm.Addresses = []string{
-		vmInfos.VirtualMachines.Guest.IpAddress,
+	if vmInfos != nil {
+		vm.Addresses = []string{
+			vmInfos.VirtualMachines.Guest.IpAddress,
+		}
+
+		switch vmInfos.VirtualMachines.Runtime.PowerState {
+		case types.VirtualMachinePowerStatePoweredOff:
+			vm.State = AutoScalerServerNodeStateStopped
+		case types.VirtualMachinePowerStatePoweredOn:
+			vm.State = AutoScalerServerNodeStateRunning
+		case types.VirtualMachinePowerStateSuspended:
+			vm.State = AutoScalerServerNodeStateStopped
+		default:
+			vm.State = AutoScalerServerNodeStateUndefined
+		}
+
+		return vm.State, nil
 	}
 
 	return AutoScalerServerNodeStateUndefined, fmt.Errorf(errAutoScalerInfoNotFound, vm.NodeName)

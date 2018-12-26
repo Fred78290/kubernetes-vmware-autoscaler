@@ -11,17 +11,19 @@ type vsphereInfos struct {
 	vmName string
 }
 
-type vsphereStatus struct {
-	addresses []string
-}
-
 type infoResult struct {
 	VirtualMachines mo.VirtualMachine
 	objects         *object.VirtualMachine
 	entities        map[types.ManagedObjectReference]string
 }
 
-func (vm *vsphereInfos) create(templateName string, memory int, cpus int) error {
+func newVSphereInfos(vm string) *vsphereInfos {
+	return &vsphereInfos{
+		vmName: vm,
+	}
+}
+
+func (vm *vsphereInfos) create(templateName string, memory int, cpus int, disk int) error {
 	return nil
 }
 
