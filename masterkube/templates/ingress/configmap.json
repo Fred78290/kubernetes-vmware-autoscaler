@@ -1,0 +1,13 @@
+{
+    "kind": "ConfigMap",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "masterkube-nginx-configuration",
+        "namespace": "$K8NAMESPACE",
+        "labels": {
+            "app": "masterkube-ingress-nginx"
+        }
+    },
+    "data": {
+    }
+}

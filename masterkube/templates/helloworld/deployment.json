@@ -1,0 +1,57 @@
+{
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+        "name": "helloworld",
+        "namespace": "$K8NAMESPACE",
+        "labels": {
+            "app": "helloworld"
+        }
+    },
+    "spec": {
+        "replicas": 1,
+        "selector": {
+            "matchLabels": {
+                "app": "helloworld"
+            }
+        },
+        "template": {
+            "metadata": {
+                "labels": {
+                    "app": "helloworld"
+                }
+            },
+            "spec": {
+                "hostNetwork": true,
+                "restartPolicy": "Always",
+                "terminationGracePeriodSeconds": 30,
+                "dnsPolicy": "ClusterFirstWithHostNet",
+                "securityContext": {},
+                "schedulerName": "default-scheduler",
+                "containers": [
+                    {
+                        "name": "helloworld",
+                        "image": "gcr.io/hello-minikube-zero-install/hello-node",
+                        "imagePullPolicy": "IfNotPresent",
+                        "ports": [
+                            {
+                                "containerPort": 8080,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "env": [
+                            {
+                                "name": "POD_NAME",
+                                "valueFrom": {
+                                    "fieldRef": {
+                                        "fieldPath": "metadata.name"
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    }
+}

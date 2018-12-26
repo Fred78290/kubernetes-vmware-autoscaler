@@ -1,0 +1,22 @@
+{
+  "apiVersion": "v1",
+  "kind": "Service",
+  "metadata": {
+      "name": "masterkube-default-http-backend",
+      "namespace": "$K8NAMESPACE",
+      "labels": {
+          "app": "masterkube-default-http-backend"
+      }
+  },
+  "spec": {
+      "ports": [
+          {
+              "port": 80,
+              "targetPort": 8080
+          }
+      ],
+      "selector": {
+          "app": "masterkube-default-http-backend"
+      }
+  }
+}

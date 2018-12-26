@@ -1,0 +1,103 @@
+{
+    "kind": "Deployment",
+    "apiVersion": "apps/v1",
+    "metadata": {
+        "labels": {
+            "k8s-app": "kubernetes-dashboard"
+        },
+        "name": "kubernetes-dashboard",
+        "namespace": "$K8NAMESPACE"
+    },
+    "spec": {
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+            "matchLabels": {
+                "k8s-app": "kubernetes-dashboard"
+            }
+        },
+        "template": {
+            "metadata": {
+                "labels": {
+                    "k8s-app": "kubernetes-dashboard"
+                }
+            },
+            "spec": {
+                "nodeSelector": {
+                    "master": "true"
+                },
+                "containers": [
+                    {
+                        "name": "kubernetes-dashboard",
+                        "image": "k8s.gcr.io/kubernetes-dashboard-amd64:v1.10.0",
+                        "ports": [
+                            {
+                                "containerPort": 8443,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "args": [
+                            "--auto-generate-certificates"
+                        ],
+                        "volumeMounts": [
+                            {
+                                "name": "kubernetes-dashboard-certs",
+                                "mountPath": "/certs"
+                            },
+                            {
+                                "mountPath": "/tmp",
+                                "name": "tmp-volume"
+                            }
+                        ],
+                        "env": [
+                            {
+                                "name": "POD_NAME",
+                                "valueFrom": {
+                                    "fieldRef": {
+                                        "fieldPath": "metadata.name"
+                                    }
+                                }
+                            },
+                            {
+                                "name": "POD_NAMESPACE",
+                                "valueFrom": {
+                                    "fieldRef": {
+                                        "fieldPath": "metadata.namespace"
+                                    }
+                                }
+                            }
+                        ],
+                        "livenessProbe": {
+                            "httpGet": {
+                                "scheme": "HTTPS",
+                                "path": "/",
+                                "port": 8443
+                            },
+                            "initialDelaySeconds": 30,
+                            "timeoutSeconds": 30
+                        }
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "kubernetes-dashboard-certs",
+                        "secret": {
+                            "secretName": "kubernetes-dashboard-certs"
+                        }
+                    },
+                    {
+                        "name": "tmp-volume",
+                        "emptyDir": {}
+                    }
+                ],
+                "serviceAccountName": "kubernetes-dashboard",
+                "tolerations": [
+                    {
+                        "key": "node-role.kubernetes.io/master",
+                        "effect": "NoSchedule"
+                    }
+                ]
+            }
+        }
+    }
+}

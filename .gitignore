@@ -10,3 +10,13 @@
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+vendor
+\.vscode/
+
+*.code-workspace
+
+out
+masterkube/cluster/*
+masterkube/kubernetes/*
+masterkube/config/*
+masterkube/etc/ssl/*
