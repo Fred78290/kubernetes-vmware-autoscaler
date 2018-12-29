@@ -200,7 +200,59 @@ func (vm *AutoScalerServerNode) setNodeLabels(extras *nodeCreationExtra) error {
 	return nil
 }
 
+var phDefaultRsyncFlags = []string{
+	"--verbose",
+	"--archive",
+	"-z",
+	"--copy-links",
+	"--no-owner",
+	"--no-group",
+	"--delete",
+}
+
 func (vm *AutoScalerServerNode) mountPoints(extras *nodeCreationExtra) error {
+
+	if extras.syncFolders != nil && len(extras.syncFolders.Folders) > 0 {
+		for _, folder := range extras.syncFolders.Folders {
+			var rsync = []string{
+				"/usr/bin/rsync",
+			}
+
+			tempFile, _ := ioutil.TempFile(os.TempDir(), "vmware-rsync")
+
+			defer tempFile.Close()
+
+			if len(extras.syncFolders.RsyncOptions) == 0 {
+				rsync = append(rsync, phDefaultRsyncFlags...)
+			} else {
+				rsync = append(rsync, extras.syncFolders.RsyncOptions...)
+			}
+
+			sshOptions := []string{
+				"--rsync-path",
+				"sudo rsync",
+				"-e",
+				fmt.Sprintf("ssh -p 22 -o LogLevel=FATAL -o ControlMaster=auto -o ControlPath=%s -o ControlPersist=10m  -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i '%s'", tempFile.Name(), extras.syncFolders.RsyncSSHKey),
+			}
+
+			excludes := make([]string, 0, len(folder.Excludes)*2)
+			for _, exclude := range folder.Excludes {
+				excludes = append(excludes, "--exclude", exclude)
+			}
+
+			rsync = append(rsync, sshOptions...)
+			rsync = append(rsync, excludes...)
+			rsync = append(rsync, folder.Source, fmt.Sprintf("%s@%s:%s", extras.syncFolders.RsyncUser, vm.Addresses[0], folder.Destination))
+
+			if out, err := pipe(rsync...); err != nil {
+				return fmt.Errorf(errRsyncError, vm.NodeName, out, err)
+			}
+		}
+	}
+	//["/usr/bin/rsync", "--verbose", "--archive", "--delete", "-z", "--copy-links", "--no-owner", "--no-group", "--rsync-path", "sudo rsync", "-e",
+	// "ssh -p 22 -o LogLevel=FATAL  -o ControlMaster=auto -o ControlPath=/tmp/vagrant-rsync-20181227-31508-1sjw4bm -o ControlPersist=10m  -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i '/home/fboltz/.ssh/id_rsa'",
+	// "--exclude", ".vagrant/", "/home/fboltz/Projects/vagrant-multipass/", "vagrant@10.196.85.125:/vagrant"]
+
 	/* 	if extras.mountPoints != nil && len(extras.mountPoints) > 0 {
 	   		for hostPath, guestPath := range extras.mountPoints {
 	   			if err = shell("AutoScaler", "mount", hostPath, fmt.Sprintf("%s:%s", vm.NodeName, guestPath)); err != nil {
@@ -448,10 +500,10 @@ func (vm *AutoScalerServerNode) statusVM() (AutoScalerServerNodeState, error) {
 
 	if vmInfos != nil {
 		vm.Addresses = []string{
-			vmInfos.VirtualMachines.Guest.IpAddress,
+			vmInfos.VirtualMachines[0].Guest.IpAddress,
 		}
 
-		switch vmInfos.VirtualMachines.Runtime.PowerState {
+		switch vmInfos.VirtualMachines[0].Runtime.PowerState {
 		case types.VirtualMachinePowerStatePoweredOff:
 			vm.State = AutoScalerServerNodeStateStopped
 		case types.VirtualMachinePowerStatePoweredOn:

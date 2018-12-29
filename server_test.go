@@ -58,7 +58,7 @@ func newTestServer(nodeGroup *AutoScalerServerNodeGroup) (*AutoScalerServerApp, 
 			map[string]int64{cloudprovider.ResourceNameCores: 5, cloudprovider.ResourceNameMemory: 100000000},
 		},
 		Groups:        map[string]*AutoScalerServerNodeGroup{},
-		Configuration: config,
+		Configuration: &config,
 		KubeAdmConfiguration: &apigrpc.KubeAdmConfig{
 			KubeAdmAddress:        config.KubeAdm.Address,
 			KubeAdmToken:          config.KubeAdm.Token,

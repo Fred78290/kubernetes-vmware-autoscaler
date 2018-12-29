@@ -8,6 +8,7 @@ import (
 	"time"
 
 	apigrpc "github.com/Fred78290/kubernetes-vmware-autoscaler/grpc"
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/vsphere"
 	"github.com/golang/glog"
 	apiv1 "k8s.io/api/core/v1"
 )
@@ -57,16 +58,19 @@ type AutoScalerServerSSH struct {
 	AuthKeys string
 }
 
-// VSphereConfig declares vsphere connection info
-type VSphereConfig struct {
-	Host       string `json:"host"`
-	UserName   string `json:"uid"`
-	Password   string `json:"password"`
-	Insecure   bool   `json:"insecure"`
-	DataCenter string `json:"dc"`
-	DataStore  string `json:"datastore"`
-	Resource   string `json:"resource"`
-	VMPath     string `json:"vm"`
+// AutoScalerServerRsync declare an rsync operation
+type AutoScalerServerRsync struct {
+	Source      string   `json:"source"`
+	Destination string   `json:"destination"`
+	Excludes    []string `json:"excludes"`
+}
+
+// AutoScalerServerSyncFolders declare how to sync file between host and guest
+type AutoScalerServerSyncFolders struct {
+	RsyncOptions []string                `json:"options"`
+	RsyncUser    string                  `json:"user"`
+	RsyncSSHKey  string                  `json:"ssh-key"`
+	Folders      []AutoScalerServerRsync `json:"folders"`
 }
 
 // AutoScalerServerConfig is contains configuration
@@ -84,18 +88,18 @@ type AutoScalerServerConfig struct {
 	DefaultMachineType string                            `default:"{\"standard\": {}}" json:"default-machine"`
 	Machines           map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
 	CloudInit          map[string]interface{}            `json:"cloud-init"`                            // Optional, The cloud init conf file
-	MountPoints        map[string]string                 `json:"mount-points"`                          // Optional, mount point between host and guest
+	SyncFolders        *AutoScalerServerSyncFolders      `json:"sync-folder"`                           // Optional, do rsync between host and guest
 	VMProvision        bool                              `default:"true" json:"vm-provision"`
 	Optionals          *AutoScalerServerOptionals        `json:"optionals"`
 	SSH                *AutoScalerServerSSH              `json:"ssh-infos"`
-	VSphere            VSphereConfig                     `json:"vsphere-infos"`
+	VSphere            vsphere.Configuration             `json:"vsphere-infos"`
 }
 
 // AutoScalerServerApp declare AutoScaler grpc server
 type AutoScalerServerApp struct {
 	ResourceLimiter      *ResourceLimiter                      `json:"limits"`
 	Groups               map[string]*AutoScalerServerNodeGroup `json:"groups"`
-	Configuration        AutoScalerServerConfig                `json:"config"`
+	Configuration        *AutoScalerServerConfig               `json:"config"`
 	KubeAdmConfiguration *apigrpc.KubeAdmConfig                `json:"kubeadm"`
 	NodesDefinition      []*apigrpc.NodeGroupDef               `json:"nodedefs"`
 	AutoProvision        bool                                  `json:"auto"`
@@ -182,7 +186,7 @@ func (s *AutoScalerServerApp) createNodeGroup(nodeGroupID string) (*AutoScalerSe
 				kubeConfig:    s.Configuration.KubeCtlConfig,
 				image:         s.Configuration.Image,
 				cloudInit:     s.Configuration.CloudInit,
-				mountPoints:   s.Configuration.MountPoints,
+				syncFolders:   s.Configuration.SyncFolders,
 				nodegroupID:   nodeGroupID,
 				nodeLabels:    nodeGroup.NodeLabels,
 				systemLabels:  nodeGroup.SystemLabels,
@@ -769,7 +773,7 @@ func (s *AutoScalerServerApp) IncreaseSize(ctx context.Context, request *apigrpc
 		kubeConfig:    s.Configuration.KubeCtlConfig,
 		image:         s.Configuration.Image,
 		cloudInit:     s.Configuration.CloudInit,
-		mountPoints:   s.Configuration.MountPoints,
+		syncFolders:   s.Configuration.SyncFolders,
 		nodegroupID:   nodeGroup.NodeGroupIdentifier,
 		nodeLabels:    nodeGroup.NodeLabels,
 		systemLabels:  nodeGroup.SystemLabels,
@@ -945,7 +949,7 @@ func (s *AutoScalerServerApp) DecreaseTargetSize(ctx context.Context, request *a
 		kubeConfig:    s.Configuration.KubeCtlConfig,
 		image:         s.Configuration.Image,
 		cloudInit:     s.Configuration.CloudInit,
-		mountPoints:   s.Configuration.MountPoints,
+		syncFolders:   s.Configuration.SyncFolders,
 		nodegroupID:   nodeGroup.NodeGroupIdentifier,
 		nodeLabels:    nodeGroup.NodeLabels,
 		systemLabels:  nodeGroup.SystemLabels,

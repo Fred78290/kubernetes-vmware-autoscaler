@@ -1,0 +1,1 @@
+{"host":"127.0.0.1:8989","uid":"user","password":"pass","insecure":true,"dc":"DC0","datastore":"LocalDS_0","resource":"","vm-base-path":"","timeout":3600000000000,"template-name":"DC0_H0_VM0","template":false,"linked":true,"Customization":"","network":{"name":"DC0_DVPG0","adapter":"E1000","address":""}}

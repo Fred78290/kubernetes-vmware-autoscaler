@@ -55,7 +55,7 @@ type nodeCreationExtra struct {
 	kubeConfig    string
 	image         string
 	cloudInit     map[string]interface{}
-	mountPoints   map[string]string
+	syncFolders   *AutoScalerServerSyncFolders
 	nodeLabels    map[string]string
 	systemLabels  map[string]string
 	vmprovision   bool

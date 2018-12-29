@@ -20,3 +20,5 @@ masterkube/cluster/*
 masterkube/kubernetes/*
 masterkube/config/*
 masterkube/etc/ssl/*
+
+vsphere/agora\.json

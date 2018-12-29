@@ -42,7 +42,7 @@ const (
 	errCloudInitMarshallError         = "Can't marshall cloud-init, reason: %v"
 	errCloudInitWriteError            = "Can't write cloud-init, reason: %v"
 	errGetVMInfoFailed                = "Can't get the VM info from AutoScaler for VM: %s, reason: %v"
-	errAutoScalerInfoNotFound          = "Can't find the VM info from AutoScaler for VM: %s"
+	errAutoScalerInfoNotFound         = "Can't find the VM info from AutoScaler for VM: %s"
 	errKubeAdmJoinFailed              = "Unable to join the master kubernetes node for VM: %s, reason: %v"
 	errKubeAdmJoinNotRunning          = "Could not join kubernetes master node, the VM: %s is not running"
 	errStopVMFailed                   = "Could not stop VM: %s, reason: %v"
@@ -61,4 +61,5 @@ const (
 	errVMNotProvisionnedByMe          = "The VM: %s is not provisionned by me"
 	errFailedToLoadServerState        = "Failed to load server state, reason: %v"
 	errFailedToSaveServerState        = "Failed to save server state, reason: %v"
+	errRsyncError                     = "Can't rsync folder for VM: %s, %s, reason: %v"
 )

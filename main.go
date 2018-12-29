@@ -88,7 +88,7 @@ func main() {
 					map[string]int64{cloudprovider.ResourceNameCores: 1, cloudprovider.ResourceNameMemory: 10000000},
 					map[string]int64{cloudprovider.ResourceNameCores: 5, cloudprovider.ResourceNameMemory: 100000000},
 				},
-				Configuration:        config,
+				Configuration:        &config,
 				Groups:               make(map[string]*AutoScalerServerNodeGroup),
 				KubeAdmConfiguration: kubeAdmConfig,
 			}
