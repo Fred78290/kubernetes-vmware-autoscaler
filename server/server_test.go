@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -12,6 +12,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	apigrpc "github.com/Fred78290/kubernetes-vmware-autoscaler/grpc"
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 )
@@ -24,7 +26,7 @@ const (
 
 var testNodeGroup = AutoScalerServerNodeGroup{
 	NodeGroupIdentifier: testGroupID,
-	Machine: &MachineCharacteristic{
+	Machine: &types.MachineCharacteristic{
 		Memory: 4096,
 		Vcpu:   4,
 		Disk:   5120,
@@ -42,7 +44,7 @@ var testNodeGroup = AutoScalerServerNodeGroup{
 
 func newTestServer(nodeGroup *AutoScalerServerNodeGroup) (*AutoScalerServerApp, context.Context, error) {
 
-	var config AutoScalerServerConfig
+	var config types.AutoScalerServerConfig
 
 	configStr, _ := ioutil.ReadFile("./masterkube/config/config.json")
 
@@ -53,7 +55,7 @@ func newTestServer(nodeGroup *AutoScalerServerNodeGroup) (*AutoScalerServerApp, 
 	}
 
 	s := &AutoScalerServerApp{
-		ResourceLimiter: &ResourceLimiter{
+		ResourceLimiter: &types.ResourceLimiter{
 			map[string]int64{cloudprovider.ResourceNameCores: 1, cloudprovider.ResourceNameMemory: 10000000},
 			map[string]int64{cloudprovider.ResourceNameCores: 5, cloudprovider.ResourceNameMemory: 100000000},
 		},
@@ -104,7 +106,7 @@ func TestAutoScalerServer_NodeGroups(t *testing.T) {
 
 	ng := AutoScalerServerNodeGroup{
 		NodeGroupIdentifier: testGroupID,
-		Machine: &MachineCharacteristic{
+		Machine: &types.MachineCharacteristic{
 			Memory: 4096,
 			Vcpu:   4,
 			Disk:   5120,
@@ -155,7 +157,7 @@ func TestAutoScalerServer_NodeGroupForNode(t *testing.T) {
 			want: testGroupID,
 			request: &apigrpc.NodeGroupForNodeRequest{
 				ProviderID: testProviderID,
-				Node: toJSON(
+				Node: utils.ToJSON(
 					apiv1.Node{
 						Spec: apiv1.NodeSpec{
 							ProviderID: fmt.Sprintf("%s://%s/object?type=node&name=%s", testProviderID, testGroupID, testNodeName),
@@ -168,7 +170,7 @@ func TestAutoScalerServer_NodeGroupForNode(t *testing.T) {
 
 	ng := AutoScalerServerNodeGroup{
 		NodeGroupIdentifier: testGroupID,
-		Machine: &MachineCharacteristic{
+		Machine: &types.MachineCharacteristic{
 			Memory: 4096,
 			Vcpu:   4,
 			Disk:   5120,
@@ -335,8 +337,8 @@ func TestAutoScalerServer_NewNodeGroup(t *testing.T) {
 	}
 }
 
-func extractResourceLimiter(res *apigrpc.ResourceLimiter) *ResourceLimiter {
-	r := &ResourceLimiter{
+func extractResourceLimiter(res *apigrpc.ResourceLimiter) *types.ResourceLimiter {
+	r := &types.ResourceLimiter{
 		MinLimits: res.MinLimits,
 		MaxLimits: res.MaxLimits,
 	}
@@ -348,12 +350,12 @@ func TestAutoScalerServer_GetResourceLimiter(t *testing.T) {
 	tests := []struct {
 		name    string
 		request *apigrpc.CloudProviderServiceRequest
-		want    *ResourceLimiter
+		want    *types.ResourceLimiter
 		wantErr bool
 	}{
 		{
 			name: "GetResourceLimiter",
-			want: &ResourceLimiter{
+			want: &types.ResourceLimiter{
 				map[string]int64{cloudprovider.ResourceNameCores: 1, cloudprovider.ResourceNameMemory: 10000000},
 				map[string]int64{cloudprovider.ResourceNameCores: 5, cloudprovider.ResourceNameMemory: 100000000},
 			},
@@ -601,7 +603,7 @@ func TestAutoScalerServer_DeleteNodes(t *testing.T) {
 				ProviderID:  testProviderID,
 				NodeGroupID: testGroupID,
 				Node: []string{
-					toJSON(
+					utils.ToJSON(
 						apiv1.Node{
 							Spec: apiv1.NodeSpec{
 								ProviderID: fmt.Sprintf("%s://%s/object?type=node&name=%s", testProviderID, testGroupID, testNodeName),
@@ -615,7 +617,7 @@ func TestAutoScalerServer_DeleteNodes(t *testing.T) {
 
 	ng := AutoScalerServerNodeGroup{
 		NodeGroupIdentifier: testGroupID,
-		Machine: &MachineCharacteristic{
+		Machine: &types.MachineCharacteristic{
 			Memory: 4096,
 			Vcpu:   4,
 			Disk:   5120,
@@ -673,7 +675,7 @@ func TestAutoScalerServer_DecreaseTargetSize(t *testing.T) {
 
 	ng := AutoScalerServerNodeGroup{
 		NodeGroupIdentifier: testGroupID,
-		Machine: &MachineCharacteristic{
+		Machine: &types.MachineCharacteristic{
 			Memory: 4096,
 			Vcpu:   4,
 			Disk:   5120,
@@ -810,7 +812,7 @@ func TestAutoScalerServer_Nodes(t *testing.T) {
 
 	ng := AutoScalerServerNodeGroup{
 		NodeGroupIdentifier: testGroupID,
-		Machine: &MachineCharacteristic{
+		Machine: &types.MachineCharacteristic{
 			Memory: 4096,
 			Vcpu:   4,
 			Disk:   5120,
@@ -981,7 +983,7 @@ func TestAutoScalerServer_Delete(t *testing.T) {
 
 	ng := AutoScalerServerNodeGroup{
 		NodeGroupIdentifier: testGroupID,
-		Machine: &MachineCharacteristic{
+		Machine: &types.MachineCharacteristic{
 			Memory: 4096,
 			Vcpu:   4,
 			Disk:   5120,
@@ -1069,7 +1071,7 @@ func TestAutoScalerServer_Belongs(t *testing.T) {
 			request: &apigrpc.BelongsRequest{
 				ProviderID:  testProviderID,
 				NodeGroupID: testGroupID,
-				Node: toJSON(
+				Node: utils.ToJSON(
 					apiv1.Node{
 						Spec: apiv1.NodeSpec{
 							ProviderID: fmt.Sprintf("%s://%s/object?type=node&name=%s", testProviderID, testGroupID, testNodeName),
@@ -1085,7 +1087,7 @@ func TestAutoScalerServer_Belongs(t *testing.T) {
 			request: &apigrpc.BelongsRequest{
 				ProviderID:  testProviderID,
 				NodeGroupID: testGroupID,
-				Node: toJSON(
+				Node: utils.ToJSON(
 					apiv1.Node{
 						Spec: apiv1.NodeSpec{
 							ProviderID: fmt.Sprintf("%s://%s/object?type=node&name=wrong-name", testProviderID, testGroupID),
@@ -1098,7 +1100,7 @@ func TestAutoScalerServer_Belongs(t *testing.T) {
 
 	ng := AutoScalerServerNodeGroup{
 		NodeGroupIdentifier: testGroupID,
-		Machine: &MachineCharacteristic{
+		Machine: &types.MachineCharacteristic{
 			Memory: 4096,
 			Vcpu:   4,
 			Disk:   5120,
@@ -1154,7 +1156,7 @@ func TestAutoScalerServer_NodePrice(t *testing.T) {
 				ProviderID: testProviderID,
 				StartTime:  time.Now().Unix(),
 				EndTime:    time.Now().Add(time.Hour).Unix(),
-				Node: toJSON(apiv1.Node{
+				Node: utils.ToJSON(apiv1.Node{
 					Spec: apiv1.NodeSpec{
 						ProviderID: fmt.Sprintf("%s://%s/object?type=node&name=%s", testProviderID, testGroupID, testNodeName),
 					},
@@ -1198,7 +1200,7 @@ func TestAutoScalerServer_PodPrice(t *testing.T) {
 				ProviderID: testProviderID,
 				StartTime:  time.Now().Unix(),
 				EndTime:    time.Now().Add(time.Hour).Unix(),
-				Pod: toJSON(
+				Pod: utils.ToJSON(
 					apiv1.Pod{
 						Spec: apiv1.PodSpec{
 							NodeName: "test-instance-id",

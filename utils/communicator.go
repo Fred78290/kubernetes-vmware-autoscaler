@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"bytes"
@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/golang/glog"
 	"golang.org/x/crypto/ssh"
 )
@@ -25,7 +26,8 @@ func PublicKeyFile(file string) ssh.AuthMethod {
 	return ssh.PublicKeys(key)
 }
 
-func pipe(args ...string) (string, error) {
+// Pipe execute local command and return output
+func Pipe(args ...string) (string, error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -45,7 +47,8 @@ func pipe(args ...string) (string, error) {
 	return strings.TrimSpace(stdout.String()), nil
 }
 
-func shell(args ...string) error {
+// Shell execute local command ignore output
+func Shell(args ...string) error {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -63,15 +66,15 @@ func shell(args ...string) error {
 	return nil
 }
 
-func scp(host, src, dst string) error {
-	return shell(fmt.Sprintf("scp %s %s@:%s", src, host, dst))
+// Scp copy file
+func Scp(host, src, dst string) error {
+	return Shell(fmt.Sprintf("scp %s %s@:%s", src, host, dst))
 }
 
-func sudo(host string, command ...string) (string, error) {
+// Sudo exec ssh command as sudo
+func Sudo(connect *types.AutoScalerServerSSH, host string, command ...string) (string, error) {
 	var sshConfig *ssh.ClientConfig
 	var err error
-
-	connect := phAutoScalerServer.Configuration.SSH
 
 	if len(connect.Password) > 0 {
 		sshConfig = &ssh.ClientConfig{

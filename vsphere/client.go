@@ -50,6 +50,7 @@ func (c *Client) GetDatacenter(ctx *Context, name string) (*Datacenter, error) {
 
 		return &Datacenter{
 			Ref:    dc.Reference(),
+			Name:   name,
 			Client: c,
 		}, nil
 	}

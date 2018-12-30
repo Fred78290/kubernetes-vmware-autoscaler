@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"encoding/json"
@@ -6,6 +6,9 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
 	"github.com/golang/glog"
 	apiv1 "k8s.io/api/core/v1"
 )
@@ -33,7 +36,7 @@ type AutoScalerServerNodeGroup struct {
 	sync.Mutex
 	NodeGroupIdentifier  string                           `json:"identifier"`
 	ServiceIdentifier    string                           `json:"service"`
-	Machine              *MachineCharacteristic           `json:"machine"`
+	Machine              *types.MachineCharacteristic     `json:"machine"`
 	Status               NodeGroupState                   `json:"status"`
 	MinNodeSize          int                              `json:"minSize"`
 	MaxNodeSize          int                              `json:"maxSize"`
@@ -55,7 +58,7 @@ type nodeCreationExtra struct {
 	kubeConfig    string
 	image         string
 	cloudInit     map[string]interface{}
-	syncFolders   *AutoScalerServerSyncFolders
+	syncFolders   *types.AutoScalerServerSyncFolders
 	nodeLabels    map[string]string
 	systemLabels  map[string]string
 	vmprovision   bool
@@ -74,7 +77,7 @@ func (g *AutoScalerServerNodeGroup) cleanup(kubeconfig string) error {
 
 	for _, node := range g.Nodes {
 		if lastError = node.deleteVM(kubeconfig); lastError != nil {
-			glog.Errorf(errNodeGroupCleanupFailOnVM, g.NodeGroupIdentifier, node.NodeName, lastError)
+			glog.Errorf(constantes.ErrNodeGroupCleanupFailOnVM, g.NodeGroupIdentifier, node.NodeName, lastError)
 		}
 	}
 
@@ -132,7 +135,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodes(delta int, extras *nodeCreationE
 
 		if node := g.Nodes[nodeName]; node != nil {
 			if err := node.deleteVM(extras.kubeConfig); err != nil {
-				glog.Errorf(errUnableToDeleteVM, node.NodeName, err)
+				glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, err)
 				return err
 			}
 
@@ -190,14 +193,14 @@ func (g *AutoScalerServerNodeGroup) addNodes(delta int, extras *nodeCreationExtr
 		}
 
 		if err := node.launchVM(extras); err != nil {
-			glog.Errorf(errUnableToLaunchVM, node.NodeName, err)
+			glog.Errorf(constantes.ErrUnableToLaunchVM, node.NodeName, err)
 
 			for _, node := range tempNodes {
 				delete(g.PendingNodes, node.NodeName)
 
 				if status, _ := node.statusVM(); status == AutoScalerServerNodeStateRunning {
 					if err := node.deleteVM(extras.kubeConfig); err != nil {
-						glog.Errorf(errUnableToDeleteVM, node.NodeName, err)
+						glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, err)
 					}
 				}
 
@@ -231,12 +234,12 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 		kubeconfig,
 	}
 
-	if out, err = pipe(arg...); err != nil {
+	if out, err = utils.Pipe(arg...); err != nil {
 		return err
 	}
 
 	if err = json.Unmarshal([]byte(out), &nodeInfos); err != nil {
-		return fmt.Errorf(errUnmarshallingError, "AutoScalerServerNodeGroup::autoDiscoveryNodes", err)
+		return fmt.Errorf(constantes.ErrUnmarshallingError, "AutoScalerServerNodeGroup::autoDiscoveryNodes", err)
 	}
 
 	formerNodes := g.Nodes
@@ -245,16 +248,16 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 	g.PendingNodes = make(map[string]*AutoScalerServerNode)
 
 	for _, nodeInfo := range nodeInfos.Items {
-		var providerID = getNodeProviderID(g.ServiceIdentifier, &nodeInfo)
+		var providerID = utils.GetNodeProviderID(g.ServiceIdentifier, &nodeInfo)
 		var nodeID = ""
 
 		if len(providerID) > 0 {
-			out, err = nodeGroupIDFromProviderID(g.ServiceIdentifier, providerID)
+			out, err = utils.NodeGroupIDFromProviderID(g.ServiceIdentifier, providerID)
 
 			if out == g.NodeGroupIdentifier {
 				glog.Infof("Discover node:%s matching nodegroup:%s", providerID, g.NodeGroupIdentifier)
 
-				if nodeID, err = nodeNameFromProviderID(g.ServiceIdentifier, providerID); err == nil {
+				if nodeID, err = utils.NodeNameFromProviderID(g.ServiceIdentifier, providerID); err == nil {
 					node := formerNodes[nodeID]
 
 					runningIP := ""
@@ -268,11 +271,11 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 
 					glog.Infof("Add node:%s with IP:%s to nodegroup:%s", nodeID, runningIP, g.NodeGroupIdentifier)
 
-					if len(nodeInfo.Annotations[annotationNodeIndex]) != 0 {
-						lastNodeIndex, _ = strconv.Atoi(nodeInfo.Annotations[annotationNodeIndex])
+					if len(nodeInfo.Annotations[constantes.AnnotationNodeIndex]) != 0 {
+						lastNodeIndex, _ = strconv.Atoi(nodeInfo.Annotations[constantes.AnnotationNodeIndex])
 					}
 
-					g.LastCreatedNodeIndex = maxInt(g.LastCreatedNodeIndex, lastNodeIndex)
+					g.LastCreatedNodeIndex = utils.MaxInt(g.LastCreatedNodeIndex, lastNodeIndex)
 
 					if node == nil {
 						node = &AutoScalerServerNode{
@@ -280,7 +283,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 							NodeName:         nodeID,
 							NodeIndex:        lastNodeIndex,
 							State:            AutoScalerServerNodeStateRunning,
-							AutoProvisionned: nodeInfo.Annotations[annotationNodeAutoProvisionned] == "true",
+							AutoProvisionned: nodeInfo.Annotations[constantes.AnnotationNodeAutoProvisionned] == "true",
 							Addresses: []string{
 								runningIP,
 							},
@@ -291,16 +294,16 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 							"annotate",
 							"node",
 							nodeInfo.Name,
-							fmt.Sprintf("%s=%s", annotationScaleDownDisabled, strconv.FormatBool(scaleDownDisabled && node.AutoProvisionned == false)),
-							fmt.Sprintf("%s=%s", annotationNodeAutoProvisionned, strconv.FormatBool(node.AutoProvisionned)),
-							fmt.Sprintf("%s=%d", annotationNodeIndex, node.NodeIndex),
+							fmt.Sprintf("%s=%s", constantes.AnnotationScaleDownDisabled, strconv.FormatBool(scaleDownDisabled && node.AutoProvisionned == false)),
+							fmt.Sprintf("%s=%s", constantes.AnnotationNodeAutoProvisionned, strconv.FormatBool(node.AutoProvisionned)),
+							fmt.Sprintf("%s=%d", constantes.AnnotationNodeIndex, node.NodeIndex),
 							"--overwrite",
 							"--kubeconfig",
 							kubeconfig,
 						}
 
-						if err := shell(arg...); err != nil {
-							glog.Errorf(errKubeCtlIgnoredError, nodeInfo.Name, err)
+						if err := utils.Shell(arg...); err != nil {
+							glog.Errorf(constantes.ErrKubeCtlIgnoredError, nodeInfo.Name, err)
 						}
 
 						arg = []string{
@@ -308,14 +311,14 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 							"label",
 							"nodes",
 							nodeInfo.Name,
-							fmt.Sprintf("%s=%s", nodeLabelGroupName, g.NodeGroupIdentifier),
+							fmt.Sprintf("%s=%s", constantes.NodeLabelGroupName, g.NodeGroupIdentifier),
 							"--overwrite",
 							"--kubeconfig",
 							kubeconfig,
 						}
 
-						if err := shell(arg...); err != nil {
-							glog.Errorf(errKubeCtlIgnoredError, nodeInfo.Name, err)
+						if err := utils.Shell(arg...); err != nil {
+							glog.Errorf(constantes.ErrKubeCtlIgnoredError, nodeInfo.Name, err)
 						}
 					}
 
@@ -338,7 +341,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodeByName(kubeconfig, nodeName string
 	if node := g.Nodes[nodeName]; node != nil {
 
 		if err := node.deleteVM(kubeconfig); err != nil {
-			glog.Errorf(errUnableToDeleteVM, node.NodeName, err)
+			glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, err)
 			return err
 		}
 
@@ -347,7 +350,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodeByName(kubeconfig, nodeName string
 		return nil
 	}
 
-	return fmt.Errorf(errNodeNotFoundInNodeGroup, nodeName, g.NodeGroupIdentifier)
+	return fmt.Errorf(constantes.ErrNodeNotFoundInNodeGroup, nodeName, g.NodeGroupIdentifier)
 }
 
 func (g *AutoScalerServerNodeGroup) deleteNodeGroup(kubeConfig string) error {

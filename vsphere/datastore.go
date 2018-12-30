@@ -6,6 +6,8 @@ import (
 	"path"
 	"strings"
 
+	"github.com/golang/glog"
+
 	"github.com/vmware/govmomi/govc/flags"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25"
@@ -21,6 +23,7 @@ var datastoreKey = contextKey("datastore")
 // Datastore datastore wrapper
 type Datastore struct {
 	Ref        types.ManagedObjectReference
+	Name       string
 	Datacenter *Datacenter
 }
 
@@ -75,10 +78,18 @@ func (ds *Datastore) Datastore(ctx *Context) *object.Datastore {
 		return d.(*object.Datastore)
 	}
 
-	d := object.NewDatastore(ds.Datacenter.VimClient(), ds.Ref)
+	f := ds.Datacenter.NewFinder(ctx)
+
+	d, err := f.ObjectReference(ctx, ds.Ref)
+
+	if err != nil {
+		glog.Fatalf("Can't find datastore:%s", ds.Name)
+	}
+	//	d := object.NewDatastore(ds.Datacenter.VimClient(), ds.Ref)
+
 	ctx.WithValue(datastoreKey, d)
 
-	return d
+	return d.(*object.Datastore)
 }
 
 // VimClient return the VIM25 client
@@ -86,12 +97,20 @@ func (ds *Datastore) VimClient() *vim25.Client {
 	return ds.Datacenter.VimClient()
 }
 
-func (ds *Datastore) virtualMachine(ctx *Context, name string) (*object.VirtualMachine, error) {
+func (ds *Datastore) findVM(ctx *Context, name string) (*object.VirtualMachine, error) {
+	key := fmt.Sprintf("[%s] %s", ds.Name, name)
+
+	if v := ctx.Value(key); v != nil {
+		return v.(*object.VirtualMachine), nil
+	}
+
 	f := ds.Datacenter.NewFinder(ctx)
 
 	vm, err := f.VirtualMachine(ctx, name)
 
 	if err == nil {
+		ctx.WithValue(key, vm)
+		ctx.WithValue(vm.Reference().String(), vm)
 	}
 
 	return vm, err
@@ -133,7 +152,7 @@ func (ds *Datastore) CreateVirtualMachine(ctx *Context, name string) (*VirtualMa
 	config := ds.Datacenter.Client.Configuration
 	output := ds.output(ctx)
 
-	if templateVM, err = ds.virtualMachine(ctx, config.TemplateName); err == nil {
+	if templateVM, err = ds.findVM(ctx, config.TemplateName); err == nil {
 
 		logger := output.ProgressLogger(fmt.Sprintf("Cloning %s to %s...", templateVM.InventoryPath, name))
 		defer logger.Wait()
@@ -214,10 +233,9 @@ func (ds *Datastore) CreateVirtualMachine(ctx *Context, name string) (*VirtualMa
 							var info *types.TaskInfo
 
 							if info, err = task.WaitForResult(ctx, logger); err == nil {
-								newVM := object.NewVirtualMachine(ds.VimClient(), info.Result.(types.ManagedObjectReference))
-
 								vm = &VirtualMachine{
-									Ref:       newVM.Reference(),
+									Ref:       info.Result.(types.ManagedObjectReference),
+									Name:      name,
 									Datastore: ds,
 								}
 							}
@@ -232,14 +250,15 @@ func (ds *Datastore) CreateVirtualMachine(ctx *Context, name string) (*VirtualMa
 	return vm, err
 }
 
-// GetVirtualMachine retrieve the specified virtual machine
-func (ds *Datastore) GetVirtualMachine(ctx *Context, name string) (*VirtualMachine, error) {
+// VirtualMachine retrieve the specified virtual machine
+func (ds *Datastore) VirtualMachine(ctx *Context, name string) (*VirtualMachine, error) {
 
-	vm, err := ds.virtualMachine(ctx, name)
+	vm, err := ds.findVM(ctx, name)
 
 	if err == nil {
 		return &VirtualMachine{
 			Ref:       vm.Reference(),
+			Name:      name,
 			Datastore: ds,
 		}, nil
 	}
@@ -299,8 +318,13 @@ func (ds *Datastore) List(ctx *Context) ([]*VirtualMachine, error) {
 			MatchPattern: []string{"*"},
 		}
 
-		fromPath := object.DatastorePath{}
+		fromPath := object.DatastorePath{
+			Datastore: ds.Name,
+			Path:      "",
+		}
+
 		arg := fromPath.Path
+
 		result := &listOutput{
 			rs:      make([]types.HostDatastoreBrowserSearchResults, 0),
 			recurse: false,
@@ -339,11 +363,12 @@ func (ds *Datastore) List(ctx *Context) ([]*VirtualMachine, error) {
 			// Find virtual machines in datacenter
 			for _, file := range item.File {
 				info := file.GetFileInfo()
-				vm, err := f.VirtualMachineList(ctx, info.Path)
+				vm, err := f.VirtualMachine(ctx, info.Path)
 
 				if err == nil {
 					vms = append(vms, &VirtualMachine{
-						Ref:       vm[0].Reference(),
+						Ref:       vm.Reference(),
+						Name:      vm.Name(),
 						Datastore: ds,
 					})
 				}

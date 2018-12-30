@@ -19,7 +19,7 @@ type Configuration struct {
 	DataCenter    string        `json:"dc"`
 	DataStore     string        `json:"datastore"`
 	Resource      string        `json:"resource"`
-	VMBasePath    string        `json:"vm-base-path"`
+	VMBasePath    string        `json:"vmFolder"`
 	Timeout       time.Duration `json:"timeout"`
 	TemplateName  string        `json:"template-name"`
 	Template      bool          `json:"template"`
@@ -57,16 +57,13 @@ func (conf *Configuration) GetClient(ctx *Context) (*Client, error) {
 	return nil, err
 }
 
-// Create will create a named VM not powered
-func (conf *Configuration) Create(name string, guestInfos *GuestInfos, annotation string, memory int, cpus int, disk int) (*VirtualMachine, error) {
+// CreateWithContext will create a named VM not powered
+func (conf *Configuration) CreateWithContext(ctx *Context, name string, guestInfos *GuestInfos, annotation string, memory int, cpus int, disk int) (*VirtualMachine, error) {
 	var err error
 	var client *Client
 	var dc *Datacenter
 	var ds *Datastore
 	var vm *VirtualMachine
-
-	ctx := NewContext(conf.Timeout)
-	defer ctx.Cancel()
 
 	if client, err = conf.GetClient(ctx); err == nil {
 		if dc, err = client.GetDatacenter(ctx, conf.DataCenter); err == nil {
@@ -81,12 +78,17 @@ func (conf *Configuration) Create(name string, guestInfos *GuestInfos, annotatio
 	return vm, err
 }
 
-// Delete a VM by name
-func (conf *Configuration) Delete(name string) error {
+// Create will create a named VM not powered
+func (conf *Configuration) Create(name string, guestInfos *GuestInfos, annotation string, memory int, cpus int, disk int) (*VirtualMachine, error) {
 	ctx := NewContext(conf.Timeout)
 	defer ctx.Cancel()
 
-	vm, err := conf.VirtualMachine(ctx, name)
+	return conf.CreateWithContext(ctx, name, guestInfos, annotation, memory, cpus, disk)
+}
+
+// DeleteWithContext a VM by name
+func (conf *Configuration) DeleteWithContext(ctx *Context, name string) error {
+	vm, err := conf.VirtualMachineWithContext(ctx, name)
 
 	if err != nil {
 		return err
@@ -95,8 +97,16 @@ func (conf *Configuration) Delete(name string) error {
 	return vm.Delete(ctx)
 }
 
-// VirtualMachine  Retrieve VM by name
-func (conf *Configuration) VirtualMachine(ctx *Context, name string) (*VirtualMachine, error) {
+// Delete a VM by name
+func (conf *Configuration) Delete(name string) error {
+	ctx := NewContext(conf.Timeout)
+	defer ctx.Cancel()
+
+	return conf.DeleteWithContext(ctx, name)
+}
+
+// VirtualMachineWithContext  Retrieve VM by name
+func (conf *Configuration) VirtualMachineWithContext(ctx *Context, name string) (*VirtualMachine, error) {
 	var err error
 	var client *Client
 	var dc *Datacenter
@@ -105,7 +115,7 @@ func (conf *Configuration) VirtualMachine(ctx *Context, name string) (*VirtualMa
 	if client, err = conf.GetClient(ctx); err == nil {
 		if dc, err = client.GetDatacenter(ctx, conf.DataCenter); err == nil {
 			if ds, err = dc.GetDatastore(ctx, conf.DataStore); err == nil {
-				return ds.GetVirtualMachine(ctx, name)
+				return ds.VirtualMachine(ctx, name)
 			}
 		}
 	}
@@ -113,26 +123,43 @@ func (conf *Configuration) VirtualMachine(ctx *Context, name string) (*VirtualMa
 	return nil, err
 }
 
-// PowerOn power on a VM by name
-func (conf *Configuration) PowerOn(name string) error {
+// VirtualMachine  Retrieve VM by name
+func (conf *Configuration) VirtualMachine(name string) (*VirtualMachine, error) {
 	ctx := NewContext(conf.Timeout)
 	defer ctx.Cancel()
 
-	vm, err := conf.VirtualMachine(ctx, name)
-
-	if err != nil {
-		return err
-	}
-
-	return vm.PowerOn(ctx)
+	return conf.VirtualMachineWithContext(ctx, name)
 }
 
-// WaitForIP wait ip a VM by name
-func (conf *Configuration) WaitForIP(name string) (string, error) {
+// VirtualMachineListWithContext return all VM for the current datastore
+func (conf *Configuration) VirtualMachineListWithContext(ctx *Context) ([]*VirtualMachine, error) {
+	var err error
+	var client *Client
+	var dc *Datacenter
+	var ds *Datastore
+
+	if client, err = conf.GetClient(ctx); err == nil {
+		if dc, err = client.GetDatacenter(ctx, conf.DataCenter); err == nil {
+			if ds, err = dc.GetDatastore(ctx, conf.DataStore); err == nil {
+				return ds.List(ctx)
+			}
+		}
+	}
+
+	return nil, err
+}
+
+// VirtualMachineList return all VM for the current datastore
+func (conf *Configuration) VirtualMachineList() ([]*VirtualMachine, error) {
 	ctx := NewContext(conf.Timeout)
 	defer ctx.Cancel()
 
-	vm, err := conf.VirtualMachine(ctx, name)
+	return conf.VirtualMachineListWithContext(ctx)
+}
+
+// WaitForIPWithContext wait ip a VM by name
+func (conf *Configuration) WaitForIPWithContext(ctx *Context, name string) (string, error) {
+	vm, err := conf.VirtualMachineWithContext(ctx, name)
 
 	if err != nil {
 		return "", err
@@ -141,12 +168,36 @@ func (conf *Configuration) WaitForIP(name string) (string, error) {
 	return vm.WaitForIP(ctx)
 }
 
-// PowerOff power off a VM by name
-func (conf *Configuration) PowerOff(name string) error {
+// WaitForIP wait ip a VM by name
+func (conf *Configuration) WaitForIP(name string) (string, error) {
 	ctx := NewContext(conf.Timeout)
 	defer ctx.Cancel()
 
-	vm, err := conf.VirtualMachine(ctx, name)
+	return conf.WaitForIPWithContext(ctx, name)
+}
+
+// PowerOnWithContext power on a VM by name
+func (conf *Configuration) PowerOnWithContext(ctx *Context, name string) error {
+	vm, err := conf.VirtualMachineWithContext(ctx, name)
+
+	if err != nil {
+		return err
+	}
+
+	return vm.PowerOn(ctx)
+}
+
+// PowerOn power on a VM by name
+func (conf *Configuration) PowerOn(name string) error {
+	ctx := NewContext(conf.Timeout)
+	defer ctx.Cancel()
+
+	return conf.PowerOnWithContext(ctx, name)
+}
+
+// PowerOffWithContext power off a VM by name
+func (conf *Configuration) PowerOffWithContext(ctx *Context, name string) error {
+	vm, err := conf.VirtualMachineWithContext(ctx, name)
 
 	if err != nil {
 		return err
@@ -155,16 +206,29 @@ func (conf *Configuration) PowerOff(name string) error {
 	return vm.PowerOff(ctx)
 }
 
-// Status return the current status of VM by name
-func (conf *Configuration) Status(name string) (*Status, error) {
+// PowerOff power off a VM by name
+func (conf *Configuration) PowerOff(name string) error {
 	ctx := NewContext(conf.Timeout)
 	defer ctx.Cancel()
 
-	vm, err := conf.VirtualMachine(ctx, name)
+	return conf.PowerOffWithContext(ctx, name)
+}
+
+// StatusWithContext return the current status of VM by name
+func (conf *Configuration) StatusWithContext(ctx *Context, name string) (*Status, error) {
+	vm, err := conf.VirtualMachineWithContext(ctx, name)
 
 	if err != nil {
 		return nil, err
 	}
 
 	return vm.Status(ctx)
+}
+
+// Status return the current status of VM by name
+func (conf *Configuration) Status(name string) (*Status, error) {
+	ctx := NewContext(conf.Timeout)
+	defer ctx.Cancel()
+
+	return conf.StatusWithContext(ctx, name)
 }

@@ -28,7 +28,11 @@ deps:
 	go get github.com/tools/godep
 
 build:
-	$(ENVVAR) GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-X main.phVersion=$(VERSION) -X main.phBuildDate=$(BUILD_DATE)" -a -o out/AutoScaler-autoscaler-$(GOOS)-$(GOARCH) ${TAGS_FLAG}
+	$(ENVVAR) GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-X main.phVersion=$(VERSION) -X main.phBuildDate=$(BUILD_DATE)" -a -o out/vsphere-autoscaler-$(GOOS)-$(GOARCH) ${TAGS_FLAG}
+
+make-image:
+	docker build --pull --build-arg BASEIMAGE=${BASEIMAGE} \
+	    -t ${REGISTRY}/vsphere-autoscaler${PROVIDER}:${TAG} .
 
 build-binary: clean
 	make -e GOOS=linux -e GOARCH=amd64 build
@@ -58,7 +62,7 @@ build-in-docker: docker-builder
 release: build-in-docker execute-release
 	@echo "Full in-docker release ${TAG}${FOR_PROVIDER} completed"
 
-container: clean build-in-docker
+container: clean build-in-docker make-image
 	@echo "Created in-docker image ${TAG}${FOR_PROVIDER}"
 
 test-in-docker: clean docker-builder

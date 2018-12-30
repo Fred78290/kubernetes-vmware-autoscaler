@@ -1,6 +1,7 @@
 package vsphere
 
 import (
+	"github.com/golang/glog"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25"
@@ -12,6 +13,7 @@ var datacenterKey = contextKey("datacenter")
 // Datacenter represent a datacenter
 type Datacenter struct {
 	Ref    types.ManagedObjectReference
+	Name   string
 	Client *Client
 }
 
@@ -21,7 +23,14 @@ func (dc *Datacenter) Datacenter(ctx *Context) *object.Datacenter {
 		return d.(*object.Datacenter)
 	}
 
-	d := object.NewDatacenter(dc.VimClient(), dc.Ref)
+	f := find.NewFinder(dc.VimClient(), true)
+
+	d, err := f.Datacenter(ctx, dc.Name)
+
+	if err != nil {
+		glog.Fatalf("Can't find datacenter:%s", dc.Name)
+	}
+
 	ctx.WithValue(datacenterKey, d)
 
 	return d
@@ -34,8 +43,7 @@ func (dc *Datacenter) VimClient() *vim25.Client {
 
 // NewFinder create a finder
 func (dc *Datacenter) NewFinder(ctx *Context) *find.Finder {
-	d := dc.Datacenter(ctx)
-
+	d := object.NewDatacenter(dc.VimClient(), dc.Ref)
 	f := find.NewFinder(dc.VimClient(), true)
 	f.SetDatacenter(d)
 
@@ -52,6 +60,7 @@ func (dc *Datacenter) GetDatastore(ctx *Context, name string) (*Datastore, error
 	if ds, err = f.Datastore(ctx, name); err == nil {
 		return &Datastore{
 			Ref:        ds.Reference(),
+			Name:       name,
 			Datacenter: dc,
 		}, nil
 	}

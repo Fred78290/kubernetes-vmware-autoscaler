@@ -1,10 +1,11 @@
-package main
+package server
 
 import (
 	"encoding/json"
 	"io/ioutil"
 	"testing"
 
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -52,8 +53,8 @@ var testNode = []nodeTest{
 	},
 }
 
-func newTestConfig() (*AutoScalerServerConfig, error) {
-	var config AutoScalerServerConfig
+func newTestConfig() (*types.AutoScalerServerConfig, error) {
+	var config types.AutoScalerServerConfig
 
 	configStr, err := ioutil.ReadFile("./masterkube/config/config.json")
 	err = json.Unmarshal(configStr, &config)
@@ -237,7 +238,7 @@ func Test_AutoScalerNodeGroup_deleteNode(t *testing.T) {
 	ng := &AutoScalerServerNodeGroup{
 		ServiceIdentifier:   testProviderID,
 		NodeGroupIdentifier: testGroupID,
-		Machine: &MachineCharacteristic{
+		Machine: &types.MachineCharacteristic{
 			Memory: 4096,
 			Vcpu:   4,
 			Disk:   5120,
@@ -288,7 +289,7 @@ func Test_AutoScalerNodeGroup_deleteNodeGroup(t *testing.T) {
 	ng := &AutoScalerServerNodeGroup{
 		ServiceIdentifier:   testProviderID,
 		NodeGroupIdentifier: testGroupID,
-		Machine: &MachineCharacteristic{
+		Machine: &types.MachineCharacteristic{
 			Memory: 4096,
 			Vcpu:   4,
 			Disk:   5120,

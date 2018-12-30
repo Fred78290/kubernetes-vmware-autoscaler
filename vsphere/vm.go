@@ -1,9 +1,9 @@
 package vsphere
 
 import (
-	"context"
 	"fmt"
 
+	"github.com/golang/glog"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25"
 
@@ -13,6 +13,7 @@ import (
 // VirtualMachine virtual machine wrapper
 type VirtualMachine struct {
 	Ref       types.ManagedObjectReference
+	Name      string
 	Datastore *Datastore
 }
 
@@ -45,8 +46,27 @@ func (e *extraConfig) Set(k, v string) {
 }
 
 // VirtualMachine return govmomi virtual machine
-func (vm *VirtualMachine) VirtualMachine() *object.VirtualMachine {
-	return object.NewVirtualMachine(vm.VimClient(), vm.Ref)
+func (vm *VirtualMachine) VirtualMachine(ctx *Context) *object.VirtualMachine {
+	key := vm.Ref.String()
+
+	if v := ctx.Value(key); v != nil {
+		return v.(*object.VirtualMachine)
+	}
+
+	f := vm.Datastore.Datacenter.NewFinder(ctx)
+
+	v, err := f.ObjectReference(ctx, vm.Ref)
+
+	if err != nil {
+		glog.Fatalf("Can't find virtual machine:%s", vm.Name)
+	}
+
+	//	v := object.NewVirtualMachine(vm.VimClient(), vm.Ref)
+
+	ctx.WithValue(key, v)
+	ctx.WithValue(fmt.Sprintf("[%s] %s", vm.Datastore.Name, vm.Name), v)
+
+	return v.(*object.VirtualMachine)
 }
 
 // VimClient return the VIM25 client
@@ -55,12 +75,12 @@ func (vm *VirtualMachine) VimClient() *vim25.Client {
 }
 
 // Configure set characteristic of VM a virtual machine
-func (vm *VirtualMachine) Configure(ctx context.Context, guestInfos *GuestInfos, annotation string, memory int, cpus int, disk int) error {
+func (vm *VirtualMachine) Configure(ctx *Context, guestInfos *GuestInfos, annotation string, memory int, cpus int, disk int) error {
 	var err error
 	var task *object.Task
 
 	if cpus > 0 || memory > 0 || len(annotation) > 0 {
-		virtualMachine := vm.VirtualMachine()
+		virtualMachine := vm.VirtualMachine(ctx)
 
 		vmConfigSpec := types.VirtualMachineConfigSpec{}
 
@@ -87,12 +107,12 @@ func (vm *VirtualMachine) Configure(ctx context.Context, guestInfos *GuestInfos,
 }
 
 // WaitForIP wait ip
-func (vm *VirtualMachine) WaitForIP(ctx context.Context) (string, error) {
+func (vm *VirtualMachine) WaitForIP(ctx *Context) (string, error) {
 	var powerState types.VirtualMachinePowerState
 	var err error
 	var ip string
 
-	v := vm.VirtualMachine()
+	v := vm.VirtualMachine(ctx)
 
 	if powerState, err = v.PowerState(ctx); err == nil {
 		if powerState == types.VirtualMachinePowerStatePoweredOn {
@@ -106,12 +126,12 @@ func (vm *VirtualMachine) WaitForIP(ctx context.Context) (string, error) {
 }
 
 // PowerOn power on a virtual machine
-func (vm *VirtualMachine) PowerOn(ctx context.Context) error {
+func (vm *VirtualMachine) PowerOn(ctx *Context) error {
 	var powerState types.VirtualMachinePowerState
 	var err error
 	var task *object.Task
 
-	v := vm.VirtualMachine()
+	v := vm.VirtualMachine(ctx)
 
 	if powerState, err = v.PowerState(ctx); err == nil {
 		if powerState != types.VirtualMachinePowerStatePoweredOn {
@@ -127,12 +147,12 @@ func (vm *VirtualMachine) PowerOn(ctx context.Context) error {
 }
 
 // PowerOff power off a virtual machine
-func (vm *VirtualMachine) PowerOff(ctx context.Context) error {
+func (vm *VirtualMachine) PowerOff(ctx *Context) error {
 	var powerState types.VirtualMachinePowerState
 	var err error
 	var task *object.Task
 
-	v := vm.VirtualMachine()
+	v := vm.VirtualMachine(ctx)
 
 	if powerState, err = v.PowerState(ctx); err == nil {
 		if powerState == types.VirtualMachinePowerStatePoweredOn {
@@ -148,12 +168,12 @@ func (vm *VirtualMachine) PowerOff(ctx context.Context) error {
 }
 
 // Delete delete the virtual machine
-func (vm *VirtualMachine) Delete(ctx context.Context) error {
+func (vm *VirtualMachine) Delete(ctx *Context) error {
 	var powerState types.VirtualMachinePowerState
 	var err error
 	var task *object.Task
 
-	v := vm.VirtualMachine()
+	v := vm.VirtualMachine(ctx)
 
 	if powerState, err = v.PowerState(ctx); err == nil {
 		if powerState != types.VirtualMachinePowerStatePoweredOn {
@@ -169,12 +189,12 @@ func (vm *VirtualMachine) Delete(ctx context.Context) error {
 }
 
 // Status refresh status virtual machine
-func (vm *VirtualMachine) Status(ctx context.Context) (*Status, error) {
+func (vm *VirtualMachine) Status(ctx *Context) (*Status, error) {
 	var powerState types.VirtualMachinePowerState
 	var err error
 	var status *Status
 
-	v := vm.VirtualMachine()
+	v := vm.VirtualMachine(ctx)
 
 	if powerState, err = v.PowerState(ctx); err == nil {
 		address := ""
@@ -193,12 +213,12 @@ func (vm *VirtualMachine) Status(ctx context.Context) (*Status, error) {
 }
 
 // SetGuestInfo change guest ingos
-func (vm *VirtualMachine) SetGuestInfo(ctx context.Context, guestInfos *GuestInfos) error {
+func (vm *VirtualMachine) SetGuestInfo(ctx *Context, guestInfos *GuestInfos) error {
 	var task *object.Task
 	var err error
 
 	vmConfigSpec := types.VirtualMachineConfigSpec{}
-	v := vm.VirtualMachine()
+	v := vm.VirtualMachine(ctx)
 
 	if guestInfos != nil && guestInfos.isEmpty() == false {
 		vmConfigSpec.ExtraConfig = guestInfos.toExtraConfig()

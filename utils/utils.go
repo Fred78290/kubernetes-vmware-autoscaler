@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"encoding/json"
@@ -6,12 +6,13 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	"github.com/golang/glog"
 	apiv1 "k8s.io/api/core/v1"
 )
 
 // NodeFromJSON deserialize a string to apiv1.Node
-func nodeFromJSON(s string) (*apiv1.Node, error) {
+func NodeFromJSON(s string) (*apiv1.Node, error) {
 	data := &apiv1.Node{}
 
 	err := json.Unmarshal([]byte(s), &data)
@@ -19,7 +20,8 @@ func nodeFromJSON(s string) (*apiv1.Node, error) {
 	return data, err
 }
 
-func toJSON(v interface{}) string {
+// ToJSON serialize interface to json
+func ToJSON(v interface{}) string {
 	if v == nil {
 		return ""
 	}
@@ -29,11 +31,12 @@ func toJSON(v interface{}) string {
 	return string(b)
 }
 
-func getNodeProviderID(serverIdentifier string, node *apiv1.Node) string {
+// GetNodeProviderID func
+func GetNodeProviderID(serverIdentifier string, node *apiv1.Node) string {
 	providerID := node.Spec.ProviderID
 
 	if len(providerID) == 0 {
-		nodegroupName := node.Labels[nodeLabelGroupName]
+		nodegroupName := node.Labels[constantes.NodeLabelGroupName]
 
 		if len(nodegroupName) != 0 {
 			providerID = fmt.Sprintf("%s://%s/object?type=node&name=%s", serverIdentifier, nodegroupName, node.Name)
@@ -44,7 +47,8 @@ func getNodeProviderID(serverIdentifier string, node *apiv1.Node) string {
 	return providerID
 }
 
-func nodeGroupIDFromProviderID(serverIdentifier string, providerID string) (string, error) {
+// NodeGroupIDFromProviderID returns group node name from provider
+func NodeGroupIDFromProviderID(serverIdentifier string, providerID string) (string, error) {
 	var nodeIdentifier *url.URL
 	var err error
 
@@ -53,21 +57,22 @@ func nodeGroupIDFromProviderID(serverIdentifier string, providerID string) (stri
 	}
 
 	if nodeIdentifier == nil {
-		return "", fmt.Errorf(errCantDecodeNodeID, providerID)
+		return "", fmt.Errorf(constantes.ErrCantDecodeNodeID, providerID)
 	}
 
 	if nodeIdentifier.Scheme != serverIdentifier {
-		return "", fmt.Errorf(errWrongSchemeInProviderID, providerID, nodeIdentifier.Scheme)
+		return "", fmt.Errorf(constantes.ErrWrongSchemeInProviderID, providerID, nodeIdentifier.Scheme)
 	}
 
 	if nodeIdentifier.Path != "object" && nodeIdentifier.Path != "/object" {
-		return "", fmt.Errorf(errWrongPathInProviderID, providerID, nodeIdentifier.Path)
+		return "", fmt.Errorf(constantes.ErrWrongPathInProviderID, providerID, nodeIdentifier.Path)
 	}
 
 	return nodeIdentifier.Hostname(), nil
 }
 
-func nodeNameFromProviderID(serverIdentifier string, providerID string) (string, error) {
+// NodeNameFromProviderID return node name from provider ID
+func NodeNameFromProviderID(serverIdentifier string, providerID string) (string, error) {
 	var nodeIdentifier *url.URL
 	var err error
 
@@ -76,21 +81,22 @@ func nodeNameFromProviderID(serverIdentifier string, providerID string) (string,
 	}
 
 	if nodeIdentifier == nil {
-		return "", fmt.Errorf(errCantDecodeNodeID, providerID)
+		return "", fmt.Errorf(constantes.ErrCantDecodeNodeID, providerID)
 	}
 
 	if nodeIdentifier.Scheme != serverIdentifier {
-		return "", fmt.Errorf(errWrongSchemeInProviderID, providerID, nodeIdentifier.Scheme)
+		return "", fmt.Errorf(constantes.ErrWrongSchemeInProviderID, providerID, nodeIdentifier.Scheme)
 	}
 
 	if nodeIdentifier.Path != "object" && nodeIdentifier.Path != "/object" {
-		return "", fmt.Errorf(errWrongPathInProviderID, providerID, nodeIdentifier.Path)
+		return "", fmt.Errorf(constantes.ErrWrongPathInProviderID, providerID, nodeIdentifier.Path)
 	}
 
 	return nodeIdentifier.Query().Get("name"), nil
 }
 
-func fileExists(name string) bool {
+// FileExists Check if FileExists
+func FileExists(name string) bool {
 	if len(name) == 0 {
 		return false
 	}
@@ -104,14 +110,16 @@ func fileExists(name string) bool {
 	return true
 }
 
-func minInt(x, y int) int {
+// MinInt min(a,b)
+func MinInt(x, y int) int {
 	if x < y {
 		return x
 	}
 	return y
 }
 
-func maxInt(x, y int) int {
+// MaxInt max(a,b)
+func MaxInt(x, y int) int {
 	if x > y {
 		return x
 	}
