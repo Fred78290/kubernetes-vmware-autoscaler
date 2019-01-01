@@ -22,3 +22,7 @@ masterkube/config/*
 masterkube/etc/ssl/*
 
 vsphere/agora\.json
+
+masterkube/guestinfos/*\.txt
+masterkube/guestinfos/*\.json
+masterkube/guestinfos/*\.yaml
