@@ -58,7 +58,7 @@ func (conf *Configuration) GetClient(ctx *Context) (*Client, error) {
 }
 
 // CreateWithContext will create a named VM not powered
-func (conf *Configuration) CreateWithContext(ctx *Context, name string, guestInfos *GuestInfos, annotation string, memory int, cpus int, disk int) (*VirtualMachine, error) {
+func (conf *Configuration) CreateWithContext(ctx *Context, name string, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory int, cpus int, disk int) (*VirtualMachine, error) {
 	var err error
 	var client *Client
 	var dc *Datacenter
@@ -69,7 +69,7 @@ func (conf *Configuration) CreateWithContext(ctx *Context, name string, guestInf
 		if dc, err = client.GetDatacenter(ctx, conf.DataCenter); err == nil {
 			if ds, err = dc.GetDatastore(ctx, conf.DataStore); err == nil {
 				if vm, err = ds.CreateVirtualMachine(ctx, name); err == nil {
-					err = vm.Configure(ctx, guestInfos, annotation, memory, cpus, disk)
+					err = vm.Configure(ctx, userName, authKey, cloudInit, network, annotation, memory, cpus, disk)
 				}
 			}
 		}
@@ -79,11 +79,11 @@ func (conf *Configuration) CreateWithContext(ctx *Context, name string, guestInf
 }
 
 // Create will create a named VM not powered
-func (conf *Configuration) Create(name string, guestInfos *GuestInfos, annotation string, memory int, cpus int, disk int) (*VirtualMachine, error) {
+func (conf *Configuration) Create(name string, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory int, cpus int, disk int) (*VirtualMachine, error) {
 	ctx := NewContext(conf.Timeout)
 	defer ctx.Cancel()
 
-	return conf.CreateWithContext(ctx, name, guestInfos, annotation, memory, cpus, disk)
+	return conf.CreateWithContext(ctx, name, userName, authKey, cloudInit, network, annotation, memory, cpus, disk)
 }
 
 // DeleteWithContext a VM by name

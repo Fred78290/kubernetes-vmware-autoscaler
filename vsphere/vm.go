@@ -1,11 +1,17 @@
 package vsphere
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/base64"
 	"fmt"
+	"time"
 
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25"
+	yaml "gopkg.in/yaml.v2"
 
 	"github.com/vmware/govmomi/vim25/types"
 )
@@ -22,6 +28,91 @@ type VirtualMachine struct {
 type GuestInfos map[string]string
 
 type extraConfig []types.BaseOptionValue
+
+// NetworkAdapter wrapper
+type NetworkAdapter struct {
+	DHCP4 bool              `json:"dhcp4"`
+	Name  string            `json:"set-name,omitempty"`
+	Match map[string]string `json:"match,omitempty"`
+}
+
+// NetworkDeclare wrapper
+type NetworkDeclare struct {
+	Version   int                       `json:"version"`
+	Ethernets map[string]NetworkAdapter `json:"ethernets"`
+}
+
+// NetworkConfig wrapper
+type NetworkConfig struct {
+	Network NetworkDeclare `json:"network"`
+}
+
+func encodeObject(name string, object interface{}) (string, error) {
+	var result string
+	out, err := yaml.Marshal(object)
+
+	if err == nil {
+		var stdout bytes.Buffer
+		var zw = gzip.NewWriter(&stdout)
+
+		zw.Name = name
+		zw.ModTime = time.Now()
+
+		if _, err = zw.Write(out); err == nil {
+			if err = zw.Close(); err == nil {
+				result = base64.StdEncoding.EncodeToString(stdout.Bytes())
+			}
+		}
+	}
+
+	return result, err
+}
+
+func buildVendorData(userName, authKey string) interface{} {
+	tz, _ := time.Now().Zone()
+
+	return map[string]interface{}{
+		"package_update":  true,
+		"package_upgrade": true,
+		"timezone":        tz,
+		"users": []string{
+			"default",
+		},
+		"ssh_authorized_keys": []string{
+			authKey,
+		},
+		"system_info": map[string]interface{}{
+			"default_user": map[string]string{
+				"name": userName,
+			},
+		},
+	}
+}
+
+func buildNetworkConfig(network *Network) NetworkConfig {
+	var match map[string]string
+
+	if len(network.Address) > 0 {
+		match = map[string]string{
+			"macaddress": network.Address,
+		}
+	}
+
+	net := NetworkConfig{
+		Network: NetworkDeclare{
+			Version: 2,
+			Ethernets: map[string]NetworkAdapter{
+				network.NicName: NetworkAdapter{
+					DHCP4: true,
+					Name:  network.NicName,
+					Match: match,
+				},
+			},
+		},
+	}
+
+	return net
+}
 
 func (g GuestInfos) isEmpty() bool {
 	return len(g) == 0
@@ -75,7 +166,7 @@ func (vm *VirtualMachine) VimClient() *vim25.Client {
 }
 
 // Configure set characteristic of VM a virtual machine
-func (vm *VirtualMachine) Configure(ctx *Context, guestInfos *GuestInfos, annotation string, memory int, cpus int, disk int) error {
+func (vm *VirtualMachine) Configure(ctx *Context, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory int, cpus int, disk int) error {
 	var err error
 	var task *object.Task
 
@@ -94,8 +185,10 @@ func (vm *VirtualMachine) Configure(ctx *Context, guestInfos *GuestInfos, annota
 
 		vmConfigSpec.Annotation = annotation
 
-		if guestInfos != nil && guestInfos.isEmpty() == false {
-			vmConfigSpec.ExtraConfig = guestInfos.toExtraConfig()
+		if guestInfos, err := vm.cloudInit(ctx, vm.Name, userName, authKey, cloudInit, network); err != nil {
+			if guestInfos.isEmpty() == false {
+				vmConfigSpec.ExtraConfig = guestInfos.toExtraConfig()
+			}
 		}
 
 		if task, err = virtualMachine.Reconfigure(ctx, vmConfigSpec); err == nil {
@@ -231,4 +324,61 @@ func (vm *VirtualMachine) SetGuestInfo(ctx *Context, guestInfos *GuestInfos) err
 	}
 
 	return err
+}
+
+func (vm *VirtualMachine) cloudInit(ctx *Context, hostName string, userName, authKey string, cloudInit interface{}, network *Network) (*GuestInfos, error) {
+	var metadata, userdata, vendordata, netconfig string
+	var err error
+	var guestInfos *GuestInfos
+
+	v := vm.VirtualMachine(ctx)
+
+	// Only DHCP supported
+	if network != nil && len(network.NicName) > 0 {
+		if netconfig, err = encodeObject("networkconfig", buildNetworkConfig(network)); err != nil {
+			err = fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "networkconfig", err)
+		} else if metadata, err = encodeObject("metadata", map[string]string{
+			"network":          netconfig,
+			"network.encoding": "gzip+base64",
+			"local-hostname":   hostName,
+			"instance-id":      v.UUID(ctx),
+		}); err != nil {
+			err = fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "metadata", err)
+		}
+	} else if metadata, _ = encodeObject("metadata", map[string]string{
+		"local-hostname": hostName,
+		"instance-id":    v.UUID(ctx),
+	}); err != nil {
+		err = fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "metadata", err)
+	}
+
+	if err == nil {
+
+		if cloudInit != nil {
+			if userdata, err = encodeObject("userdata", cloudInit); err != nil {
+				return nil, fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "userdata", err)
+			}
+		} else if userdata, err = encodeObject("userdata", map[string]string{}); err != nil {
+			return nil, fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "userdata", err)
+		}
+
+		if len(userName) > 0 && len(authKey) > 0 {
+			if vendordata, err = encodeObject("vendordata", buildVendorData(userName, authKey)); err != nil {
+				return nil, fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "vendordata", err)
+			}
+		} else if vendordata, err = encodeObject("vendordata", map[string]string{}); err != nil {
+			return nil, fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "vendordata", err)
+		}
+
+		guestInfos = &GuestInfos{
+			"metadata":            metadata,
+			"metadata.encoding":   "gzip+base64",
+			"userdata":            userdata,
+			"userdata.encoding":   "gzip+base64",
+			"vendordata":          vendordata,
+			"vendordata.encoding": "gzip+base64",
+		}
+	}
+
+	return guestInfos, err
 }

@@ -69,7 +69,7 @@ type AutoScalerServerConfig struct {
 	KubeAdm            KubeJoinConfig                    `json:"kubeadm"`
 	DefaultMachineType string                            `default:"{\"standard\": {}}" json:"default-machine"`
 	Machines           map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
-	CloudInit          map[string]interface{}            `json:"cloud-init"`                            // Optional, The cloud init conf file
+	CloudInit          interface{}                       `json:"cloud-init"`                            // Optional, The cloud init conf file
 	SyncFolders        *AutoScalerServerSyncFolders      `json:"sync-folder"`                           // Optional, do rsync between host and guest
 	VMProvision        bool                              `default:"true" json:"vm-provision"`
 	Optionals          *AutoScalerServerOptionals        `json:"optionals"`

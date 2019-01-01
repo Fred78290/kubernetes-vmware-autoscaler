@@ -165,4 +165,7 @@ const (
 
 	// ErrRsyncError error msg
 	ErrRsyncError = "Can't rsync folder for VM: %s, %s, reason: %v"
+
+	// ErrUnableToEncodeGuestInfo error msg
+	ErrUnableToEncodeGuestInfo = "Unable to encode vmware guest info: %s, reason: %v"
 )

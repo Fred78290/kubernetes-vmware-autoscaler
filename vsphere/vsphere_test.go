@@ -139,7 +139,7 @@ func Test_listVM(t *testing.T) {
 func Test_createVM(t *testing.T) {
 	config := loadFromJson(confName)
 
-	_, err := config.Create(config.New.Name, nil, config.New.Annotation, config.New.Memory, config.New.CPUS, 0)
+	_, err := config.Create(config.New.Name, "", "", nil, nil, config.New.Annotation, config.New.Memory, config.New.CPUS, 0)
 
 	if assert.NoError(t, err, "Can't create VM") {
 		t.Logf("VM created")

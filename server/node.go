@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -10,11 +9,7 @@ import (
 	"strings"
 	"time"
 
-	yaml "gopkg.in/yaml.v2"
 	apiv1 "k8s.io/api/core/v1"
-
-	"compress/gzip"
-	"encoding/base64"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
@@ -42,24 +37,6 @@ const (
 	// AutoScalerServerNodeStateUndefined undefined state
 	AutoScalerServerNodeStateUndefined AutoScalerServerNodeState = 4
 )
-
-// NetworkAdapter wrapper
-type NetworkAdapter struct {
-	DHCP4 bool              `json:"dhcp4"`
-	Name  string            `json:"set-name,omitempty"`
-	Match map[string]string `json:"match,omitempty"`
-}
-
-// NetworkDeclare wrapper
-type NetworkDeclare struct {
-	Version   int                       `json:"version"`
-	Ethernets map[string]NetworkAdapter `json:"ethernets"`
-}
-
-// NetworkConfig wrapper
-type NetworkConfig struct {
-	Network NetworkDeclare `json:"network"`
-}
 
 // AutoScalerServerNode Describe a AutoScaler VM
 type AutoScalerServerNode struct {
@@ -103,110 +80,6 @@ func (vm *AutoScalerServerNode) prepareKubelet() (string, error) {
 	}
 
 	return "", nil
-}
-
-func encodeObject(name string, object interface{}) (string, error) {
-	var result string
-	out, err := yaml.Marshal(object)
-
-	if err == nil {
-		var stdout bytes.Buffer
-		var zw = gzip.NewWriter(&stdout)
-
-		zw.Name = name
-		zw.ModTime = time.Now()
-
-		if _, err = zw.Write(out); err == nil {
-			if err = zw.Close(); err == nil {
-				result = base64.StdEncoding.EncodeToString(stdout.Bytes())
-			}
-		}
-	}
-
-	return result, err
-}
-
-func buildVendorData(config *types.AutoScalerServerSSH) interface{} {
-	tz, _ := time.Now().Zone()
-
-	return map[string]interface{}{
-		"package_update":  true,
-		"package_upgrade": true,
-		"timezone":        tz,
-		"users": []string{
-			"default",
-		},
-		"ssh_authorized_keys": []string{
-			config.AuthKeys,
-		},
-		"system_info": map[string]interface{}{
-			"default_user": map[string]string{
-				"name": config.UserName,
-			},
-		},
-	}
-}
-
-func buildNetworkConfig(network *vsphere.Network) NetworkConfig {
-	var match map[string]string
-
-	if len(network.Address) > 0 {
-		match = map[string]string{
-			"macaddress": network.Address,
-		}
-	}
-
-	net := NetworkConfig{
-		Network: NetworkDeclare{
-			Version: 2,
-			Ethernets: map[string]NetworkAdapter{
-				network.NicName: NetworkAdapter{
-					DHCP4: true,
-					Name:  network.NicName,
-					Match: match,
-				},
-			},
-		},
-	}
-
-	return net
-}
-
-func (vm *AutoScalerServerNode) prepareGuestInfos() *vsphere.GuestInfos {
-	var metadata, userdata, vendordata, netconfig string
-
-	network := vm.configuration.VSphere.Network
-
-	// Only DHCP supported
-	if network != nil && len(network.NicName) > 0 {
-		netconfig, _ = encodeObject("networkconfig", buildNetworkConfig(network))
-
-		metadata, _ = encodeObject("metadata", map[string]string{
-			"network":          netconfig,
-			"network.encoding": "gzip+base64",
-			"local-hostname":   vm.NodeName,
-			"instance-id":      vm.NodeName,
-		})
-	} else {
-		metadata, _ = encodeObject("metadata", map[string]string{
-			"local-hostname": vm.NodeName,
-			"instance-id":    vm.NodeName,
-		})
-	}
-
-	userdata, _ = encodeObject("userdata", vm.configuration.CloudInit)
-	vendordata, _ = encodeObject("vendordata", buildVendorData(vm.configuration.SSH))
-
-	guestInfos := &vsphere.GuestInfos{
-		"metadata":            metadata,
-		"metadata.encoding":   "gzip+base64",
-		"userdata":            userdata,
-		"userdata.encoding":   "gzip+base64",
-		"vendordata":          vendordata,
-		"vendordata.encoding": "gzip+base64",
-	}
-
-	return guestInfos
 }
 
 func (vm *AutoScalerServerNode) waitReady() error {
@@ -396,7 +269,8 @@ func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabe
 	var output string
 
 	vsphere := vm.configuration.VSphere
-	guestInfos := vm.prepareGuestInfos()
+	network := vsphere.Network
+	userInfo := vm.configuration.SSH
 
 	glog.Infof("Launch VM:%s for nodegroup: %s", vm.NodeName, vm.NodeGroupID)
 
@@ -408,7 +282,7 @@ func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabe
 
 		err = fmt.Errorf(constantes.ErrVMAlreadyCreated, vm.NodeName)
 
-	} else if _, err = vsphere.Create(vm.NodeName, guestInfos, "", vm.Memory, vm.CPU, vm.Disk); err != nil {
+	} else if _, err = vsphere.Create(vm.NodeName, userInfo.UserName, userInfo.AuthKeys, vm.configuration.CloudInit, network, "", vm.Memory, vm.CPU, vm.Disk); err != nil {
 
 		err = fmt.Errorf(constantes.ErrUnableToLaunchVM, vm.NodeName, err)
 
