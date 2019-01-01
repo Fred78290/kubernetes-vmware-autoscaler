@@ -14,6 +14,7 @@ type Network struct {
 	Name    string `json:"name"`
 	Adapter string `json:"adapter"`
 	Address string `json:"address"`
+	NicName string `json:"nic"`
 }
 
 // Reference return the network reference

@@ -30,6 +30,9 @@ const (
 	NodegroupDeleted NodeGroupState = 3
 )
 
+// KubernetesLabel labels
+type KubernetesLabel map[string]string
+
 // AutoScalerServerNodeGroup Group all AutoScaler VM created inside a NodeGroup
 // Each node have name like <node group name>-vm-<vm index>
 type AutoScalerServerNodeGroup struct {
@@ -41,30 +44,16 @@ type AutoScalerServerNodeGroup struct {
 	MinNodeSize          int                              `json:"minSize"`
 	MaxNodeSize          int                              `json:"maxSize"`
 	Nodes                map[string]*AutoScalerServerNode `json:"nodes"`
-	NodeLabels           map[string]string                `json:"nodeLabels"`
-	SystemLabels         map[string]string                `json:"systemLabels"`
+	NodeLabels           KubernetesLabel                  `json:"nodeLabels"`
+	SystemLabels         KubernetesLabel                  `json:"systemLabels"`
 	AutoProvision        bool                             `json:"auto-provision"`
 	LastCreatedNodeIndex int                              `json:"node-index"`
 	PendingNodes         map[string]*AutoScalerServerNode `json:"-"`
 	PendingNodesWG       sync.WaitGroup                   `json:"-"`
+	configuration        *types.AutoScalerServerConfig
 }
 
-type nodeCreationExtra struct {
-	nodegroupID   string
-	kubeHost      string
-	kubeToken     string
-	kubeCACert    string
-	kubeExtraArgs []string
-	kubeConfig    string
-	image         string
-	cloudInit     map[string]interface{}
-	syncFolders   *types.AutoScalerServerSyncFolders
-	nodeLabels    map[string]string
-	systemLabels  map[string]string
-	vmprovision   bool
-}
-
-func (g *AutoScalerServerNodeGroup) cleanup(kubeconfig string) error {
+func (g *AutoScalerServerNodeGroup) cleanup() error {
 	glog.V(5).Infof("AutoScalerServerNodeGroup::cleanup, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	var lastError error
@@ -76,7 +65,7 @@ func (g *AutoScalerServerNodeGroup) cleanup(kubeconfig string) error {
 	glog.V(5).Infof("AutoScalerServerNodeGroup::cleanup, nodeGroupID:%s, iterate node to delete", g.NodeGroupIdentifier)
 
 	for _, node := range g.Nodes {
-		if lastError = node.deleteVM(kubeconfig); lastError != nil {
+		if lastError = node.deleteVM(); lastError != nil {
 			glog.Errorf(constantes.ErrNodeGroupCleanupFailOnVM, g.NodeGroupIdentifier, node.NodeName, lastError)
 		}
 	}
@@ -94,7 +83,7 @@ func (g *AutoScalerServerNodeGroup) targetSize() int {
 	return len(g.PendingNodes) + len(g.Nodes)
 }
 
-func (g *AutoScalerServerNodeGroup) setNodeGroupSize(newSize int, extras *nodeCreationExtra) error {
+func (g *AutoScalerServerNodeGroup) setNodeGroupSize(newSize int) error {
 	glog.V(5).Infof("AutoScalerServerNodeGroup::setNodeGroupSize, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	var err error
@@ -104,9 +93,9 @@ func (g *AutoScalerServerNodeGroup) setNodeGroupSize(newSize int, extras *nodeCr
 	delta := newSize - g.targetSize()
 
 	if delta < 0 {
-		err = g.deleteNodes(delta, extras)
+		err = g.deleteNodes(delta)
 	} else if delta > 0 {
-		err = g.addNodes(delta, extras)
+		err = g.addNodes(delta)
 	}
 
 	g.Unlock()
@@ -123,7 +112,7 @@ func (g *AutoScalerServerNodeGroup) refresh() {
 }
 
 // delta must be negative!!!!
-func (g *AutoScalerServerNodeGroup) deleteNodes(delta int, extras *nodeCreationExtra) error {
+func (g *AutoScalerServerNodeGroup) deleteNodes(delta int) error {
 	glog.V(5).Infof("AutoScalerServerNodeGroup::deleteNodes, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	startIndex := len(g.Nodes) - 1
@@ -134,7 +123,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodes(delta int, extras *nodeCreationE
 		nodeName := g.nodeName(nodeIndex)
 
 		if node := g.Nodes[nodeName]; node != nil {
-			if err := node.deleteVM(extras.kubeConfig); err != nil {
+			if err := node.deleteVM(); err != nil {
 				glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, err)
 				return err
 			}
@@ -150,7 +139,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodes(delta int, extras *nodeCreationE
 	return nil
 }
 
-func (g *AutoScalerServerNodeGroup) addNodes(delta int, extras *nodeCreationExtra) error {
+func (g *AutoScalerServerNodeGroup) addNodes(delta int) error {
 	glog.V(5).Infof("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	tempNodes := make([]*AutoScalerServerNode, 0, delta)
@@ -169,12 +158,14 @@ func (g *AutoScalerServerNodeGroup) addNodes(delta int, extras *nodeCreationExtr
 
 		node := &AutoScalerServerNode{
 			ProviderID:       g.providerIDForNode(nodeName),
+			NodeGroupID:      g.NodeGroupIdentifier,
 			NodeName:         nodeName,
 			NodeIndex:        g.LastCreatedNodeIndex,
 			Memory:           g.Machine.Memory,
 			CPU:              g.Machine.Vcpu,
 			Disk:             g.Machine.Disk,
 			AutoProvisionned: true,
+			configuration:    g.configuration,
 		}
 
 		tempNodes = append(tempNodes, node)
@@ -192,14 +183,14 @@ func (g *AutoScalerServerNodeGroup) addNodes(delta int, extras *nodeCreationExtr
 			break
 		}
 
-		if err := node.launchVM(extras); err != nil {
+		if err := node.launchVM(g.NodeLabels, g.SystemLabels); err != nil {
 			glog.Errorf(constantes.ErrUnableToLaunchVM, node.NodeName, err)
 
 			for _, node := range tempNodes {
 				delete(g.PendingNodes, node.NodeName)
 
 				if status, _ := node.statusVM(); status == AutoScalerServerNodeStateRunning {
-					if err := node.deleteVM(extras.kubeConfig); err != nil {
+					if err := node.deleteVM(); err != nil {
 						glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, err)
 					}
 				}
@@ -280,6 +271,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 					if node == nil {
 						node = &AutoScalerServerNode{
 							ProviderID:       providerID,
+							NodeGroupID:      g.NodeGroupIdentifier,
 							NodeName:         nodeID,
 							NodeIndex:        lastNodeIndex,
 							State:            AutoScalerServerNodeStateRunning,
@@ -287,6 +279,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 							Addresses: []string{
 								runningIP,
 							},
+							configuration: g.configuration,
 						}
 
 						arg = []string{
@@ -335,12 +328,12 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 	return nil
 }
 
-func (g *AutoScalerServerNodeGroup) deleteNodeByName(kubeconfig, nodeName string) error {
+func (g *AutoScalerServerNodeGroup) deleteNodeByName(nodeName string) error {
 	glog.V(5).Infof("AutoScalerServerNodeGroup::deleteNodeByName, nodeGroupID:%s, nodeName:%s", g.NodeGroupIdentifier, nodeName)
 
 	if node := g.Nodes[nodeName]; node != nil {
 
-		if err := node.deleteVM(kubeconfig); err != nil {
+		if err := node.deleteVM(); err != nil {
 			glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, err)
 			return err
 		}
@@ -353,10 +346,20 @@ func (g *AutoScalerServerNodeGroup) deleteNodeByName(kubeconfig, nodeName string
 	return fmt.Errorf(constantes.ErrNodeNotFoundInNodeGroup, nodeName, g.NodeGroupIdentifier)
 }
 
-func (g *AutoScalerServerNodeGroup) deleteNodeGroup(kubeConfig string) error {
+func (g *AutoScalerServerNodeGroup) setConfiguration(config *types.AutoScalerServerConfig) {
+	glog.V(5).Infof("AutoScalerServerNodeGroup::setConfiguration, nodeGroupID:%s", g.NodeGroupIdentifier)
+
+	g.configuration = config
+
+	for _, node := range g.Nodes {
+		node.setConfiguration(config)
+	}
+}
+
+func (g *AutoScalerServerNodeGroup) deleteNodeGroup() error {
 	glog.V(5).Infof("AutoScalerServerNodeGroup::deleteNodeGroup, nodeGroupID:%s", g.NodeGroupIdentifier)
 
-	return g.cleanup(kubeConfig)
+	return g.cleanup()
 }
 
 func (g *AutoScalerServerNodeGroup) nodeName(vmIndex int) string {

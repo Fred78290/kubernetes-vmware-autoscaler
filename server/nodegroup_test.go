@@ -9,10 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	kubeconfig = "/etc/kubernetes/config"
-)
-
 type arguments struct {
 	kubeHost      string
 	kubeToken     string
@@ -34,23 +30,69 @@ type vm struct {
 type nodeTest struct {
 	name    string
 	wantErr bool
-	vm      vm
+	node    *AutoScalerServerNode
 }
 
-var testNode = []nodeTest{
-	nodeTest{
-		name:    "Test Node VM",
-		wantErr: false,
-		vm: vm{
-			name:   testNodeName,
-			memory: 2048,
-			cpu:    2,
-			disk:   5120,
-			address: []string{
-				"127.0.0.1",
-			},
+func createTestNode(ng *AutoScalerServerNodeGroup) *AutoScalerServerNode {
+	return &AutoScalerServerNode{
+		ProviderID:  ng.providerIDForNode(testNodeName),
+		NodeGroupID: testGroupID,
+		NodeName:    testNodeName,
+		Memory:      2048,
+		CPU:         2,
+		Disk:        5120,
+		Addresses: []string{
+			"127.0.0.1",
 		},
-	},
+		State:            AutoScalerServerNodeStateNotCreated,
+		AutoProvisionned: true,
+		configuration:    ng.configuration,
+	}
+}
+
+func newTestNode() (*types.AutoScalerServerConfig, *AutoScalerServerNodeGroup, *AutoScalerServerNode, error) {
+	config, ng, err := newTestNodeGroup()
+
+	if err == nil {
+		vm := createTestNode(ng)
+
+		ng.Nodes[testGroupID] = vm
+
+		return config, ng, vm, err
+	}
+
+	return config, ng, nil, err
+}
+
+func newTestNodeGroup() (*types.AutoScalerServerConfig, *AutoScalerServerNodeGroup, error) {
+	config, err := newTestConfig()
+
+	if err == nil {
+		ng := &AutoScalerServerNodeGroup{
+			ServiceIdentifier:   testProviderID,
+			NodeGroupIdentifier: testGroupID,
+			Machine: &types.MachineCharacteristic{
+				Memory: 4096,
+				Vcpu:   4,
+				Disk:   5120,
+			},
+			Status:      NodegroupNotCreated,
+			MinNodeSize: 0,
+			MaxNodeSize: 5,
+			NodeLabels: KubernetesLabel{
+				"monitor":  "true",
+				"database": "true",
+			},
+			SystemLabels:  KubernetesLabel{},
+			Nodes:         make(map[string]*AutoScalerServerNode),
+			PendingNodes:  make(map[string]*AutoScalerServerNode),
+			configuration: config,
+		}
+
+		return config, ng, err
+	}
+
+	return nil, nil, err
 }
 
 func newTestConfig() (*types.AutoScalerServerConfig, error) {
@@ -67,124 +109,61 @@ func newTestConfig() (*types.AutoScalerServerConfig, error) {
 }
 
 func Test_AutoScalerNode_launchVM(t *testing.T) {
-	config, err := newTestConfig()
+	_, ng, testNode, err := newTestNode()
 
 	if assert.NoError(t, err) {
-		for _, tt := range testNode {
-			t.Run(tt.name, func(t *testing.T) {
-				vm := &AutoScalerServerNode{
-					NodeName:         tt.vm.name,
-					Memory:           tt.vm.memory,
-					CPU:              tt.vm.cpu,
-					Disk:             tt.vm.disk,
-					Addresses:        tt.vm.address,
-					State:            AutoScalerServerNodeStateNotCreated,
-					AutoProvisionned: true,
-				}
-
-				nodeLabels := map[string]string{
-					"monitor":  "true",
-					"database": "true",
-				}
-
-				extras := &nodeCreationExtra{
-					kubeHost:      config.KubeAdm.Address,
-					kubeToken:     config.KubeAdm.Token,
-					kubeCACert:    config.KubeAdm.CACert,
-					kubeExtraArgs: config.KubeAdm.ExtraArguments,
-					kubeConfig:    config.KubeCtlConfig,
-					image:         config.Image,
-					cloudInit:     config.CloudInit,
-					syncFolders:   config.SyncFolders,
-					nodegroupID:   testGroupID,
-					nodeLabels:    nodeLabels,
-					systemLabels:  make(map[string]string),
-					vmprovision:   config.VMProvision,
-				}
-
-				if err := vm.launchVM(extras); (err != nil) != tt.wantErr {
-					t.Errorf("AutoScalerNode.launchVM() error = %v, wantErr %v", err, tt.wantErr)
-				}
-			})
-		}
+		t.Run("Launch VM", func(t *testing.T) {
+			if err := testNode.launchVM(ng.NodeLabels, ng.SystemLabels); err != nil {
+				t.Errorf("AutoScalerNode.launchVM() error = %v", err)
+			}
+		})
 	}
 }
 
 func Test_AutoScalerNode_startVM(t *testing.T) {
-	for _, tt := range testNode {
-		t.Run(tt.name, func(t *testing.T) {
-			vm := &AutoScalerServerNode{
-				NodeName:         tt.vm.name,
-				Memory:           tt.vm.memory,
-				CPU:              tt.vm.cpu,
-				Disk:             tt.vm.disk,
-				Addresses:        tt.vm.address,
-				State:            AutoScalerServerNodeStateNotCreated,
-				AutoProvisionned: true,
-			}
-			if err := vm.startVM(kubeconfig); (err != nil) != tt.wantErr {
-				t.Errorf("AutoScalerNode.startVM() error = %v, wantErr %v", err, tt.wantErr)
+	_, _, testNode, err := newTestNode()
+
+	if assert.NoError(t, err) {
+		t.Run("Start VM", func(t *testing.T) {
+			if err := testNode.startVM(); err != nil {
+				t.Errorf("AutoScalerNode.startVM() error = %v", err)
 			}
 		})
 	}
 }
 
 func Test_AutoScalerNode_stopVM(t *testing.T) {
-	for _, tt := range testNode {
-		t.Run(tt.name, func(t *testing.T) {
-			vm := &AutoScalerServerNode{
-				NodeName:         tt.vm.name,
-				Memory:           tt.vm.memory,
-				CPU:              tt.vm.cpu,
-				Disk:             tt.vm.disk,
-				Addresses:        tt.vm.address,
-				State:            AutoScalerServerNodeStateNotCreated,
-				AutoProvisionned: true,
-			}
-			if err := vm.stopVM(kubeconfig); (err != nil) != tt.wantErr {
-				t.Errorf("AutoScalerNode.stopVM() error = %v, wantErr %v", err, tt.wantErr)
+	_, _, testNode, err := newTestNode()
+
+	if assert.NoError(t, err) {
+		t.Run("Stop VM", func(t *testing.T) {
+			if err := testNode.stopVM(); err != nil {
+				t.Errorf("AutoScalerNode.stopVM() error = %v", err)
 			}
 		})
 	}
 }
 
 func Test_AutoScalerNode_deleteVM(t *testing.T) {
-	for _, tt := range testNode {
-		t.Run(tt.name, func(t *testing.T) {
-			vm := &AutoScalerServerNode{
-				NodeName:         tt.vm.name,
-				Memory:           tt.vm.memory,
-				CPU:              tt.vm.cpu,
-				Disk:             tt.vm.disk,
-				Addresses:        tt.vm.address,
-				State:            AutoScalerServerNodeStateNotCreated,
-				AutoProvisionned: true,
-			}
-			if err := vm.deleteVM(kubeconfig); (err != nil) != tt.wantErr {
-				t.Errorf("AutoScalerNode.deleteVM() error = %v, wantErr %v", err, tt.wantErr)
+	_, _, testNode, err := newTestNode()
+
+	if assert.NoError(t, err) {
+		t.Run("Delete VM", func(t *testing.T) {
+			if err := testNode.deleteVM(); err != nil {
+				t.Errorf("AutoScalerNode.deleteVM() error = %v", err)
 			}
 		})
 	}
 }
 
 func Test_AutoScalerNode_statusVM(t *testing.T) {
-	for _, tt := range testNode {
-		t.Run(tt.name, func(t *testing.T) {
-			vm := &AutoScalerServerNode{
-				NodeName:         tt.vm.name,
-				Memory:           tt.vm.memory,
-				CPU:              tt.vm.cpu,
-				Disk:             tt.vm.disk,
-				Addresses:        tt.vm.address,
-				State:            AutoScalerServerNodeStateNotCreated,
-				AutoProvisionned: true,
-			}
-			got, err := vm.statusVM()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("AutoScalerNode.statusVM() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != AutoScalerServerNodeStateRunning {
+	_, _, testNode, err := newTestNode()
+
+	if assert.NoError(t, err) {
+		t.Run("Status VM", func(t *testing.T) {
+			if got, err := testNode.statusVM(); err != nil {
+				t.Errorf("AutoScalerNode.statusVM() error = %v", err)
+			} else if got != AutoScalerServerNodeStateRunning {
 				t.Errorf("AutoScalerNode.statusVM() = %v, want %v", got, AutoScalerServerNodeStateRunning)
 			}
 		})
@@ -192,144 +171,37 @@ func Test_AutoScalerNode_statusVM(t *testing.T) {
 }
 
 func Test_AutoScalerNodeGroup_addNode(t *testing.T) {
-	config, err := newTestConfig()
+	_, ng, err := newTestNodeGroup()
 
 	if assert.NoError(t, err) {
-		extras := &nodeCreationExtra{
-			kubeHost:      config.KubeAdm.Address,
-			kubeToken:     config.KubeAdm.Token,
-			kubeCACert:    config.KubeAdm.CACert,
-			kubeExtraArgs: config.KubeAdm.ExtraArguments,
-			kubeConfig:    config.KubeCtlConfig,
-			image:         config.Image,
-			cloudInit:     config.CloudInit,
-			syncFolders:   config.SyncFolders,
-			nodegroupID:   testGroupID,
-			nodeLabels:    testNodeGroup.NodeLabels,
-			systemLabels:  testNodeGroup.SystemLabels,
-			vmprovision:   config.VMProvision,
-		}
-
-		tests := []struct {
-			name    string
-			delta   int
-			ng      *AutoScalerServerNodeGroup
-			wantErr bool
-		}{
-			{
-				name:    "addNode",
-				delta:   1,
-				wantErr: false,
-				ng:      &testNodeGroup,
-			},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				if err := tt.ng.addNodes(tt.delta, extras); (err != nil) != tt.wantErr {
-					t.Errorf("AutoScalerServerNodeGroup.addNode() error = %v, wantErr %v", err, tt.wantErr)
-				}
-			})
-		}
+		t.Run("addNode", func(t *testing.T) {
+			if err := ng.addNodes(1); err != nil {
+				t.Errorf("AutoScalerServerNodeGroup.addNode() error = %v", err)
+			}
+		})
 	}
 }
 
 func Test_AutoScalerNodeGroup_deleteNode(t *testing.T) {
-	ng := &AutoScalerServerNodeGroup{
-		ServiceIdentifier:   testProviderID,
-		NodeGroupIdentifier: testGroupID,
-		Machine: &types.MachineCharacteristic{
-			Memory: 4096,
-			Vcpu:   4,
-			Disk:   5120,
-		},
-		Status:       NodegroupNotCreated,
-		MinNodeSize:  0,
-		MaxNodeSize:  5,
-		PendingNodes: make(map[string]*AutoScalerServerNode),
-		Nodes: map[string]*AutoScalerServerNode{
-			testNodeName: &AutoScalerServerNode{
-				NodeName:         testNodeName,
-				Memory:           4096,
-				CPU:              4,
-				Disk:             5120,
-				Addresses:        []string{},
-				State:            AutoScalerServerNodeStateNotCreated,
-				AutoProvisionned: true,
-			},
-		},
-	}
+	_, ng, testNode, err := newTestNode()
 
-	tests := []struct {
-		name     string
-		delta    int
-		nodeName string
-		ng       *AutoScalerServerNodeGroup
-		wantErr  bool
-	}{
-		{
-			name:     "deleteNode",
-			delta:    1,
-			wantErr:  false,
-			nodeName: testNodeName,
-			ng:       ng,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.ng.deleteNodeByName(kubeconfig, tt.nodeName); (err != nil) != tt.wantErr {
-				t.Errorf("AutoScalerServerNodeGroup.deleteNode() error = %v, wantErr %v", err, tt.wantErr)
+	if assert.NoError(t, err) {
+		t.Run("Delete VM", func(t *testing.T) {
+			if err := ng.deleteNodeByName(testNode.NodeName); err != nil {
+				t.Errorf("AutoScalerServerNodeGroup.deleteNode() error = %vv", err)
 			}
 		})
 	}
 }
 
 func Test_AutoScalerNodeGroup_deleteNodeGroup(t *testing.T) {
-	ng := &AutoScalerServerNodeGroup{
-		ServiceIdentifier:   testProviderID,
-		NodeGroupIdentifier: testGroupID,
-		Machine: &types.MachineCharacteristic{
-			Memory: 4096,
-			Vcpu:   4,
-			Disk:   5120,
-		},
-		Status:       NodegroupNotCreated,
-		MinNodeSize:  0,
-		MaxNodeSize:  5,
-		PendingNodes: make(map[string]*AutoScalerServerNode),
-		Nodes: map[string]*AutoScalerServerNode{
-			testNodeName: &AutoScalerServerNode{
-				NodeName:         testNodeName,
-				Memory:           4096,
-				CPU:              4,
-				Disk:             5120,
-				Addresses:        []string{},
-				State:            AutoScalerServerNodeStateNotCreated,
-				AutoProvisionned: true,
-			},
-		},
-	}
+	_, ng, _, err := newTestNode()
 
-	tests := []struct {
-		name     string
-		delta    int
-		nodeName string
-		ng       *AutoScalerServerNodeGroup
-		wantErr  bool
-	}{
-		{
-			name:    "deleteNodeGroup",
-			delta:   1,
-			wantErr: false,
-			ng:      ng,
-		},
-	}
+	if assert.NoError(t, err) {
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.ng.deleteNodeGroup(kubeconfig); (err != nil) != tt.wantErr {
-				t.Errorf("AutoScalerServerNodeGroup.deleteNodeGroup() error = %v, wantErr %v", err, tt.wantErr)
+		t.Run("Delete node group", func(t *testing.T) {
+			if err := ng.deleteNodeGroup(); err != nil {
+				t.Errorf("AutoScalerServerNodeGroup.deleteNodeGroup() error = %v", err)
 			}
 		})
 	}
