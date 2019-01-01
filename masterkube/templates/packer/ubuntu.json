@@ -1,0 +1,55 @@
+{
+    "builders": [
+        {
+            "type": "vsphere-iso",
+            "vcenter_server": "$GOVC_SERVER",
+            "insecure_connection": "true",
+            "datacenter": "$GOVC_DATACENTER",
+            "resource_pool": "$GOVC_RESOURCE_POOL",
+            "username": "$GOVC_USERNAME",
+            "password": "$GOVC_PASSWORD",
+            "cluster": "$GOVC_CLUSTER",
+            "vm_name": "bionic-k8s-$KUBERNETES_VERSION",
+            "convert_to_template": "false",
+            "folder": "$GOVC_FOLDER",
+            "cpu": "2",
+            "ram": "4096",
+            "network": "$GOVC_NETWORK",
+            "network_adapter": "e1000",
+            "guest_os_type": "Ubuntu",
+            "datastore": "$GOVC_DATASTORE",
+            "disk_size": "10GB",
+            "iso": "ISO/ubuntu-18.04.1-live-server-amd64.iso",
+            "iso_datastore": "$GOVC_DATASTORE",
+            "communicator": "ssh"
+        }
+    ],
+    "provisioners": [
+        {
+            "type": "shell",
+            "inline": [
+                "apt-get update",
+                "apt-get upgrade",
+                "apt-get dist-upgrade",
+                "KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)",
+                "CNI_VERSION=v0.7.1",
+                "mkdir -p /opt/cni/bin",
+                "mkdir -p /usr/local/bin",
+                "curl https://get.docker.com | bash",
+                "curl -L \"https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-amd64-${CNI_VERSION}.tgz\" | tar -C /opt/cni/bin -xz",
+                "cd /usr/local/bin",
+                "curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/{kubeadm,kubelet,kubectl}",
+                "chmod +x /usr/local/bin/kube*",
+                "echo \"KUBELET_EXTRA_ARGS='--fail-swap-on=false --read-only-port=10255 --feature-gates=VolumeSubpathEnvExpansion=true'\" > /etc/default/kubelet",
+                "curl -sSL \"https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/kubelet.service\" | sed 's:/usr/bin:/usr/local/bin:g' > /etc/systemd/system/kubelet.service",
+                "mkdir -p /etc/systemd/system/kubelet.service.d",
+                "curl -sSL \"https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/10-kubeadm.conf\" | sed 's:/usr/bin:/usr/local/bin:g' > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf",
+                "systemctl enable kubelet",
+                "systemctl restart kubelet",
+                "echo 'export PATH=/usr/local/bin:/opt/cni/bin:$PATH' >> /etc/profile.d/apps-bin-path.sh",
+                "apt autoremove -y",
+                "/usr/local/bin/kubeadm config images pull --kubernetes-version=${KUBERNETES_VERSION}"
+            ]
+        }
+    ]
+}
