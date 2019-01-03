@@ -7,14 +7,14 @@
 
 CURDIR=$(dirname $0)
 
-export CUSTOM_IMAGE=YES
+export MASTERKUBE="afp-bionic-masterkube"
 export SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
 export KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 export KUBERNETES_PASSWORD=$(uuidgen)
 export KUBECONFIG=$HOME/.kube/config
-export TARGET_IMAGE=$HOME/.local/AutoScaler/cache/bionic-k8s-$KUBERNETES_VERSION-amd64.img
+export TARGET_IMAGE=afp-bionic-k8s-$KUBERNETES_VERSION
 export CNI_VERSION="v0.7.1"
-export PROVIDERID="AutoScaler://ca-grpc-AutoScaler/object?type=node&name=masterkube"
+export PROVIDERID="vmware://ca-grpc-vmware/object?type=node&name=$MASTERKUBE"
 export MINNODES=0
 export MAXNODES=5
 export MAXTOTALNODES=$MAXNODES
@@ -30,20 +30,23 @@ export SCALEDOWNUNREADYTIME="1m"
 export DEFAULT_MACHINE="medium"
 export UNREMOVABLENODERECHECKTIMEOUT="1m"
 export OSDISTRO=$(uname -a)
-export TRANSPORT="unix"
-export LOWBANDWIDTH="NO"
+export TRANSPORT="tcp"
 
-TEMP=$(getopt -o cli:k:n:p:t:v: --long low-bandwidth,transport:,no-custom-image,image:,ssh-key:,cni-version:,password:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
+if [ "$OSDISTRO" == "Linux" ]; then
+    TZ=$(cat /etc/timezone)
+    BASE64="base64 -w 0"
+else
+    TZ=$(sudo systemsetup -gettimezone | awk '{print $2}')
+    BASE64="base64"
+fi
+
+TEMP=$(getopt -o i:k:n:p:t:v: --long transport:,no-custom-image,image:,ssh-key:,cni-version:,password:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
 
 eval set -- "$TEMP"
 
 # extract options and their arguments into variables.
 while true; do
 	case "$1" in
-	-c | --no-custom-image)
-		CUSTOM_IMAGE="NO"
-		shift 1
-		;;
 	-d | --default-machine)
 		DEFAULT_MACHINE="$2"
 		shift 2
@@ -56,10 +59,6 @@ while true; do
 		SSH_KEY="$2"
 		shift 2
 		;;
-    -l | --low-bandwidth)
-        LOWBANDWIDTH="YES"
-        shift 1
-        ;;
 	-n | --cni-version)
 		CNI_VERSION="$2"
 		shift 2
@@ -74,7 +73,7 @@ while true; do
 		;;
 	-v | --kubernetes-version)
 		KUBERNETES_VERSION="$2"
-		TARGET_IMAGE="$HOME/.local/AutoScaler/cache/bionic-k8s-$KUBERNETES_VERSION-amd64.img"
+        TARGET_IMAGE=afp-bionic-k8s-$KUBERNETES_VERSION
 		shift 2
 		;;
 	--max-nodes-total)
@@ -134,8 +133,8 @@ done
 
 # GRPC network endpoint
 if [ "$TRANSPORT" == "unix" ]; then
-    LISTEN="/var/run/cluster-autoscaler/grpc.sock"
-    CONNECTTO="/var/run/cluster-autoscaler/grpc.sock"
+    LISTEN="/var/run/cluster-autoscaler/vmware.sock"
+    CONNECTTO="/var/run/cluster-autoscaler/vmware.sock"
 elif [ "$TRANSPORT" == "tcp" ]; then
     if [ "$OSDISTRO" == "Linux" ]; then
         NET_IF=$(ip route get 1 | awk '{print $5;exit}')
@@ -154,92 +153,39 @@ fi
 
 echo "Transport set to:${TRANSPORT}, listen endpoint at ${LISTEN}"
 
-# Bandwidth. If low then fetch components before AutoScaler launch, because AutoScaler launch doesnt have timeout option control
-if [ "$LOWBANDWIDTH" == "YES" ]; then
-    echo "Low network low band width endorsed"
-
-    KUBERNETES_CACHE="${HOME}/.local/kubernetes-vmware-autoscaler/${KUBERNETES_VERSION}"
-    PACKAGE_UPGRADE="false"
-
-    MOUNTPOINTS=$(cat <<EOF
-        "$PWD/config": "/etc/cluster-autoscaler",
-        "$KUBERNETES_CACHE/cni": "/opt/cni/bin",
-        "$KUBERNETES_CACHE/kubernetes": "/opt/bin",
-        "$KUBERNETES_CACHE/docker": "/opt/docker"
+MOUNTPOINTS=$(cat <<EOF
+    "$PWD/config": "/etc/cluster-autoscaler"
 EOF
 )
 
-    if [ ! -d "$KUBERNETES_CACHE" ]; then
-        mkdir -p "${HOME}/.local/kubernetes-vmware-autoscaler/${KUBERNETES_VERSION}"
-        pushd $KUBERNETES_CACHE
-        mkdir -p docker
-        mkdir -p cni
-        curl -L https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-amd64-${CNI_VERSION}.tgz | tar -C cni -xz
-        mkdir -p kubernetes
-        pushd kubernetes
-        curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/{kubeadm,kubelet,kubectl}
-        chmod +x *
-        popd
-    fi
+PACKAGE_UPGRADE="true"
 
-    RUN_CMD=$(
-    cat <<EOF
-    [
-        "mkdir -p /opt/cni/bin",
-        "mkdir -p /opt/bin",
-        "curl https://get.docker.com | bash",
-        "echo \"KUBELET_EXTRA_ARGS='--fail-swap-on=false --read-only-port=10255 --feature-gates=VolumeSubpathEnvExpansion=true'\" > /etc/default/kubelet",
-        "curl -sSL \"https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/kubelet.service\" | sed 's:/usr/bin:/opt/bin:g' > /etc/systemd/system/kubelet.service",
-        "mkdir -p /etc/systemd/system/kubelet.service.d",
-        "curl -sSL \"https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/10-kubeadm.conf\" | sed 's:/usr/bin:/opt/bin:g' > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf",
-        "ln -s /opt/bin/kubeadm /usr/local/bin/kubeadm",
-        "ln -s /opt/bin/kubelet /usr/local/bin/kubelet",
-        "ln -s /opt/bin/kubectl /usr/local/bin/kubectl",
-        "systemctl enable kubelet",
-        "systemctl restart kubelet",
-        "echo 'export PATH=/opt/bin:/opt/cni/bin:\$PATH' >> /etc/profile.d/apps-bin-path.sh",
-        "apt autoremove -y",
-        "echo '#!/bin/bash' > /usr/local/bin/kubeimage",
-        "echo 'for f in /opt/docker/*.tar ; do echo \"Import docker image cache \$f\" ; docker load -i \$f ; done' >> /usr/local/bin/kubeimage",
-        "chmod +x /usr/local/bin/kubeimage"
+RUN_CMD=$(
+cat <<EOF
+[
+    "curl https://get.docker.com | bash",
+    "mkdir -p /opt/cni/bin",
+    "curl -L https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-amd64-${CNI_VERSION}.tgz | tar -C /opt/cni/bin -xz",
+    "mkdir -p /opt/bin",
+    "cd /opt/bin ; curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/{kubeadm,kubelet,kubectl}",
+    "chmod +x /opt/bin/kube*",
+    "echo \"KUBELET_EXTRA_ARGS='--fail-swap-on=false --read-only-port=10255 --feature-gates=VolumeSubpathEnvExpansion=true'\" > /etc/default/kubelet",
+    "curl -sSL \"https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/kubelet.service\" | sed 's:/usr/bin:/opt/bin:g' > /etc/systemd/system/kubelet.service",
+    "mkdir -p /etc/systemd/system/kubelet.service.d",
+    "curl -sSL \"https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/10-kubeadm.conf\" | sed 's:/usr/bin:/opt/bin:g' > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf",
+    "ln -s /opt/bin/kubeadm /usr/local/bin/kubeadm",
+    "ln -s /opt/bin/kubelet /usr/local/bin/kubelet",
+    "ln -s /opt/bin/kubectl /usr/local/bin/kubectl",
+    "systemctl enable kubelet",
+    "systemctl restart kubelet",
+    "echo 'export PATH=/opt/bin:/opt/cni/bin:\$PATH' >> /etc/profile.d/apps-bin-path.sh",
+    "apt autoremove -y"
+    "echo '#!/bin/bash' > /usr/local/bin/kubeimage",
+    "echo '/opt/bin/kubeadm config images pull --kubernetes-version=${KUBERNETES_VERSION}' >> /usr/local/bin/kubeimage",
+    "chmod +x /usr/local/bin/kubeimage"
 ]
 EOF
 )
-else
-    MOUNTPOINTS=$(cat <<EOF
-        "$PWD/config": "/etc/cluster-autoscaler"
-EOF
-)
-
-    PACKAGE_UPGRADE="true"
-
-    RUN_CMD=$(
-    cat <<EOF
-    [
-        "curl https://get.docker.com | bash",
-        "mkdir -p /opt/cni/bin",
-        "curl -L https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-amd64-${CNI_VERSION}.tgz | tar -C /opt/cni/bin -xz",
-        "mkdir -p /opt/bin",
-        "cd /opt/bin ; curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/{kubeadm,kubelet,kubectl}",
-        "chmod +x /opt/bin/kube*",
-        "echo \"KUBELET_EXTRA_ARGS='--fail-swap-on=false --read-only-port=10255 --feature-gates=VolumeSubpathEnvExpansion=true'\" > /etc/default/kubelet",
-        "curl -sSL \"https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/kubelet.service\" | sed 's:/usr/bin:/opt/bin:g' > /etc/systemd/system/kubelet.service",
-        "mkdir -p /etc/systemd/system/kubelet.service.d",
-        "curl -sSL \"https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/10-kubeadm.conf\" | sed 's:/usr/bin:/opt/bin:g' > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf",
-        "ln -s /opt/bin/kubeadm /usr/local/bin/kubeadm",
-        "ln -s /opt/bin/kubelet /usr/local/bin/kubelet",
-        "ln -s /opt/bin/kubectl /usr/local/bin/kubectl",
-        "systemctl enable kubelet",
-        "systemctl restart kubelet",
-        "echo 'export PATH=/opt/bin:/opt/cni/bin:\$PATH' >> /etc/profile.d/apps-bin-path.sh",
-        "apt autoremove -y"
-        "echo '#!/bin/bash' > /usr/local/bin/kubeimage",
-        "echo '/opt/bin/kubeadm config images pull --kubernetes-version=${KUBERNETES_VERSION}' >> /usr/local/bin/kubeimage",
-        "chmod +x /usr/local/bin/kubeimage"
-    ]
-EOF
-)
-fi
 
 KUBERNETES_USER=$(
 	cat <<EOF
@@ -309,120 +255,81 @@ fi
 export DOMAIN_NAME=$(openssl x509 -noout -fingerprint -text <./etc/ssl/cert.pem | grep 'Subject: CN' | tr '=' ' ' | awk '{print $3}' | sed 's/\*\.//g')
 
 # Because AutoScaler on MacOS doesn't support local image, we can't use custom image
-if [ "$OSDISTRO" == "Linux" ]; then
-	POWERSTATE=$(
-		cat <<EOF
-        , "power_state": {
-            "mode": "reboot",
-            "message": "Reboot VM due upgrade",
-            "condition": true
-        }
+POWERSTATE=$(
+    cat <<EOF
+    , "power_state": {
+        "mode": "reboot",
+        "message": "Reboot VM due upgrade",
+        "condition": true
+    }
 EOF
-	)
-else
-	CUSTOM_IMAGE="NO"
-	POWERSTATE=
-fi
+)
 
-if [ "$CUSTOM_IMAGE" == "YES" ] && [ ! -f $TARGET_IMAGE ]; then
+if [ -z "$(govc vm.info)" ]; then
+    echo "Create vmware preconfigured image"
 
-	[ -d "$HOME/.local/AutoScaler/cache/" ] || mkdir -p $HOME/.local/AutoScaler/cache/
-
-	if [ "$OSDISTRO" == "Linux" ]; then
-		echo "Create AutoScaler preconfigured image"
-
-		create-image.sh --password=$KUBERNETES_PASSWORD \
-			--cni-version=$CNI_VERSION \
-			--custom-image=$TARGET_IMAGE \
-			--kubernetes-version=$KUBERNETES_VERSION
-	else
-		cat <<-EOF | python2 -c "import json,sys,yaml; print yaml.safe_dump(json.load(sys.stdin), width=500, indent=4, default_flow_style=False)" >./config/imagecreator.yaml
-        {
-            "package_update": true,
-            "package_upgrade": false,
-            "packages" : [
-                "libguestfs-tools"
-            ],
-            "ssh_authorized_keys": [
-                "$SSH_KEY"
-            ]
-        }
-EOF
-		echo "Create AutoScaler VM to create the custom image"
-
-		AutoScaler launch -n imagecreator -m 4096 -c 4 --cloud-init=./config/imagecreator.yaml bionic
-
-		ROOT_IMAGE=$(dirname $TARGET_IMAGE)
-
-		AutoScaler mount $PWD/bin imagecreator:/masterkube/bin
-		AutoScaler mount $HOME/.local/AutoScaler/cache/ imagecreator:/home/AutoScaler/.local/AutoScaler/cache/
-		AutoScaler mount $ROOT_IMAGE imagecreator:$ROOT_IMAGE
-
-		echo "Create AutoScaler preconfigured image (could take a long)"
-
-		AutoScaler shell imagecreator <<EOF
-            /masterkube/bin/create-image.sh --password=$KUBERNETES_PASSWORD \
-                --cni-version=$CNI_VERSION \
-                --custom-image=$TARGET_IMAGE \
-                --kubernetes-version=$KUBERNETES_VERSION
-            exit
-EOF
-		AutoScaler delete imagecreator -p
-	fi
+    create-image.sh --password=$KUBERNETES_PASSWORD \
+        --cni-version=$CNI_VERSION \
+        --custom-image=$TARGET_IMAGE \
+        --kubernetes-version=$KUBERNETES_VERSION
 fi
 
 ./bin/delete-masterkube.sh
 
-if [ "$CUSTOM_IMAGE" = "YES" ]; then
-	echo "Launch custom masterkube instance with $TARGET_IMAGE"
+echo "Launch custom $MASTERKUBE instance with $TARGET_IMAGE"
 
-	cat <<EOF | tee ./config/cloud-init-masterkube.json | python2 -c "import json,sys,yaml; print yaml.safe_dump(json.load(sys.stdin), width=500, indent=4, default_flow_style=False)" >./config/cloud-init-masterkube.yaml
-    {
-        "package_update": false,
-        "package_upgrade": false,
-        "users": $KUBERNETES_USER,
-        "ssh_authorized_keys": [
-            "$SSH_KEY"
-        ],
-        "group": [
-            "kubernetes"
-        ]
-    }
+cat > ./config/network.yaml <<EOF
+network:
+    version: 2
+    ethernets:
+        eth0:
+            dhcp4: true
+        eth1:
+            dhcp4: true
 EOF
 
-	LAUNCH_IMAGE_URL=file://$TARGET_IMAGE
-
-else
-	echo "Launch standard masterkube instance"
-
-	cat <<EOF | tee ./config/cloud-init-masterkube.json | python2 -c "import json,sys,yaml; print yaml.safe_dump(json.load(sys.stdin), width=500, indent=4, default_flow_style=False)" >./config/cloud-init-masterkube.yaml
-    {
-        "package_update": true,
-        "package_upgrade": $PACKAGE_UPGRADE,
-        "runcmd": $RUN_CMD,
-        "users": $KUBERNETES_USER,
-        "ssh_authorized_keys": [
-            "$SSH_KEY"
-        ],
-        "group": [
-            "kubernetes"
-        ]
-        $POWERSTATE
-    }
+cat > ./config/vendordata.yaml <<EOF
+package_update: true
+package_upgrade: true
+timezone: $TZ
+ssh_authorized_keys:
+    - $SSHKEY
+users:
+    - default
+system_info:
+    default_user:
+        name: kubernetes
 EOF
 
-	LAUNCH_IMAGE_URL="bionic"
-fi
+cat > ./config/metadata.json <<EOF
+{
+	"network": "$(cat ./config/network.yaml | gzip -c9 | $BASE64)",
+	"network.encoding": "gzip+base64",
+	"local-hostname": "$MASTERKUBE",
+	"instance-id": "$MASTERKUBE"
+}
+EOF
 
-AutoScaler launch -n masterkube -m 4096 -c 2 -d 10G --cloud-init=./config/cloud-init-masterkube.yaml $LAUNCH_IMAGE_URL
+cat <<EOF | tee ./config/userdata.json | python2 -c "import json,sys,yaml; print yaml.safe_dump(json.load(sys.stdin), width=500, indent=4, default_flow_style=False)" >./config/userdata.yaml
+{
+}
+EOF
 
-# Due bug in AutoScaler MacOS, we need to reboot manually the VM after apt upgrade
-if [ "$LOWBANDWIDTH" != "YES" ] && [ "$CUSTOM_IMAGE" != "YES" ] && [ "$OSDISTRO" != "Linux" ]; then
-	AutoScaler stop masterkube
-	AutoScaler start masterkube
-fi
+METADATA=$(gzip -c9 <./config/metadata.yaml | $BASE64)
+USERDATA=$(gzip -c9 <./config/userdata.yaml | $BASE64)
+VENDORDATA=$(gzip -c9 <./config/vendordata.yaml | $BASE64)
 
-sudo mkdir -p /var/run/cluster-autoscaler
+govc vm.clone -link=false -on=false -c=2 -m=4096 -vm=$TARGET_IMAGE $MASTERKUBE
+
+govc vm.change -vm "${MASTERKUBE}" -e guestinfo.metadata="${METADATA}"
+govc vm.change -vm "${MASTERKUBE}" -e guestinfo.metadata.encoding="gzip+base64"
+govc vm.change -vm "${MASTERKUBE}" -e guestinfo.userdata="${USERDATA}"
+govc vm.change -vm "${MASTERKUBE}" -e guestinfo.userdata.encoding="gzip+base64"
+govc vm.change -vm "${MASTERKUBE}" -e guestinfo.vendordata="${VENDORDATA}"
+govc vm.change -vm "${MASTERKUBE}" -e guestinfo.vendordata.encoding="gzip+base64"
+
+govc vm.power -on "${MASTERKUBE}"
+IPADDR=$(govc vm.ip -wait 5m "${MASTERKUBE}")
 
 AutoScaler mount $PWD/bin masterkube:/masterkube/bin
 AutoScaler mount $PWD/templates masterkube:/masterkube/templates
@@ -430,24 +337,14 @@ AutoScaler mount $PWD/etc masterkube:/masterkube/etc
 AutoScaler mount $PWD/cluster masterkube:/etc/cluster
 AutoScaler mount $PWD/kubernetes masterkube:/etc/kubernetes
 AutoScaler mount $PWD/config masterkube:/etc/cluster-autoscaler
-AutoScaler mount /var/run/cluster-autoscaler masterkube:/var/run/cluster-autoscaler
-
-if [ "$LOWBANDWIDTH" == "YES" ]; then
-    AutoScaler mount "$KUBERNETES_CACHE/kubernetes" masterkube:/opt/bin
-    AutoScaler mount "$KUBERNETES_CACHE/docker" masterkube:/opt/docker
-    AutoScaler mount "$KUBERNETES_CACHE/cni" masterkube:/opt/cni/bin
-fi
 
 echo "Prepare masterkube instance"
+scp ./bin/* kubernetes@${IPADDR}:/usr/local/bin/*
 
-AutoScaler shell masterkube <<EOF
-sudo usermod -aG docker AutoScaler
-sudo usermod -aG docker kubernetes
 echo "Start kubernetes masterkube instance master node"
-sudo /usr/local/bin/kubeimage
-sudo bash -c "export PATH=/opt/bin:/opt/cni/bin:/masterkube/bin:\$PATH; create-cluster.sh flannel ens3 '$KUBERNETES_VERSION' '$PROVIDERID'"
-exit
-EOF
+ssh kubernetes@${IPADDR} sudo bash -c "export PATH=/opt/cni/bin:/masterkube/bin:\$PATH; create-cluster.sh flannel eth0 '$KUBERNETES_VERSION' '$PROVIDERID'" 
+
+scp kubernetes@${IPADDR}:/etc/cluster/* ./cluster
 
 MASTER_IP=$(cat ./cluster/manager-ip)
 TOKEN=$(cat ./cluster/token)
@@ -465,108 +362,55 @@ echo $(eval "cat <<EOF
 $(<./templates/cluster/grpc-config.json)
 EOF") | jq . >./config/grpc-config.json
 
-if [ "$CUSTOM_IMAGE" = "YES" ]; then
-
-	cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
-    {
-        "network": "$TRANSPORT",
-        "listen": "$LISTEN",
-        "secret": "AutoScaler",
-        "minNode": $MINNODES,
-        "maxNode": $MAXNODES,
-        "nodePrice": 0.0,
-        "podPrice": 0.0,
-        "image": "$LAUNCH_IMAGE_URL",
-        "vm-provision": true,
-        "kubeconfig": "$KUBECONFIG",
-        "optionals": {
-            "pricing": false,
-            "getAvailableMachineTypes": false,
-            "newNodeGroup": false,
-            "templateNodeInfo": false,
-            "createNodeGroup": false,
-            "deleteNodeGroup": false
-        },
-        "kubeadm": {
-            "address": "$MASTER_IP",
-            "token": "$TOKEN",
-            "ca": "sha256:$CACERT",
-            "extras-args": [
-                "--ignore-preflight-errors=All"
-            ]
-        },
-        "default-machine": "$DEFAULT_MACHINE",
-        "machines": $MACHINE_DEFS,
-        "cloud-init": {
-            "package_update": false,
-            "package_upgrade": false,
-            "users": $KUBERNETES_USER,
-            "runcmd": [
-                "kubeadm config images pull --kubernetes-version=${KUBERNETES_VERION}"
-            ],
-            "ssh_authorized_keys": [
-                "$SSH_KEY"
-            ],
-            "group": [
-                "kubernetes"
-            ]
-        },
-        "mount-point": {
-            $MOUNTPOINTS
-        }
+cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
+{
+    "network": "$TRANSPORT",
+    "listen": "$LISTEN",
+    "secret": "AutoScaler",
+    "minNode": $MINNODES,
+    "maxNode": $MAXNODES,
+    "nodePrice": 0.0,
+    "podPrice": 0.0,
+    "image": "$LAUNCH_IMAGE_URL",
+    "vm-provision": true,
+    "kubeconfig": "$KUBECONFIG",
+    "optionals": {
+        "pricing": false,
+        "getAvailableMachineTypes": false,
+        "newNodeGroup": false,
+        "templateNodeInfo": false,
+        "createNodeGroup": false,
+        "deleteNodeGroup": false
+    },
+    "kubeadm": {
+        "address": "$MASTER_IP",
+        "token": "$TOKEN",
+        "ca": "sha256:$CACERT",
+        "extras-args": [
+            "--ignore-preflight-errors=All"
+        ]
+    },
+    "default-machine": "$DEFAULT_MACHINE",
+    "machines": $MACHINE_DEFS,
+    "cloud-init": {
+        "package_update": false,
+        "package_upgrade": false,
+        "users": $KUBERNETES_USER,
+        "runcmd": [
+            "kubeadm config images pull --kubernetes-version=${KUBERNETES_VERION}"
+        ],
+        "ssh_authorized_keys": [
+            "$SSH_KEY"
+        ],
+        "group": [
+            "kubernetes"
+        ]
+    },
+    "mount-point": {
+        $MOUNTPOINTS
     }
+}
 EOF
-else
-	cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
-    {
-        "network": "$TRANSPORT",
-        "listen": "$LISTEN",
-        "secret": "AutoScaler",
-        "minNode": $MINNODES,
-        "maxNode": $MAXNODES,
-        "nodePrice": 0.0,
-        "podPrice": 0.0,
-        "image": "bionic",
-        "vm-provision": true,
-        "kubeconfig": "$KUBECONFIG",
-        "optionals": {
-            "pricing": false,
-            "getAvailableMachineTypes": false,
-            "newNodeGroup": false,
-            "templateNodeInfo": false,
-            "createNodeGroup": false,
-            "deleteNodeGroup": false
-        },
-        "kubeadm": {
-            "address": "$MASTER_IP",
-            "token": "$TOKEN",
-            "ca": "sha256:$CACERT",
-            "extras-args": [
-                "--ignore-preflight-errors=All"
-            ]
-        },
-        "default-machine": "$DEFAULT_MACHINE",
-        "machines": $MACHINE_DEFS,
-        "cloud-init": {
-            "package_update": true,
-            "package_upgrade": $PACKAGE_UPGRADE,
-            "runcmd": $RUN_CMD,
-            "users": $KUBERNETES_USER,
-            "ssh_authorized_keys": [
-                "$SSH_KEY"
-            ],
-            "group": [
-                "kubernetes"
-            ]
-            $POWERSTATE
-        },
-        "mount-point": {
-            $MOUNTPOINTS
-        }
-    }
-EOF
-
-fi
 
 HOSTS_DEF=$(AutoScaler info masterkube | grep IPv4 | awk "{print \$2 \"    masterkube.$DOMAIN_NAME masterkube-dashboard.$DOMAIN_NAME\"}")
 

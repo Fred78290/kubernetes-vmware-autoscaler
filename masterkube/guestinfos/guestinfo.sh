@@ -20,7 +20,7 @@ elif [ ! -z "$(vmrun list | grep $VMX)" ]; then
 	vmrun stop $VMX
 fi
 
-cat > ${CURDIR}/vendordata.yaml <<EOF
+cat > ${CURDIR}/userdata.yaml <<EOF
 group:
     - kubernetes
 runcmd:

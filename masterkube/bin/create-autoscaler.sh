@@ -24,14 +24,14 @@ EOF") | jq . > $ETC_DIR/$1.json
 kubectl apply -f $ETC_DIR/$1.json --kubeconfig=./cluster/config
 }
 
-nohup ../out/AutoScaler-autoscaler-$GOOS-amd64 \
+nohup ../out/vmware-autoscaler-$GOOS-amd64 \
     --config=$PWD/config/kubernetes-vmware-autoscaler.json \
-    --save=$PWD/config/autoscaler-state.json \
+    --save=$PWD/config/vmware-autoscaler-state.json \
     -v=1 \
-    -logtostderr=true  1>>config/AutoScaler-autoscaler.log 2>&1 &
+    -logtostderr=true  1>>config/vmware-autoscaler.log 2>&1 &
 pid="$!"
 
-echo -n "$pid" > config/AutoScaler-autoscaler.pid
+echo -n "$pid" > config/vmware-autoscaler.pid
 
 deploy service-account
 deploy cluster-role
