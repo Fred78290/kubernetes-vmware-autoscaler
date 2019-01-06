@@ -35,9 +35,9 @@ type AutoScalerServerOptionals struct {
 
 // AutoScalerServerSSH contains ssh client infos
 type AutoScalerServerSSH struct {
-	UserName string
-	Password string
-	AuthKeys string
+	UserName string `json:"user"`
+	Password string `json:"password"`
+	AuthKeys string `json:"ssh-key"`
 }
 
 // AutoScalerServerRsync declare an rsync operation
@@ -64,15 +64,13 @@ type AutoScalerServerConfig struct {
 	MaxNode            int                               `json:"maxNode"`                       // Mandatory, Max AutoScaler VM
 	NodePrice          float64                           `json:"nodePrice"`                     // Optional, The VM price
 	PodPrice           float64                           `json:"podPrice"`                      // Optional, The pod price
-	Image              string                            `json:"image"`                         // Mandatory, VM to clone
 	KubeCtlConfig      string                            `default:"/etc/kubernetes/config" json:"kubeconfig"`
 	KubeAdm            KubeJoinConfig                    `json:"kubeadm"`
 	DefaultMachineType string                            `default:"{\"standard\": {}}" json:"default-machine"`
 	Machines           map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
 	CloudInit          interface{}                       `json:"cloud-init"`                            // Optional, The cloud init conf file
 	SyncFolders        *AutoScalerServerSyncFolders      `json:"sync-folder"`                           // Optional, do rsync between host and guest
-	VMProvision        bool                              `default:"true" json:"vm-provision"`
 	Optionals          *AutoScalerServerOptionals        `json:"optionals"`
 	SSH                *AutoScalerServerSSH              `json:"ssh-infos"`
-	VSphere            vsphere.Configuration             `json:"vsphere-infos"`
+	VMwareInfos        map[string]*vsphere.Configuration `json:"vsphere"`
 }

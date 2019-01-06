@@ -10,10 +10,9 @@ if [ -f ./cluster/config ]; then
     do
         vm=$(echo -n $vm | tr -d '"')
         echo "Delete VM: $vm"
-        UUID=$(govc vm.info $vm | grep UUID | awk '{print $2}')
-        if [ ! -z "$UUID" ]; then
+        if [ -z "$(govc vm.info $vm 2>&1)" ]; then
             govc vm.power -off $vm
-            govc vm.destroy -vm.uuid=$UUID
+            govc vm.destroy $vm
         fi
     done
 fi
@@ -24,8 +23,8 @@ if [ -f config/vmware-autoscaler.pid ]; then
     kill $(cat config/vmware-autoscaler.pid)
 fi
 
-rm -rf cluster/*
-rm -rf config/*
-rm -rf kubernetes/*
+find cluster ! -name '*.md' -type f -exec rm -f "{}" "+"
+find config ! -name '*.md' -type f -exec rm -f "{}" "+"
+find kubernetes ! -name '*.md' -type f -exec rm -f "{}" "+"
 
 popd

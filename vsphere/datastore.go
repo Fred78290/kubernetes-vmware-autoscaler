@@ -11,6 +11,7 @@ import (
 	"github.com/vmware/govmomi/govc/flags"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25"
+	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
@@ -32,6 +33,16 @@ type listOutput struct {
 	recurse bool
 	all     bool
 	slash   bool
+}
+
+func arrayContains(arrayOfString []string, value string) bool {
+	for _, v := range arrayOfString {
+		if v == value {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (o *listOutput) add(r types.HostDatastoreBrowserSearchResults) {
@@ -122,10 +133,33 @@ func (ds *Datastore) resourcePool(ctx *Context, name string) (*object.ResourcePo
 	return f.ResourcePoolOrDefault(ctx, name)
 }
 
-func (ds *Datastore) folder(ctx *Context, name string) (*object.Folder, error) {
+func (ds *Datastore) vmFolder(ctx *Context, name string) (*object.Folder, error) {
 	f := ds.Datacenter.NewFinder(ctx)
 
-	return f.FolderOrDefault(ctx, name)
+	if len(name) != 0 {
+		es, err := f.ManagedObjectList(ctx, name)
+
+		if err != nil {
+			return nil, err
+		}
+
+		for _, e := range es {
+			switch o := e.Object.(type) {
+			case mo.Folder:
+				if arrayContains(o.ChildType, "VirtualMachine") {
+
+					folder := object.NewFolder(ds.VimClient(), o.Reference())
+					folder.InventoryPath = e.Path
+
+					return folder, err
+				}
+			}
+		}
+
+		return nil, fmt.Errorf("Folder %s not found", name)
+	}
+
+	return f.DefaultFolder(ctx)
 }
 
 func (ds *Datastore) output(ctx *Context) *flags.OutputFlag {
@@ -144,7 +178,6 @@ func (ds *Datastore) CreateVirtualMachine(ctx *Context, name string) (*VirtualMa
 	var templateVM *object.VirtualMachine
 	var folder *object.Folder
 	var resourcePool *object.ResourcePool
-	var devices object.VirtualDeviceList
 	var task *object.Task
 	var err error
 	var vm *VirtualMachine
@@ -157,19 +190,22 @@ func (ds *Datastore) CreateVirtualMachine(ctx *Context, name string) (*VirtualMa
 		logger := output.ProgressLogger(fmt.Sprintf("Cloning %s to %s...", templateVM.InventoryPath, name))
 		defer logger.Wait()
 
-		if folder, err = ds.folder(ctx, config.VMBasePath); err == nil {
+		if folder, err = ds.vmFolder(ctx, config.VMBasePath); err == nil {
 			if resourcePool, err = ds.resourcePool(ctx, config.Resource); err == nil {
-				if devices, err = templateVM.Device(ctx); err == nil {
+				// prepare virtual device config spec for network card
+				configSpecs := []types.BaseVirtualDeviceConfigSpec{}
 
-					// prepare virtual device config spec for network card
-					configSpecs := []types.BaseVirtualDeviceConfigSpec{}
+				if config.Network != nil {
+					var devices object.VirtualDeviceList
 
-					if config.Network != nil {
+					if devices, err = templateVM.Device(ctx); err == nil {
 						op := types.VirtualDeviceConfigSpecOperationAdd
 						card, derr := config.Network.Device(ds.VimClient(), ds.Datacenter.Datacenter(ctx))
+
 						if derr != nil {
 							return nil, derr
 						}
+
 						// search for the first network card of the source
 						for _, device := range devices {
 							if _, ok := device.(types.BaseVirtualEthernetCard); ok {
@@ -185,60 +221,60 @@ func (ds *Datastore) CreateVirtualMachine(ctx *Context, name string) (*VirtualMa
 							Operation: op,
 							Device:    card,
 						})
+					}
+				}
 
-						folderref := folder.Reference()
-						poolref := resourcePool.Reference()
+				folderref := folder.Reference()
+				poolref := resourcePool.Reference()
 
-						cloneSpec := &types.VirtualMachineCloneSpec{
-							PowerOn:  false,
-							Template: config.Template,
-						}
+				cloneSpec := &types.VirtualMachineCloneSpec{
+					PowerOn:  false,
+					Template: config.Template,
+				}
 
-						relocateSpec := types.VirtualMachineRelocateSpec{
-							DeviceChange: configSpecs,
-							Folder:       &folderref,
-							Pool:         &poolref,
-						}
+				relocateSpec := types.VirtualMachineRelocateSpec{
+					DeviceChange: configSpecs,
+					Folder:       &folderref,
+					Pool:         &poolref,
+				}
 
-						if config.LinkedClone {
-							relocateSpec.DiskMoveType = string(types.VirtualMachineRelocateDiskMoveOptionsMoveAllDiskBackingsAndAllowSharing)
-						}
+				if config.LinkedClone {
+					relocateSpec.DiskMoveType = string(types.VirtualMachineRelocateDiskMoveOptionsMoveAllDiskBackingsAndAllowSharing)
+				}
 
-						cloneSpec.Location = relocateSpec
-						cloneSpec.Location.Datastore = &ds.Ref
+				cloneSpec.Location = relocateSpec
+				cloneSpec.Location.Datastore = &ds.Ref
 
-						// check if customization specification requested
-						if len(config.Customization) > 0 {
-							// get the customization spec manager
-							customizationSpecManager := object.NewCustomizationSpecManager(ds.VimClient())
-							// check if customization specification exists
-							exists, err := customizationSpecManager.DoesCustomizationSpecExist(ctx, config.Customization)
-							if err != nil {
-								return nil, err
-							}
-							if exists == false {
-								return nil, fmt.Errorf("Customization specification %s does not exists", config.Customization)
-							}
-							// get the customization specification
-							customSpecItem, err := customizationSpecManager.GetCustomizationSpec(ctx, config.Customization)
-							if err != nil {
-								return nil, err
-							}
-							customSpec := customSpecItem.Spec
-							// set the customization
-							cloneSpec.Customization = &customSpec
-						}
+				// check if customization specification requested
+				if len(config.Customization) > 0 {
+					// get the customization spec manager
+					customizationSpecManager := object.NewCustomizationSpecManager(ds.VimClient())
+					// check if customization specification exists
+					exists, err := customizationSpecManager.DoesCustomizationSpecExist(ctx, config.Customization)
+					if err != nil {
+						return nil, err
+					}
+					if exists == false {
+						return nil, fmt.Errorf("Customization specification %s does not exists", config.Customization)
+					}
+					// get the customization specification
+					customSpecItem, err := customizationSpecManager.GetCustomizationSpec(ctx, config.Customization)
+					if err != nil {
+						return nil, err
+					}
+					customSpec := customSpecItem.Spec
+					// set the customization
+					cloneSpec.Customization = &customSpec
+				}
 
-						if task, err = templateVM.Clone(ctx, folder, name, *cloneSpec); err == nil {
-							var info *types.TaskInfo
+				if task, err = templateVM.Clone(ctx, folder, name, *cloneSpec); err == nil {
+					var info *types.TaskInfo
 
-							if info, err = task.WaitForResult(ctx, logger); err == nil {
-								vm = &VirtualMachine{
-									Ref:       info.Result.(types.ManagedObjectReference),
-									Name:      name,
-									Datastore: ds,
-								}
-							}
+					if info, err = task.WaitForResult(ctx, logger); err == nil {
+						vm = &VirtualMachine{
+							Ref:       info.Result.(types.ManagedObjectReference),
+							Name:      name,
+							Datastore: ds,
 						}
 					}
 				}

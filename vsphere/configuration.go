@@ -1,30 +1,28 @@
 package vsphere
 
 import (
-	"fmt"
 	"net/url"
 	"time"
 
 	"github.com/vmware/govmomi"
-	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
 )
 
 // Configuration declares vsphere connection info
 type Configuration struct {
-	Host          string        `json:"host"`
+	URL           string        `json:"url"`
 	UserName      string        `json:"uid"`
 	Password      string        `json:"password"`
 	Insecure      bool          `json:"insecure"`
 	DataCenter    string        `json:"dc"`
 	DataStore     string        `json:"datastore"`
-	Resource      string        `json:"resource"`
+	Resource      string        `json:"resource-pool"`
 	VMBasePath    string        `json:"vmFolder"`
 	Timeout       time.Duration `json:"timeout"`
 	TemplateName  string        `json:"template-name"`
 	Template      bool          `json:"template"`
 	LinkedClone   bool          `json:"linked"`
-	Customization string        `json:"Customization"`
+	Customization string        `json:"customization"`
 	Network       *Network      `json:"network"`
 }
 
@@ -34,30 +32,41 @@ type Status struct {
 	Powered bool
 }
 
-func (conf *Configuration) getURL() string {
-	return fmt.Sprintf("https://%s:%s@%s%s", conf.UserName, conf.Password, conf.Host, vim25.Path)
+func (conf *Configuration) getURL() (string, error) {
+	u, err := url.Parse(conf.URL)
+
+	if err != nil {
+		return "", err
+	}
+
+	u.User = url.UserPassword(conf.UserName, conf.Password)
+
+	return u.String(), err
 }
 
 // GetClient create a new govomi client
 func (conf *Configuration) GetClient(ctx *Context) (*Client, error) {
 	var u *url.URL
+	var sURL string
 	var err error
 	var c *govmomi.Client
 
-	if u, err = soap.ParseURL(conf.getURL()); err == nil {
-		// Connect and log in to ESX or vCenter
-		if c, err = govmomi.NewClient(ctx, u, conf.Insecure); err == nil {
-			return &Client{
-				Client:        c,
-				Configuration: conf,
-			}, nil
+	if sURL, err = conf.getURL(); err == nil {
+		if u, err = soap.ParseURL(sURL); err == nil {
+			// Connect and log in to ESX or vCenter
+			if c, err = govmomi.NewClient(ctx, u, conf.Insecure); err == nil {
+				return &Client{
+					Client:        c,
+					Configuration: conf,
+				}, nil
+			}
 		}
 	}
-
 	return nil, err
 }
 
 // CreateWithContext will create a named VM not powered
+// memory and disk are in megabytes
 func (conf *Configuration) CreateWithContext(ctx *Context, name string, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory int, cpus int, disk int) (*VirtualMachine, error) {
 	var err error
 	var client *Client
@@ -79,6 +88,7 @@ func (conf *Configuration) CreateWithContext(ctx *Context, name string, userName
 }
 
 // Create will create a named VM not powered
+// memory and disk are in megabytes
 func (conf *Configuration) Create(name string, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory int, cpus int, disk int) (*VirtualMachine, error) {
 	ctx := NewContext(conf.Timeout)
 	defer ctx.Cancel()

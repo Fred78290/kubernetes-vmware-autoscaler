@@ -50,7 +50,7 @@ type AutoScalerServerNode struct {
 	Addresses        []string                  `json:"addresses"`
 	State            AutoScalerServerNodeState `json:"state"`
 	AutoProvisionned bool                      `json:"auto"`
-	configuration    *types.AutoScalerServerConfig
+	serverConfig     *types.AutoScalerServerConfig
 }
 
 func (vm *AutoScalerServerNode) prepareKubelet() (string, error) {
@@ -75,7 +75,7 @@ func (vm *AutoScalerServerNode) prepareKubelet() (string, error) {
 		return out, err
 	}
 
-	if out, err = utils.Sudo(vm.configuration.SSH, vm.Addresses[0], fmt.Sprintf("bash %s", fName)); err != nil {
+	if out, err = utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], fmt.Sprintf("bash %s", fName)); err != nil {
 		return out, err
 	}
 
@@ -85,7 +85,7 @@ func (vm *AutoScalerServerNode) prepareKubelet() (string, error) {
 func (vm *AutoScalerServerNode) waitReady() error {
 	glog.V(5).Infof("AutoScalerNode::waitReady, node:%s", vm.NodeName)
 
-	kubeconfig := vm.configuration.KubeCtlConfig
+	kubeconfig := vm.serverConfig.KubeCtlConfig
 
 	// Max 60s
 	for index := 0; index < 12; index++ {
@@ -132,7 +132,7 @@ func (vm *AutoScalerServerNode) waitReady() error {
 }
 
 func (vm *AutoScalerServerNode) kubeAdmJoin() error {
-	kubeAdm := vm.configuration.KubeAdm
+	kubeAdm := vm.serverConfig.KubeAdm
 
 	args := []string{
 		"kubeadm",
@@ -149,7 +149,7 @@ func (vm *AutoScalerServerNode) kubeAdmJoin() error {
 		args = append(args, kubeAdm.ExtraArguments...)
 	}
 
-	if _, err := utils.Sudo(vm.configuration.SSH, vm.Addresses[0], strings.Join(args, " ")); err != nil {
+	if _, err := utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], strings.Join(args, " ")); err != nil {
 		return err
 	}
 
@@ -176,7 +176,7 @@ func (vm *AutoScalerServerNode) setNodeLabels(nodeLabels, systemLabels Kubernete
 		}
 
 		args = append(args, "--kubeconfig")
-		args = append(args, vm.configuration.KubeCtlConfig)
+		args = append(args, vm.serverConfig.KubeCtlConfig)
 
 		if out, err := utils.Pipe(args...); err != nil {
 			return fmt.Errorf(constantes.ErrKubeCtlReturnError, vm.NodeName, out, err)
@@ -193,7 +193,7 @@ func (vm *AutoScalerServerNode) setNodeLabels(nodeLabels, systemLabels Kubernete
 		fmt.Sprintf("%s=%d", constantes.AnnotationNodeIndex, vm.NodeIndex),
 		"--overwrite",
 		"--kubeconfig",
-		vm.configuration.KubeCtlConfig,
+		vm.serverConfig.KubeCtlConfig,
 	}
 
 	if out, err := utils.Pipe(args...); err != nil {
@@ -215,7 +215,7 @@ var phDefaultRsyncFlags = []string{
 
 func (vm *AutoScalerServerNode) syncFolders() (string, error) {
 
-	syncFolders := vm.configuration.SyncFolders
+	syncFolders := vm.serverConfig.SyncFolders
 
 	if syncFolders != nil && len(syncFolders.Folders) > 0 {
 		for _, folder := range syncFolders.Folders {
@@ -268,9 +268,9 @@ func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabe
 	var status *vsphere.Status
 	var output string
 
-	vsphere := vm.configuration.VSphere
+	vsphere := vm.getVSphere()
 	network := vsphere.Network
-	userInfo := vm.configuration.SSH
+	userInfo := vm.serverConfig.SSH
 
 	glog.Infof("Launch VM:%s for nodegroup: %s", vm.NodeName, vm.NodeGroupID)
 
@@ -282,7 +282,7 @@ func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabe
 
 		err = fmt.Errorf(constantes.ErrVMAlreadyCreated, vm.NodeName)
 
-	} else if _, err = vsphere.Create(vm.NodeName, userInfo.UserName, userInfo.AuthKeys, vm.configuration.CloudInit, network, "", vm.Memory, vm.CPU, vm.Disk); err != nil {
+	} else if _, err = vsphere.Create(vm.NodeName, userInfo.UserName, userInfo.AuthKeys, vm.serverConfig.CloudInit, network, "", vm.Memory, vm.CPU, vm.Disk); err != nil {
 
 		err = fmt.Errorf(constantes.ErrUnableToLaunchVM, vm.NodeName, err)
 
@@ -339,8 +339,8 @@ func (vm *AutoScalerServerNode) startVM() error {
 
 	glog.Infof("Start VM:%s", vm.NodeName)
 
-	kubeconfig := vm.configuration.KubeCtlConfig
-
+	kubeconfig := vm.serverConfig.KubeCtlConfig
+	vsphere := vm.getVSphere()
 	if vm.AutoProvisionned == false {
 
 		err = fmt.Errorf(constantes.ErrVMNotProvisionnedByMe, vm.NodeName)
@@ -351,11 +351,11 @@ func (vm *AutoScalerServerNode) startVM() error {
 
 	} else if state == AutoScalerServerNodeStateStopped {
 
-		if err = vm.configuration.VSphere.PowerOn(vm.NodeName); err != nil {
+		if err = vsphere.PowerOn(vm.NodeName); err != nil {
 
 			err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
 
-		} else if _, err = vm.configuration.VSphere.WaitForIP(vm.NodeName); err != nil {
+		} else if _, err = vsphere.WaitForIP(vm.NodeName); err != nil {
 
 			err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
 
@@ -405,7 +405,8 @@ func (vm *AutoScalerServerNode) stopVM() error {
 
 	glog.Infof("Stop VM:%s", vm.NodeName)
 
-	kubeconfig := vm.configuration.KubeCtlConfig
+	kubeconfig := vm.serverConfig.KubeCtlConfig
+	vsphere := vm.getVSphere()
 
 	if vm.AutoProvisionned == false {
 
@@ -429,7 +430,7 @@ func (vm *AutoScalerServerNode) stopVM() error {
 			glog.Errorf(constantes.ErrKubeCtlIgnoredError, vm.NodeName, err)
 		}
 
-		if err = vm.configuration.VSphere.PowerOff(vm.NodeName); err == nil {
+		if err = vsphere.PowerOff(vm.NodeName); err == nil {
 			vm.State = AutoScalerServerNodeStateStopped
 		} else {
 			err = fmt.Errorf(constantes.ErrStopVMFailed, vm.NodeName, err)
@@ -459,8 +460,8 @@ func (vm *AutoScalerServerNode) deleteVM() error {
 	if vm.AutoProvisionned == false {
 		err = fmt.Errorf(constantes.ErrVMNotProvisionnedByMe, vm.NodeName)
 	} else {
-		kubeconfig := vm.configuration.KubeCtlConfig
-		vsphere := vm.configuration.VSphere
+		kubeconfig := vm.serverConfig.KubeCtlConfig
+		vsphere := vm.getVSphere()
 
 		if status, err = vsphere.Status(vm.NodeName); err == nil {
 			if status.Powered {
@@ -524,7 +525,7 @@ func (vm *AutoScalerServerNode) statusVM() (AutoScalerServerNodeState, error) {
 	var status *vsphere.Status
 	var err error
 
-	if status, err = vm.configuration.VSphere.Status(vm.NodeName); err != nil {
+	if status, err = vm.getVSphere().Status(vm.NodeName); err != nil {
 		glog.Errorf(constantes.ErrGetVMInfoFailed, vm.NodeName, err)
 		return AutoScalerServerNodeStateUndefined, err
 	}
@@ -546,6 +547,20 @@ func (vm *AutoScalerServerNode) statusVM() (AutoScalerServerNodeState, error) {
 	return AutoScalerServerNodeStateUndefined, fmt.Errorf(constantes.ErrAutoScalerInfoNotFound, vm.NodeName)
 }
 
-func (vm *AutoScalerServerNode) setConfiguration(config *types.AutoScalerServerConfig) {
-	vm.configuration = config
+func (vm *AutoScalerServerNode) getVSphere() *vsphere.Configuration {
+	var vsphere *vsphere.Configuration
+
+	if vsphere = vm.serverConfig.VMwareInfos[vm.NodeGroupID]; vsphere == nil {
+		vsphere = vm.serverConfig.VMwareInfos["default"]
+	}
+
+	if vsphere == nil {
+		glog.Fatalf("Unable to find vmware config for node:%s in group", vm.NodeName, vm.NodeGroupID)
+	}
+
+	return vsphere
+}
+
+func (vm *AutoScalerServerNode) setServerConfiguration(config *types.AutoScalerServerConfig) {
+	vm.serverConfig = config
 }

@@ -46,7 +46,7 @@ func createTestNode(ng *AutoScalerServerNodeGroup) *AutoScalerServerNode {
 		},
 		State:            AutoScalerServerNodeStateNotCreated,
 		AutoProvisionned: true,
-		configuration:    ng.configuration,
+		serverConfig:     ng.configuration,
 	}
 }
 
@@ -85,7 +85,7 @@ func newTestNodeGroup() (*types.AutoScalerServerConfig, *AutoScalerServerNodeGro
 			},
 			SystemLabels:  KubernetesLabel{},
 			Nodes:         make(map[string]*AutoScalerServerNode),
-			PendingNodes:  make(map[string]*AutoScalerServerNode),
+			pendingNodes:  make(map[string]*AutoScalerServerNode),
 			configuration: config,
 		}
 

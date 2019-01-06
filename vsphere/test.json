@@ -1,5 +1,5 @@
 {
-    "host": "127.0.0.1:8989",
+    "url": "https://127.0.0.1:8989/sdk",
     "uid": "user",
     "password": "pass",
     "insecure": true,
@@ -7,18 +7,22 @@
     "datastore": "LocalDS_0",
     "resource": "",
     "vmFolder": "",
-    "timeout": 3600000000000,
+    "timeout": 600,
     "template-name": "DC0_H0_VM0",
     "template": false,
     "linked": true,
-    "Customization": "",
+    "customization": "",
     "network": {
         "name": "DC0_DVPG0",
         "adapter": "E1000",
         "address": ""
     },
-    "vm": "DC0_H0_VM0",
-    "new": {
+    "cloud-init": {
+        "package_update": false,
+        "package_upgrade": false
+    },
+    "old-vm": "DC0_H0_VM0",
+    "new-vm": {
         "name": "afp-clusterautoscaler-vm",
         "annotation": "autoscaled VM",
         "memory": 2048,

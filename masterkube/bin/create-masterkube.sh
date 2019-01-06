@@ -5,14 +5,16 @@
 # Custom AutoScaler image with every thing for kubernetes
 # Config file to deploy the cluster autoscaler.
 
+set -e
+
 CURDIR=$(dirname $0)
 
-export MASTERKUBE="afp-bionic-masterkube"
+export MASTERKUBE="afp-bionic-k8s-masterkube"
 export SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
 export KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 export KUBERNETES_PASSWORD=$(uuidgen)
 export KUBECONFIG=$HOME/.kube/config
-export TARGET_IMAGE=afp-bionic-k8s-$KUBERNETES_VERSION
+export TARGET_IMAGE=afp-slyo-bionic-kubernetes-$KUBERNETES_VERSION
 export CNI_VERSION="v0.7.1"
 export PROVIDERID="vmware://ca-grpc-vmware/object?type=node&name=$MASTERKUBE"
 export MINNODES=0
@@ -29,7 +31,7 @@ export SCALEDOWNUNEEDEDTIME="1m"
 export SCALEDOWNUNREADYTIME="1m"
 export DEFAULT_MACHINE="medium"
 export UNREMOVABLENODERECHECKTIMEOUT="1m"
-export OSDISTRO=$(uname -a)
+export OSDISTRO=$(uname -s)
 export TRANSPORT="tcp"
 
 if [ "$OSDISTRO" == "Linux" ]; then
@@ -160,33 +162,6 @@ EOF
 
 PACKAGE_UPGRADE="true"
 
-RUN_CMD=$(
-cat <<EOF
-[
-    "curl https://get.docker.com | bash",
-    "mkdir -p /opt/cni/bin",
-    "curl -L https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-amd64-${CNI_VERSION}.tgz | tar -C /opt/cni/bin -xz",
-    "mkdir -p /opt/bin",
-    "cd /opt/bin ; curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/{kubeadm,kubelet,kubectl}",
-    "chmod +x /opt/bin/kube*",
-    "echo \"KUBELET_EXTRA_ARGS='--fail-swap-on=false --read-only-port=10255 --feature-gates=VolumeSubpathEnvExpansion=true'\" > /etc/default/kubelet",
-    "curl -sSL \"https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/kubelet.service\" | sed 's:/usr/bin:/opt/bin:g' > /etc/systemd/system/kubelet.service",
-    "mkdir -p /etc/systemd/system/kubelet.service.d",
-    "curl -sSL \"https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/10-kubeadm.conf\" | sed 's:/usr/bin:/opt/bin:g' > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf",
-    "ln -s /opt/bin/kubeadm /usr/local/bin/kubeadm",
-    "ln -s /opt/bin/kubelet /usr/local/bin/kubelet",
-    "ln -s /opt/bin/kubectl /usr/local/bin/kubectl",
-    "systemctl enable kubelet",
-    "systemctl restart kubelet",
-    "echo 'export PATH=/opt/bin:/opt/cni/bin:\$PATH' >> /etc/profile.d/apps-bin-path.sh",
-    "apt autoremove -y"
-    "echo '#!/bin/bash' > /usr/local/bin/kubeimage",
-    "echo '/opt/bin/kubeadm config images pull --kubernetes-version=${KUBERNETES_VERSION}' >> /usr/local/bin/kubeimage",
-    "chmod +x /usr/local/bin/kubeimage"
-]
-EOF
-)
-
 KUBERNETES_USER=$(
 	cat <<EOF
 [
@@ -213,24 +188,24 @@ MACHINE_DEFS=$(
 	cat <<EOF
 {
     "tiny": {
-        "memsize": 2048,
-        "vcpus": 2,
-        "disksize": 5120
-    },
-    "medium": {
         "memsize": 4096,
         "vcpus": 2,
         "disksize": 10240
     },
-    "large": {
+    "medium": {
         "memsize": 8192,
         "vcpus": 4,
         "disksize": 20480
     },
-    "extra-large": {
+    "large": {
         "memsize": 16384,
         "vcpus": 8,
         "disksize": 51200
+    },
+    "extra-large": {
+        "memsize": 32767,
+        "vcpus": 16,
+        "disksize": 102400
     }
 }
 EOF
@@ -254,18 +229,7 @@ fi
 
 export DOMAIN_NAME=$(openssl x509 -noout -fingerprint -text <./etc/ssl/cert.pem | grep 'Subject: CN' | tr '=' ' ' | awk '{print $3}' | sed 's/\*\.//g')
 
-# Because AutoScaler on MacOS doesn't support local image, we can't use custom image
-POWERSTATE=$(
-    cat <<EOF
-    , "power_state": {
-        "mode": "reboot",
-        "message": "Reboot VM due upgrade",
-        "condition": true
-    }
-EOF
-)
-
-if [ -z "$(govc vm.info)" ]; then
+if [ -z "$(govc vm.info $TARGET_IMAGE 2>&1)" ]; then
     echo "Create vmware preconfigured image"
 
     create-image.sh --password=$KUBERNETES_PASSWORD \
@@ -279,6 +243,7 @@ fi
 echo "Launch custom $MASTERKUBE instance with $TARGET_IMAGE"
 
 cat > ./config/network.yaml <<EOF
+#cloud-config
 network:
     version: 2
     ethernets:
@@ -288,12 +253,15 @@ network:
             dhcp4: true
 EOF
 
+echo "$KUBERNETES_PASSWORD" > ./config/kubernetes-password.txt
+
 cat > ./config/vendordata.yaml <<EOF
+#cloud-config
 package_update: true
 package_upgrade: true
 timezone: $TZ
 ssh_authorized_keys:
-    - $SSHKEY
+    - $SSH_KEY
 users:
     - default
 system_info:
@@ -301,48 +269,72 @@ system_info:
         name: kubernetes
 EOF
 
-cat > ./config/metadata.json <<EOF
+cat > ./config/metadata.yaml <<EOF
 {
-	"network": "$(cat ./config/network.yaml | gzip -c9 | $BASE64)",
-	"network.encoding": "gzip+base64",
-	"local-hostname": "$MASTERKUBE",
-	"instance-id": "$MASTERKUBE"
+    "network": "$(cat ./config/network.yaml | gzip -c9 | $BASE64)",
+    "network.encoding": "gzip+base64",
+    "local-hostname": "$MASTERKUBE",
+    "instance-id": "$(uuidgen)"
 }
 EOF
 
-cat <<EOF | tee ./config/userdata.json | python2 -c "import json,sys,yaml; print yaml.safe_dump(json.load(sys.stdin), width=500, indent=4, default_flow_style=False)" >./config/userdata.yaml
+echo "#cloud-config" > ./config/userdata.yaml
+
+cat <<EOF | tee ./config/userdata.json | python2 -c "import json,sys,yaml; print yaml.safe_dump(json.load(sys.stdin), width=500, indent=4, default_flow_style=False)" >> ./config/userdata.yaml
 {
+    "group": [
+        "kubernetes"
+    ],
+    "users": $KUBERNETES_USER,
+    "runcmd": [
+        "echo Kubernetes > /var/log/kubernetes.log"
+    ]
 }
 EOF
 
-METADATA=$(gzip -c9 <./config/metadata.yaml | $BASE64)
-USERDATA=$(gzip -c9 <./config/userdata.yaml | $BASE64)
-VENDORDATA=$(gzip -c9 <./config/vendordata.yaml | $BASE64)
+gzip -c9 <./config/metadata.json | $BASE64 | tee > config/metadata.base64
+gzip -c9 <./config/userdata.yaml | $BASE64 | tee > config/userdata.base64
+gzip -c9 <./config/vendordata.yaml | $BASE64 | tee > config/vendordata.base64
 
-govc vm.clone -link=false -on=false -c=2 -m=4096 -vm=$TARGET_IMAGE $MASTERKUBE
+echo "Clone $TARGET_IMAGE to $MASTERKUBE"
 
-govc vm.change -vm "${MASTERKUBE}" -e guestinfo.metadata="${METADATA}"
-govc vm.change -vm "${MASTERKUBE}" -e guestinfo.metadata.encoding="gzip+base64"
-govc vm.change -vm "${MASTERKUBE}" -e guestinfo.userdata="${USERDATA}"
-govc vm.change -vm "${MASTERKUBE}" -e guestinfo.userdata.encoding="gzip+base64"
-govc vm.change -vm "${MASTERKUBE}" -e guestinfo.vendordata="${VENDORDATA}"
-govc vm.change -vm "${MASTERKUBE}" -e guestinfo.vendordata.encoding="gzip+base64"
+echo "TARGET_IMAGE=$TARGET_IMAGE"
+echo "MASTERKUBE=$MASTERKUBE"
 
+#### FOLDER=$(govc folder.info AFP | sed "s/\s\+//g" |  grep "Path\|Types" | sed "s/\nTypes/\|Types/g")
+
+# Due to my vsphere center the folder name refer more path, so I need to precise the path instead
+if [ "$GOVC_FOLDER" ]; then
+    FOLDERS=$(govc folder.info $GOVC_FOLDER|grep Path|wc -l)
+    if [ "$FOLDER" != "1" ]; then
+        FOLDER_OPTIONS="-folder=/$GOVC_DATACENTER/vm/$GOVC_FOLDER"
+    fi
+fi
+
+govc vm.clone -link=false -on=false $FOLDER_OPTIONS -c=2 -m=4096 -vm=$TARGET_IMAGE $MASTERKUBE
+
+echo "Set cloud-init settings for $MASTERKUBE"
+
+govc vm.change -vm "${MASTERKUBE}" \
+    -e guestinfo.metadata="$(cat config/metadata.base64)" \
+    -e guestinfo.metadata.encoding="gzip+base64" \
+    -e guestinfo.userdata="$(cat config/userdata.base64)" \
+    -e guestinfo.userdata.encoding="gzip+base64" \
+    -e guestinfo.vendordata="$(cat config/vendordata.base64)" \
+    -e guestinfo.vendordata.encoding="gzip+base64" \
+
+echo "Power On $MASTERKUBE"
 govc vm.power -on "${MASTERKUBE}"
+
+echo "Wait for IP from $MASTERKUBE"
 IPADDR=$(govc vm.ip -wait 5m "${MASTERKUBE}")
 
-AutoScaler mount $PWD/bin masterkube:/masterkube/bin
-AutoScaler mount $PWD/templates masterkube:/masterkube/templates
-AutoScaler mount $PWD/etc masterkube:/masterkube/etc
-AutoScaler mount $PWD/cluster masterkube:/etc/cluster
-AutoScaler mount $PWD/kubernetes masterkube:/etc/kubernetes
-AutoScaler mount $PWD/config masterkube:/etc/cluster-autoscaler
-
 echo "Prepare masterkube instance"
-scp ./bin/* kubernetes@${IPADDR}:/usr/local/bin/*
+scp -r bin kubernetes@${IPADDR}:~
 
 echo "Start kubernetes masterkube instance master node"
-ssh kubernetes@${IPADDR} sudo bash -c "export PATH=/opt/cni/bin:/masterkube/bin:\$PATH; create-cluster.sh flannel eth0 '$KUBERNETES_VERSION' '$PROVIDERID'" 
+ssh kubernetes@${IPADDR} sudo mv /home/kubernetes/bin/* /usr/local/bin 
+ssh kubernetes@${IPADDR} sudo create-cluster.sh flannel eth0 "$KUBERNETES_VERSION" "$PROVIDERID" 
 
 scp kubernetes@${IPADDR}:/etc/cluster/* ./cluster
 
@@ -350,29 +342,34 @@ MASTER_IP=$(cat ./cluster/manager-ip)
 TOKEN=$(cat ./cluster/token)
 CACERT=$(cat ./cluster/ca.cert)
 
-kubectl annotate node masterkube "cluster.autoscaler.nodegroup/name=ca-grpc-AutoScaler" "cluster.autoscaler.nodegroup/node-index=0" "cluster.autoscaler.nodegroup/autoprovision=false" "cluster-autoscaler.kubernetes.io/scale-down-disabled=true" --overwrite --kubeconfig=./cluster/config
-kubectl label nodes masterkube "cluster.autoscaler.nodegroup/name=ca-grpc-AutoScaler" "master=true" --overwrite --kubeconfig=./cluster/config
+kubectl annotate node masterkube "cluster.autoscaler.nodegroup/name=ca-grpc-vmware" "cluster.autoscaler.nodegroup/node-index=0" "cluster.autoscaler.nodegroup/autoprovision=false" "cluster-autoscaler.kubernetes.io/scale-down-disabled=true" --overwrite --kubeconfig=./cluster/config
+kubectl label nodes masterkube "cluster.autoscaler.nodegroup/name=ca-grpc-vmware" "master=true" --overwrite --kubeconfig=./cluster/config
 kubectl create secret tls kube-system -n kube-system --key ./etc/ssl/privkey.pem --cert ./etc/ssl/fullchain.pem --kubeconfig=./cluster/config
 
 ./bin/kubeconfig-merge.sh masterkube cluster/config
 
-echo "Write AutoScaler cloud autoscaler provider config"
+echo "Write vmware cloud autoscaler provider config"
 
 echo $(eval "cat <<EOF
 $(<./templates/cluster/grpc-config.json)
 EOF") | jq . >./config/grpc-config.json
 
+if [ "$GOVC_INSECURE" == "1" ]; then
+    INSECURE=true
+else
+    INSECURE=false
+fi
+
 cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
 {
     "network": "$TRANSPORT",
     "listen": "$LISTEN",
-    "secret": "AutoScaler",
+    "secret": "vsphere",
     "minNode": $MINNODES,
     "maxNode": $MAXNODES,
     "nodePrice": 0.0,
     "podPrice": 0.0,
-    "image": "$LAUNCH_IMAGE_URL",
-    "vm-provision": true,
+    "image": "$TARGET_IMAGE",
     "kubeconfig": "$KUBECONFIG",
     "optionals": {
         "pricing": false,
@@ -394,33 +391,68 @@ cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
     "machines": $MACHINE_DEFS,
     "cloud-init": {
         "package_update": false,
-        "package_upgrade": false,
-        "users": $KUBERNETES_USER,
-        "runcmd": [
-            "kubeadm config images pull --kubernetes-version=${KUBERNETES_VERION}"
-        ],
-        "ssh_authorized_keys": [
-            "$SSH_KEY"
-        ],
-        "group": [
-            "kubernetes"
-        ]
+        "package_upgrade": false
     },
-    "mount-point": {
-        $MOUNTPOINTS
+    "sync-folder": {
+    },
+    "ssh-infos" : {
+        "user": "kubernetes",
+        "ssh-key": "$SSH_KEY"
+    },
+    "vsphere": {
+        "default": {
+            "url": "$GOVC_URL",
+            "uid": "$GOVC_USERNAME",
+            "password": "$GOVC_PASSWORD",
+            "insecure": "$INSECURE",
+            "dc" : "$GOVC_DATACENTER",
+            "datastore": "$GOVC_DATASTORE",
+            "resource-pool": "$GOVC_RESOURCE_POOL",
+            "vmFolder": "$GOVC_FOLDER",
+            "timeout": "300",
+            "template-name": "$TARGET_IMAGE",
+            "template": false,
+            "linked": false,
+            "customization": "$GOVC_CUSTOMIZATION",
+            "network" :{
+                "name": "$GOVC_NETWORK",
+                "adapter": "E1000",
+                "address": "",
+                "nic": "eth1"
+            }
+        },
+        "ca-grpc-vmware": {
+            "url": "$GOVC_URL",
+            "uid": "$GOVC_USERNAME",
+            "password": "$GOVC_PASSWORD",
+            "insecure": "$INSECURE",
+            "dc" : "$GOVC_DATACENTER",
+            "datastore": "$GOVC_DATASTORE",
+            "resource-pool": "$GOVC_RESOURCE_POOL",
+            "vmFolder": "$GOVC_FOLDER",
+            "timeout": "300",
+            "template-name": "$TARGET_IMAGE",
+            "template": false,
+            "linked": false,
+            "customization": "$GOVC_CUSTOMIZATION",
+            "network" :{
+                "name": "AFP-PROD-LYO",
+                "adapter": "E1000",
+                "address": "",
+                "nic": "eth1"
+            }
+        }
     }
 }
 EOF
 
-HOSTS_DEF=$(AutoScaler info masterkube | grep IPv4 | awk "{print \$2 \"    masterkube.$DOMAIN_NAME masterkube-dashboard.$DOMAIN_NAME\"}")
-
 if [ "$OSDISTRO" == "Linux" ]; then
 	sudo sed -i '/masterkube/d' /etc/hosts
-	sudo bash -c "echo '$HOSTS_DEF' >> /etc/hosts"
 else
 	sudo sed -i '' '/masterkube/d' /etc/hosts
-	sudo bash -c "echo '$HOSTS_DEF' >> /etc/hosts"
 fi
+
+sudo bash -c "echo '${IPADDR} masterkube.$DOMAIN_NAME masterkube-dashboard.$DOMAIN_NAME' >> /etc/hosts"
 
 ./bin/create-ingress-controller.sh
 ./bin/create-dashboard.sh

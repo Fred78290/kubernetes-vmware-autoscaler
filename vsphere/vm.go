@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -27,7 +28,8 @@ type VirtualMachine struct {
 // Must not start with `guestinfo.`
 type GuestInfos map[string]string
 
-type extraConfig []types.BaseOptionValue
+// CloudInitConfig contains extra config
+type CloudInitConfig []types.BaseOptionValue
 
 // NetworkAdapter wrapper
 type NetworkAdapter struct {
@@ -45,6 +47,56 @@ type NetworkDeclare struct {
 // NetworkConfig wrapper
 type NetworkConfig struct {
 	Network NetworkDeclare `json:"network"`
+}
+
+func encodeMetadata(object interface{}) (string, error) {
+	var result string
+	out, err := json.Marshal(object)
+
+	if err == nil {
+		var stdout bytes.Buffer
+		var zw = gzip.NewWriter(&stdout)
+
+		zw.Name = "metadata"
+		zw.ModTime = time.Now()
+
+		if _, err = zw.Write(out); err == nil {
+			if err = zw.Close(); err == nil {
+				result = base64.StdEncoding.EncodeToString(stdout.Bytes())
+			}
+		}
+	}
+
+	return result, err
+}
+
+func encodeCloudInit(name string, object interface{}) (string, error) {
+	var result string
+	var out bytes.Buffer
+	var err error
+
+	fmt.Fprintln(&out, "#cloud-init")
+
+	wr := yaml.NewEncoder(&out)
+	err = wr.Encode(object)
+
+	wr.Close()
+
+	if err == nil {
+		var stdout bytes.Buffer
+		var zw = gzip.NewWriter(&stdout)
+
+		zw.Name = name
+		zw.ModTime = time.Now()
+
+		if _, err = zw.Write(out.Bytes()); err == nil {
+			if err = zw.Close(); err == nil {
+				result = base64.StdEncoding.EncodeToString(stdout.Bytes())
+			}
+		}
+	}
+
+	return result, err
 }
 
 func encodeObject(name string, object interface{}) (string, error) {
@@ -118,22 +170,18 @@ func (g GuestInfos) isEmpty() bool {
 	return len(g) == 0
 }
 
-func (g GuestInfos) toExtraConfig() extraConfig {
-	extraConfig := make(extraConfig, 0, len(g))
+func (g GuestInfos) toExtraConfig() CloudInitConfig {
+	extraConfig := make(CloudInitConfig, 0, len(g))
 
 	for k, v := range g {
-		extraConfig.Set(fmt.Sprintf("guestinfo.%s", k), v)
+		extraConfig.set(fmt.Sprintf("guestinfo.%s", k), v)
 	}
 
 	return extraConfig
 }
 
-func (e *extraConfig) String() string {
-	return fmt.Sprintf("%v", *e)
-}
-
-func (e *extraConfig) Set(k, v string) {
-	*e = append(*e, &types.OptionValue{Key: k, Value: v})
+func (e CloudInitConfig) set(k, v string) {
+	e = append(e, &types.OptionValue{Key: k, Value: v})
 }
 
 // VirtualMachine return govmomi virtual machine
@@ -165,38 +213,115 @@ func (vm *VirtualMachine) VimClient() *vim25.Client {
 	return vm.Datastore.VimClient()
 }
 
-// Configure set characteristic of VM a virtual machine
-func (vm *VirtualMachine) Configure(ctx *Context, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory int, cpus int, disk int) error {
+func (vm *VirtualMachine) addNetwork(ctx *Context, network *Network, devices object.VirtualDeviceList) (object.VirtualDeviceList, error) {
+	var net object.NetworkReference
 	var err error
-	var task *object.Task
+	var backing types.BaseVirtualDeviceBackingInfo
+	var device types.BaseVirtualDevice
 
-	if cpus > 0 || memory > 0 || len(annotation) > 0 {
-		virtualMachine := vm.VirtualMachine(ctx)
+	if network != nil && len(network.Name) > 0 {
+		f := vm.Datastore.Datacenter.NewFinder(ctx)
 
-		vmConfigSpec := types.VirtualMachineConfigSpec{}
+		if net, err = f.NetworkOrDefault(ctx, network.Name); err == nil {
 
-		if cpus > 0 {
-			vmConfigSpec.NumCPUs = int32(cpus)
-		}
+			if backing, err = net.EthernetCardBackingInfo(ctx); err == nil {
 
-		if memory > 0 {
-			vmConfigSpec.MemoryMB = int64(memory)
-		}
+				if device, err = object.EthernetCardTypes().CreateEthernetCard(network.Adapter, backing); err == nil {
 
-		vmConfigSpec.Annotation = annotation
+					if len(network.Address) != 0 {
+						card := device.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
+						card.AddressType = string(types.VirtualEthernetCardMacTypeManual)
+						card.MacAddress = network.Address
+					}
+				}
 
-		if guestInfos, err := vm.cloudInit(ctx, vm.Name, userName, authKey, cloudInit, network); err != nil {
-			if guestInfos.isEmpty() == false {
-				vmConfigSpec.ExtraConfig = guestInfos.toExtraConfig()
+				devices = append(devices, device)
 			}
-		}
 
-		if task, err = virtualMachine.Reconfigure(ctx, vmConfigSpec); err == nil {
-			_, err = task.WaitForResult(ctx, nil)
 		}
 	}
 
-	return nil
+	return devices, err
+}
+
+func (vm *VirtualMachine) addHardDrive(ctx *Context, virtualMachine *object.VirtualMachine, diskSize int, devices object.VirtualDeviceList) (object.VirtualDeviceList, error) {
+	var err error
+	var existingDevices object.VirtualDeviceList
+	var controller types.BaseVirtualController
+
+	if diskSize > 0 {
+		drivePath := fmt.Sprintf("[%s] %s/harddrive.vmdk", vm.Datastore.Name, vm.Name)
+
+		if existingDevices, err = virtualMachine.Device(ctx); err == nil {
+
+			if controller, err = existingDevices.FindDiskController(""); err == nil {
+
+				disk := existingDevices.CreateDisk(controller, vm.Datastore.Ref, drivePath)
+
+				if len(existingDevices.SelectByBackingInfo(disk.Backing)) != 0 {
+
+					err = fmt.Errorf("Disk %s already exists", drivePath)
+
+				} else {
+
+					backing := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo)
+
+					backing.ThinProvisioned = types.NewBool(true)
+					backing.DiskMode = string(types.VirtualDiskModePersistent)
+					backing.Sharing = string(types.VirtualDiskSharingSharingNone)
+
+					disk.CapacityInKB = int64(diskSize) * 1024
+
+					devices = append(devices, disk)
+				}
+			}
+		}
+	}
+
+	return devices, err
+}
+
+// Configure set characteristic of VM a virtual machine
+func (vm *VirtualMachine) Configure(ctx *Context, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory int, cpus int, disk int) error {
+	var devices object.VirtualDeviceList
+	var err error
+	var task *object.Task
+
+	virtualMachine := vm.VirtualMachine(ctx)
+
+	vmConfigSpec := types.VirtualMachineConfigSpec{
+		NumCPUs:    int32(cpus),
+		MemoryMB:   int64(memory),
+		Annotation: annotation,
+	}
+
+	if devices, err = vm.addHardDrive(ctx, virtualMachine, disk, devices); err != nil {
+
+		err = fmt.Errorf(constantes.ErrUnableToAddHardDrive, vm.Name, err)
+
+	} else if devices, err = vm.addNetwork(ctx, network, devices); err != nil {
+
+		err = fmt.Errorf(constantes.ErrUnableToAddNetworkCard, vm.Name, err)
+
+	} else if vmConfigSpec.DeviceChange, err = devices.ConfigSpec(types.VirtualDeviceConfigSpecOperationAdd); err != nil {
+
+		err = fmt.Errorf(constantes.ErrUnableToCreateDeviceChangeOp, vm.Name, err)
+
+	} else if vmConfigSpec.ExtraConfig, err = vm.cloudInit(ctx, vm.Name, userName, authKey, cloudInit, network); err != nil {
+
+		err = fmt.Errorf(constantes.ErrCloudInitFailCreation, vm.Name, err)
+
+	} else if task, err = virtualMachine.Reconfigure(ctx, vmConfigSpec); err != nil {
+
+		err = fmt.Errorf(constantes.ErrUnableToReconfigureVM, vm.Name, err)
+
+	} else if _, err = task.WaitForResult(ctx, nil); err != nil {
+
+		err = fmt.Errorf(constantes.ErrUnableToReconfigureVM, vm.Name, err)
+
+	}
+
+	return err
 }
 
 // WaitForIP wait ip
@@ -326,7 +451,7 @@ func (vm *VirtualMachine) SetGuestInfo(ctx *Context, guestInfos *GuestInfos) err
 	return err
 }
 
-func (vm *VirtualMachine) cloudInit(ctx *Context, hostName string, userName, authKey string, cloudInit interface{}, network *Network) (*GuestInfos, error) {
+func (vm *VirtualMachine) cloudInit(ctx *Context, hostName string, userName, authKey string, cloudInit interface{}, network *Network) (CloudInitConfig, error) {
 	var metadata, userdata, vendordata, netconfig string
 	var err error
 	var guestInfos *GuestInfos
@@ -337,7 +462,7 @@ func (vm *VirtualMachine) cloudInit(ctx *Context, hostName string, userName, aut
 	if network != nil && len(network.NicName) > 0 {
 		if netconfig, err = encodeObject("networkconfig", buildNetworkConfig(network)); err != nil {
 			err = fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "networkconfig", err)
-		} else if metadata, err = encodeObject("metadata", map[string]string{
+		} else if metadata, err = encodeMetadata(map[string]string{
 			"network":          netconfig,
 			"network.encoding": "gzip+base64",
 			"local-hostname":   hostName,
@@ -345,7 +470,7 @@ func (vm *VirtualMachine) cloudInit(ctx *Context, hostName string, userName, aut
 		}); err != nil {
 			err = fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "metadata", err)
 		}
-	} else if metadata, _ = encodeObject("metadata", map[string]string{
+	} else if metadata, _ = encodeMetadata(map[string]string{
 		"local-hostname": hostName,
 		"instance-id":    v.UUID(ctx),
 	}); err != nil {
@@ -355,18 +480,18 @@ func (vm *VirtualMachine) cloudInit(ctx *Context, hostName string, userName, aut
 	if err == nil {
 
 		if cloudInit != nil {
-			if userdata, err = encodeObject("userdata", cloudInit); err != nil {
+			if userdata, err = encodeCloudInit("userdata", cloudInit); err != nil {
 				return nil, fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "userdata", err)
 			}
-		} else if userdata, err = encodeObject("userdata", map[string]string{}); err != nil {
+		} else if userdata, err = encodeCloudInit("userdata", map[string]string{}); err != nil {
 			return nil, fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "userdata", err)
 		}
 
 		if len(userName) > 0 && len(authKey) > 0 {
-			if vendordata, err = encodeObject("vendordata", buildVendorData(userName, authKey)); err != nil {
+			if vendordata, err = encodeCloudInit("vendordata", buildVendorData(userName, authKey)); err != nil {
 				return nil, fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "vendordata", err)
 			}
-		} else if vendordata, err = encodeObject("vendordata", map[string]string{}); err != nil {
+		} else if vendordata, err = encodeCloudInit("vendordata", map[string]string{}); err != nil {
 			return nil, fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "vendordata", err)
 		}
 
@@ -380,5 +505,5 @@ func (vm *VirtualMachine) cloudInit(ctx *Context, hostName string, userName, aut
 		}
 	}
 
-	return guestInfos, err
+	return guestInfos.toExtraConfig(), err
 }

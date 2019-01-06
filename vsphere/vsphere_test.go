@@ -4,18 +4,20 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/vsphere"
 )
 
 type ConfigurationTest struct {
 	vsphere.Configuration
-	VM  string
-	New *NewVirtualMachineConf
+	CloudInit interface{}               `json:"cloud-init"`
+	SSH       types.AutoScalerServerSSH `json:"ssh"`
+	VM        string                    `json:"old-vm"`
+	New       *NewVirtualMachineConf    `json:"new-vm"`
 }
 
 type NewVirtualMachineConf struct {
@@ -23,34 +25,8 @@ type NewVirtualMachineConf struct {
 	Annotation string
 	Memory     int
 	CPUS       int
-}
-
-var wConfig = &ConfigurationTest{
-	Configuration: vsphere.Configuration{
-		Host:          "127.0.0.1:8989",
-		UserName:      "user",
-		Password:      "pass",
-		Insecure:      true,
-		DataCenter:    "DC0",
-		DataStore:     "LocalDS_0",
-		VMBasePath:    "",
-		Timeout:       time.Hour * 1, // Allows debugging :)
-		TemplateName:  "DC0_H0_VM0",
-		Template:      false,
-		LinkedClone:   true,
-		Customization: "",
-		Network: &vsphere.Network{
-			Name:    "DC0_DVPG0",
-			Adapter: "E1000",
-		},
-	},
-	VM: "DC0_H0_VM0",
-	New: &NewVirtualMachineConf{
-		"test-vm-01",
-		"autoscaled VM",
-		2048,
-		2,
-	},
+	Disk       int
+	Network    *vsphere.Network
 }
 
 var testConfig *ConfigurationTest
@@ -139,7 +115,7 @@ func Test_listVM(t *testing.T) {
 func Test_createVM(t *testing.T) {
 	config := loadFromJson(confName)
 
-	_, err := config.Create(config.New.Name, "", "", nil, nil, config.New.Annotation, config.New.Memory, config.New.CPUS, 0)
+	_, err := config.Create(config.New.Name, config.SSH.UserName, config.SSH.AuthKeys, config.CloudInit, config.New.Network, config.New.Annotation, config.New.Memory, config.New.CPUS, config.New.Disk)
 
 	if assert.NoError(t, err, "Can't create VM") {
 		t.Logf("VM created")

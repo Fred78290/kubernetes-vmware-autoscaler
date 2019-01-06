@@ -168,4 +168,19 @@ const (
 
 	// ErrUnableToEncodeGuestInfo error msg
 	ErrUnableToEncodeGuestInfo = "Unable to encode vmware guest info: %s, reason: %v"
+
+	// ErrUnableToAddHardDrive error msg
+	ErrUnableToAddHardDrive = "Unable to add hard drive to VM:%s, reason: %v"
+
+	// ErrUnableToAddNetworkCard error msg
+	ErrUnableToAddNetworkCard = "Unable to add network card to VM:%s, reason: %v"
+
+	// ErrUnableToCreateDeviceChangeOp error msg
+	ErrUnableToCreateDeviceChangeOp = "Unable to create device change operation for VM:%s, reason: %v"
+
+	// ErrCloudInitFailCreation error msg
+	ErrCloudInitFailCreation = "Unable to create cloud-init data for VM:%s, reason: %v"
+
+	// ErrUnableToReconfigureVM error msg
+	ErrUnableToReconfigureVM = "Unable to reconfigure VM:%s, reason: %v"
 )

@@ -48,8 +48,8 @@ type AutoScalerServerNodeGroup struct {
 	SystemLabels         KubernetesLabel                  `json:"systemLabels"`
 	AutoProvision        bool                             `json:"auto-provision"`
 	LastCreatedNodeIndex int                              `json:"node-index"`
-	PendingNodes         map[string]*AutoScalerServerNode `json:"-"`
-	PendingNodesWG       sync.WaitGroup                   `json:"-"`
+	pendingNodes         map[string]*AutoScalerServerNode
+	pendingNodesWG       sync.WaitGroup
 	configuration        *types.AutoScalerServerConfig
 }
 
@@ -60,7 +60,7 @@ func (g *AutoScalerServerNodeGroup) cleanup() error {
 
 	g.Status = NodegroupDeleting
 
-	g.PendingNodesWG.Wait()
+	g.pendingNodesWG.Wait()
 
 	glog.V(5).Infof("AutoScalerServerNodeGroup::cleanup, nodeGroupID:%s, iterate node to delete", g.NodeGroupIdentifier)
 
@@ -71,7 +71,7 @@ func (g *AutoScalerServerNodeGroup) cleanup() error {
 	}
 
 	g.Nodes = make(map[string]*AutoScalerServerNode)
-	g.PendingNodes = make(map[string]*AutoScalerServerNode)
+	g.pendingNodes = make(map[string]*AutoScalerServerNode)
 	g.Status = NodegroupDeleted
 
 	return lastError
@@ -80,7 +80,7 @@ func (g *AutoScalerServerNodeGroup) cleanup() error {
 func (g *AutoScalerServerNodeGroup) targetSize() int {
 	glog.V(5).Infof("AutoScalerServerNodeGroup::targetSize, nodeGroupID:%s", g.NodeGroupIdentifier)
 
-	return len(g.PendingNodes) + len(g.Nodes)
+	return len(g.pendingNodes) + len(g.Nodes)
 }
 
 func (g *AutoScalerServerNodeGroup) setNodeGroupSize(newSize int) error {
@@ -144,7 +144,7 @@ func (g *AutoScalerServerNodeGroup) addNodes(delta int) error {
 
 	tempNodes := make([]*AutoScalerServerNode, 0, delta)
 
-	g.PendingNodesWG.Add(delta)
+	g.pendingNodesWG.Add(delta)
 
 	for nodeIndex := 0; nodeIndex < delta; nodeIndex++ {
 		if g.Status != NodegroupCreated {
@@ -165,16 +165,16 @@ func (g *AutoScalerServerNodeGroup) addNodes(delta int) error {
 			CPU:              g.Machine.Vcpu,
 			Disk:             g.Machine.Disk,
 			AutoProvisionned: true,
-			configuration:    g.configuration,
+			serverConfig:     g.configuration,
 		}
 
 		tempNodes = append(tempNodes, node)
 
-		if g.PendingNodes == nil {
-			g.PendingNodes = make(map[string]*AutoScalerServerNode)
+		if g.pendingNodes == nil {
+			g.pendingNodes = make(map[string]*AutoScalerServerNode)
 		}
 
-		g.PendingNodes[node.NodeName] = node
+		g.pendingNodes[node.NodeName] = node
 	}
 
 	for _, node := range tempNodes {
@@ -187,7 +187,7 @@ func (g *AutoScalerServerNodeGroup) addNodes(delta int) error {
 			glog.Errorf(constantes.ErrUnableToLaunchVM, node.NodeName, err)
 
 			for _, node := range tempNodes {
-				delete(g.PendingNodes, node.NodeName)
+				delete(g.pendingNodes, node.NodeName)
 
 				if status, _ := node.statusVM(); status == AutoScalerServerNodeStateRunning {
 					if err := node.deleteVM(); err != nil {
@@ -195,16 +195,16 @@ func (g *AutoScalerServerNodeGroup) addNodes(delta int) error {
 					}
 				}
 
-				g.PendingNodesWG.Done()
+				g.pendingNodesWG.Done()
 			}
 
 			return err
 		}
 
-		delete(g.PendingNodes, node.NodeName)
+		delete(g.pendingNodes, node.NodeName)
 
 		g.Nodes[node.NodeName] = node
-		g.PendingNodesWG.Done()
+		g.pendingNodesWG.Done()
 	}
 
 	return nil
@@ -236,7 +236,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 	formerNodes := g.Nodes
 
 	g.Nodes = make(map[string]*AutoScalerServerNode)
-	g.PendingNodes = make(map[string]*AutoScalerServerNode)
+	g.pendingNodes = make(map[string]*AutoScalerServerNode)
 
 	for _, nodeInfo := range nodeInfos.Items {
 		var providerID = utils.GetNodeProviderID(g.ServiceIdentifier, &nodeInfo)
@@ -279,7 +279,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 							Addresses: []string{
 								runningIP,
 							},
-							configuration: g.configuration,
+							serverConfig: g.configuration,
 						}
 
 						arg = []string{
@@ -352,7 +352,7 @@ func (g *AutoScalerServerNodeGroup) setConfiguration(config *types.AutoScalerSer
 	g.configuration = config
 
 	for _, node := range g.Nodes {
-		node.setConfiguration(config)
+		node.setServerConfiguration(config)
 	}
 }
 

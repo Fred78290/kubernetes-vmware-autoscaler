@@ -6,6 +6,10 @@
 #
 
 # The script to lookup the path to the cloud-init's datasource directory, "sources".
+apt-get update
+apt-get upgrade -y
+apt-get dist-upgrade -y
+
 PY_SCRIPT='import os; from cloudinit import sources; print(os.path.dirname(sources.__file__));'
 
 PYTHON=$(command -v python)
@@ -46,7 +50,7 @@ rm /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg
 cloud-init clean
 rm /var/log/cloud-ini*
 
-sed -i 'd/^GRUB_CMDLINE_LINUX=\"/GRUB_CMDLINE_LINUX=\"ipv6.disable=1 net.ifnames=0 biosdevname=0/g' /etc/default/grub
+sed -i 's/^GRUB_CMDLINE_LINUX=\"/GRUB_CMDLINE_LINUX=\"ipv6.disable=1 net.ifnames=0 biosdevname=0/g' /etc/default/grub
 update-grub2
 
-shutdown now
+shutdown -P now

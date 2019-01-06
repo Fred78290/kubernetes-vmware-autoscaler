@@ -22,24 +22,6 @@ const (
 	testNodeName   = "ca-grpc-AutoScaler-vm-00"
 )
 
-var stestNodeGroup = AutoScalerServerNodeGroup{
-	NodeGroupIdentifier: testGroupID,
-	Machine: &types.MachineCharacteristic{
-		Memory: 4096,
-		Vcpu:   4,
-		Disk:   5120,
-	},
-	Status:       NodegroupNotCreated,
-	MinNodeSize:  0,
-	MaxNodeSize:  5,
-	PendingNodes: make(map[string]*AutoScalerServerNode),
-	Nodes:        make(map[string]*AutoScalerServerNode),
-	NodeLabels: map[string]string{
-		"monitor":  "true",
-		"database": "true",
-	},
-}
-
 func newTestServer(addNodeGroup, addTestNode bool) (*AutoScalerServerApp, *AutoScalerServerNodeGroup, context.Context, error) {
 
 	config, ng, err := newTestNodeGroup()

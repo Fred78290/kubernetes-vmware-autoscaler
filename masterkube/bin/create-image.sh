@@ -15,20 +15,24 @@ KUBERNETES_PASSWORD=$(uuidgen)
 CNI_VERSION=v0.7.1
 SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
 CACHE=~/.local/vmware/cache
-ISODIR=~/.local/vmware/cache/iso
-TARGET_IMAGE=afp-bionic-kubernetes-$KUBERNETES_VERSION
+TARGET_IMAGE=afp-slyo-bionic-kubernetes-$KUBERNETES_VERSION
 PASSWORD=$(uuidgen)
-OSDISTRO=$(uname -a)
-TEMP=`getopt -o i:k:n:p:v: --long custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
+OSDISTRO=$(uname -s)
+SEEDIMAGE=afp-slyo-bionic-server-seed
+IMPORTMODE="govc"
+TEMP=`getopt -o i:k:n:op:s:v: --long ovftool,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
+CURDIR=$(dirname $0)
 
 eval set -- "$TEMP"
 
 if [ "$OSDISTRO" == "Linux" ]; then
     TZ=$(cat /etc/timezone)
     BASE64='base64 -w 0'
+    ISODIR=~/.local/vmware/cache
 else
     TZ=$(sudo systemsetup -gettimezone | awk '{print $2}')
     BASE64=base64
+    ISODIR=~/.local/vmware/cache/iso
 fi
 
 mkdir -p $ISODIR
@@ -42,59 +46,118 @@ while true ; do
         -i|--custom-image) TARGET_IMAGE="$2" ; shift 2;;
         -k|--ssh-key) SSH_KEY=$2 ; shift 2;;
         -n|--cni-version) CNI_VERSION=$2 ; shift 2;;
+        -o|--ovftool) IMPORTMODE=ovftool ; shift 2;;
         -p|--password) KUBERNETES_PASSWORD=$2 ; shift 2;;
+        -s|--seed) afp-slyo-cloud-init-guestinfo=$2 ; shift 2;;
         -v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
         --) shift ; break ;;
         *) echo "$1 - Internal error!" ; exit 1 ;;
     esac
 done
 
-cat > ./iso/user-data <<EOF
-runcmd:
-    - sed -i 'd/^GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="ipv6.disable=1 net.ifnames=0 biosdevname=0/g' /etc/default/grub
-    - update-grub2
-    - mkdir -p /opt/cni/bin
-    - mkdir -p /usr/local/bin
-    - curl https://get.docker.com | bash
-    - curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-amd64-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
-    - cd /usr/local/bin
-    - curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/{kubeadm,kubelet,kubectl}
-    - chmod +x /usr/local/bin/kube*
-    - echo 'KUBELET_EXTRA_ARGS="--fail-swap-on=false --read-only-port=10255 --feature-gates=VolumeSubpathEnvExpansion=true"' > /etc/default/kubelet
-    - curl -sSL "https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/kubelet.service" | sed 's:/usr/bin:/usr/local/bin:g' > /etc/systemd/system/kubelet.service
-    - mkdir -p /etc/systemd/system/kubelet.service.d
-    - curl -sSL "https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/10-kubeadm.conf" | sed 's:/usr/bin:/usr/local/bin:g' > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
-    - systemctl enable kubelet
-    - systemctl restart kubelet
-    - echo 'export PATH=/opt/cni/bin:\$PATH' >> /etc/profile.d/apps-bin-path.sh
-    - apt autoremove -y
-    - /usr/local/bin/kubeadm config images pull --kubernetes-version=${KUBERNETES_VERSION}
-    - CLOUD_INIT_SOURCES=\$(python3 -c "import os; from cloudinit import sources; print(os.path.dirname(sources.__file__));" 2>/dev/null || (exit_code="\${?}"; echo "failed to find python runtime" 1>&2; exit "\${exit_code}"; ))
-    - [ -z "\${CLOUD_INIT_SOURCES}" ] && echo "cloud-init not found" 1>&2 && exit 1
-    - echo "Cloud init sources located here: \$CLOUD_INIT_SOURCES"
-    - curl -sSL -o "\${CLOUD_INIT_SOURCES}/DataSourceVMwareGuestInfo.py" "https://raw.githubusercontent.com/akutz/cloud-init-vmware-guestinfo/master/DataSourceVMwareGuestInfo.py"
-    - mkdir -p /etc/cloud/cloud.cfg.d
-    - curl -sSL -o /etc/cloud/cloud.cfg.d/99-DataSourceVMwareGuestInfo.cfg "https://raw.githubusercontent.com/akutz/cloud-init-vmware-guestinfo/master/99-DataSourceVMwareGuestInfo.cfg"
-    - sed -i 's/None/None, VMwareGuestInfo/g' /etc/cloud/cloud.cfg.d/90_dpkg.cfg
-    - rm /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg
-    - cloud-init clean
-    - rm /var/log/cloud-ini*
+if [ -z "$(govc vm.info $TARGET_IMAGE 2>&1)" ]; then
+    echo "$TARGET_IMAGE already exists!"
+    exit 0
+fi
+
+# If your seed image isn't present create one by import bionic cloud ova.
+# If you don't have the access right to import with govc (firewall rules blocking https traffic to esxi),
+# you can try with ovftool to import the ova.
+# If you have the bug "unsupported server", you must do it manually!
+if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
+    wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.ova -O bionic-server-cloudimg-amd64.ova
+        
+    MAPPED_NETWORK=$(govc import.spec bionic-server-cloudimg-amd64.ova | jq .NetworkMapping[0].Name)
+
+    if [ "$IMPORTMODE" == "govc" ]; then        
+        govc import.spec bionic-server-cloudimg-amd64.ova \
+            | jq --arg GOVC_NETWORK "$GOVC_NETWORK" --arg MAPPED_NETWORK "$MAPPED_NETWORK" '.NetworkMapping |= [ { Name: $MAPPED_NETWORK, Network: $GOVC_NETWORK } ]' \
+            > bionic-server-cloudimg-amd64.spec
+        
+        cat bionic-server-cloudimg-amd64.spec \
+            | jq --arg SSH_KEY "$SSH_KEY" \
+                --arg SSH_KEY "$SSH_KEY" \
+                --arg USERDATA "" \
+                --arg PASSWORD "$PASSWORD" \
+                --arg NAME "$SEEDIMAGE" \
+                --arg INSTANCEID $(uuidgen) \
+                '.Name = $NAME | .PropertyMapping |= [ { Key: "instance-id", Value: $INSTANCEID }, { Key: "hostname", Value: $TARGET_IMAGE }, { Key: "public-keys", Value: $SSH_KEY }, { Key: "user-data", Value: $USERDATA }, { Key: "password", Value: $PASSWORD } ]' \
+                > bionic-server-cloudimg-amd64.txt
+
+        echo "Import bionic-server-cloudimg-amd64.ova to $SEEDIMAGE with govc"
+        govc import.ova \
+            -options=bionic-server-cloudimg-amd64.txt \
+            -folder=/$GOVC_DATACENTER/vm/$GOVC_FOLDER \
+            -ds=/$GOVC_DATACENTER/datastore/$GOVC_CLUSTER/CUSTOMER/$GOVC_FOLDER/$GOVC_DATASTORE \
+            -name=$SEEDIMAGE bionic-server-cloudimg-amd64.ova
+    else
+        echo "Import bionic-server-cloudimg-amd64.ova to $SEEDIMAGE with ovftool"
+
+        ovftool \
+            --acceptAllEulas \
+            --name=$SEEDIMAGE \
+            --datastore=$GOVC_DATASTORE \
+            --vmFolder=$GOVC_FOLDER \
+            --diskMode=thin \
+            --prop:instance-id="$(uuidgen)" \
+            --prop:hostname="$SEEDIMAGE" \
+            --prop:public-keys="$SSH_KEY" \
+            --prop:user-data="" \
+            --prop:password="$PASSWORD" \
+            --net:"$MAPPED_NETWORK"="$GOVC_NETWORK" \
+            https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.ova \
+            vi://$GOVC_USERNAME:$GOVC_PASSWORD@$GOVC_HOST/$GOVC_RESOURCE_POOL/
+    fi
+
+    if [ $? -eq 0 ]; then
+        echo "Power On $SEEDIMAGE"
+        govc vm.power -on "${SEEDIMAGE}"
+
+        echo "Wait for IP from $SEEDIMAGE"
+        IPADDR=$(govc vm.ip -wait 5m "${SEEDIMAGE}")
+
+        if [ -z "$IPADDR" ]; then
+            echo "Can't get IP!"
+            exit -1
+        fi
+
+        echo "Install cloud-init VMWareGuestInfo datasource"
+        scp $CURDIR/../guestinfos/install-guestinfo-datasource.sh $CURDIR/../guestinfos/cloud-init-clean.sh ubuntu@$IPADDR:/tmp
+        ssh ubuntu@$IPADDR sudo update-grub2
+        ssh ubuntu@$IPADDR sudo mv /tmp/cloud-init-clean.sh /tmp/install-guestinfo-datasource.sh /usr/local/bin
+        ssh ubuntu@$IPADDR sudo /usr/local/bin/install-guestinfo-datasource.sh
+
+        sleep 10
+
+        echo "$SEEDIMAGE is ready"
+    else
+        echo "Import failed!"
+        exit -1
+    fi 
+else
+    echo "$SEEDIMAGE already exists, nothing to do!"
+fi
+
+echo "Prepare $TARGET_IMAGE image"
+
+cat > $ISODIR/user-data <<EOF
+#cloud-config
 EOF
 
-cat > ./iso/network.yaml <<EOF
+cat > $ISODIR/network.yaml <<EOF
+#cloud-config
 network:
     version: 2
     ethernets:
-        ens33:
+        eth0:
             dhcp4: true
 EOF
 
-cat > ./iso/vendor-data <<EOF
-package_update: true
-package_upgrade: true
+cat > $ISODIR/vendor-data <<EOF
+#cloud-config
 timezone: $TZ
 ssh_authorized_keys:
-    - $SSHKEY
+    - $SSH_KEY
 users:
     - default
 system_info:
@@ -102,80 +165,84 @@ system_info:
         name: kubernetes
 EOF
 
-cat > ./iso/meta-data <<EOF
+cat > $ISODIR/meta-data <<EOF
 {
-	"network": "$(cat ./iso/network.yaml | gzip -c9 | $BASE64)",
-	"network.encoding": "gzip+base64",
-	"local-hostname": "$TARGET_IMAGE",
-	"instance-id": "$TARGET_IMAGE"
+    "local-hostname": "$TARGET_IMAGE",
+    "instance-id": "$(uuidgen)"
 }
 EOF
 
-METADATA=$(cat ./iso/meta-data | $BASE64)
-USERDATA=$(cat ./iso/user-data | $BASE64)
-VENDORDATA=$(cat ./iso/vendor-data | $BASE64)
+cat > $ISODIR/prepare.sh <<EOF
+#!/bin/bash
 
-if [ "$OSDISTRO" == "Linux" ]; then
-    genisoimage -output cidata.iso -volid cidata -joliet -rock user-data meta-data vendor-data
-else
-    mkisofs -V cidata -J -r -o cidata.iso iso
+apt-get update
+apt-get upgrade -y
+apt-get autoremove -y
+
+mkdir -p /opt/cni/bin
+mkdir -p /usr/local/bin
+
+curl https://get.docker.com | bash
+curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-amd64-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
+
+cd /usr/local/bin
+curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/{kubeadm,kubelet,kubectl}
+chmod +x /usr/local/bin/kube*
+
+echo 'KUBELET_EXTRA_ARGS="--fail-swap-on=false --read-only-port=10255 --feature-gates=VolumeSubpathEnvExpansion=true"' > /etc/default/kubelet
+curl -sSL "https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/kubelet.service" | sed 's:/usr/bin:/usr/local/bin:g' > /etc/systemd/system/kubelet.service
+
+mkdir -p /etc/systemd/system/kubelet.service.d
+curl -sSL "https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/10-kubeadm.conf" | sed 's:/usr/bin:/usr/local/bin:g' > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+echo 'export PATH=/opt/cni/bin:\$PATH' >> /etc/profile.d/apps-bin-path.sh
+
+systemctl enable kubelet
+systemctl restart kubelet
+
+/usr/local/bin/kubeadm config images pull --kubernetes-version=${KUBERNETES_VERSION}
+
+[ -f /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg ] && rm /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg
+rm /etc/netplan/*
+cloud-init clean
+rm /var/log/cloud-ini*
+shutdown -P now
+EOF
+
+chmod +x prepare.sh
+
+gzip -c9 < $ISODIR/meta-data | $BASE64 > metadata.base64
+gzip -c9 < $ISODIR/user-data | $BASE64 > userdata.base64
+gzip -c9 < $ISODIR/vendor-data | $BASE64 > vendordata.base64
+
+# Due to my vsphere center the folder name refer more path, so I need to precise the path instead
+if [ "$GOVC_FOLDER" ]; then
+    FOLDERS=$(govc folder.info $GOVC_FOLDER|grep Path|wc -l)
+    if [ "$FOLDER" != "1" ]; then
+        FOLDER_OPTIONS="-folder=/$GOVC_DATACENTER/vm/$GOVC_FOLDER"
+    fi
 fi
 
-if [ ! -f bionic-server-cloudimg-amd64.ova ]; then
-    wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.ova -O bionic-server-cloudimg-amd64.ova
-    NETWORK=$(govc import.spec bionic-server-cloudimg-amd64.ova | jq .NetworkMapping[0].Name)
-    govc import.spec bionic-server-cloudimg-amd64.ova \
-        | jq --arg GOVC_NETWORK $GOVC_NETWORK --arg NETWORK 'VM Network' '.NetworkMapping |= [ { Name: $NETWORK, Network: $GOVC_NETWORK } ]' \
-        > bionic-server-cloudimg-amd64.spec
-fi
+govc vm.clone -link=false -on=false $FOLDER_OPTIONS -c=2 -m=4096 -vm=$SEEDIMAGE $TARGET_IMAGE
 
-cat bionic-server-cloudimg-amd64.spec \
-    | jq --arg SSH_KEY "$SSH_KEY" \
-        --arg SSH_KEY "$SSH_KEY" \
-        --arg USERDATA "$VENDORDATA" \
-        --arg PASSWORD "$PASSWORD" \
-        --arg TARGET_IMAGE "$TARGET_IMAGE" '.Name = $TARGET_IMAGE | .PropertyMapping |= [ { Key: "instance-id", Value: $TARGET_IMAGE }, { Key: "hostname", Value: $TARGET_IMAGE }, { Key: "public-keys", Value: $SSH_KEY }, { Key: "user-data", Value: $USERDATA }, { Key: "password", Value: $PASSWORD } ]' \
-        > bionic-server-cloudimg-amd64.txt
+govc vm.change -vm "${TARGET_IMAGE}" \
+    -e guestinfo.metadata="$(cat metadata.base64)" \
+    -e guestinfo.metadata.encoding="gzip+base64" \
+    -e guestinfo.userdata="$(cat userdata.base64)" \
+    -e guestinfo.userdata.encoding="gzip+base64" \
+    -e guestinfo.vendordata="$(cat vendordata.base64)" \
+    -e guestinfo.vendordata.encoding="gzip+base64"
 
-echo "Import OVA to $TARGET_IMAGE"
-#govc import.ova \
-    -options=bionic-server-cloudimg-amd64.txt \
-    -dump=true \
-    -debug=true \
-    -folder=/$GOVC_DATACENTER/vm/$GOVC_FOLDER \
-    -ds=/$GOVC_DATACENTER/datastore/$GOVC_CLUSTER/CUSTOMER/$GOVC_FOLDER/$GOVC_DATASTORE \
-    -name=$TARGET_IMAGE bionic-server-cloudimg-amd64.ova
+echo "Power On $TARGET_IMAGE"
+govc vm.power -on "${TARGET_IMAGE}"
 
-ovftool \
-    --acceptAllEulas \
-    --name=$TARGET_IMAGE \
-    --datastore=$GOVC_DATASTORE \
-    --vmFolder=$GOVC_FOLDER \
-    --diskMode=thin \
-    --prop:instance-id="$TARGET_IMAGE" \
-    --prop:hostname="$TARGET_IMAGE" \
-    --prop:public-keys="$SSH_KEY" \
-    --prop:user-data="$VENDORDATA" \
-    --prop:password="$PASSWORD" \
-    --net:"VM Network"="$GOVC_NETWORK" \
-    https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.ova \
-    vi://$GOVC_USERNAME:$GOVC_PASSWORD@$GOVC_HOST/$GOVC_RESOURCE_POOL
+echo "Wait for IP from $TARGET_IMAGE"
+IPADDR=$(govc vm.ip -wait 5m "${TARGET_IMAGE}")
 
-exit 
-echo "Import cidata.iso to $TARGET_IMAGE"
-govc datastore.upload  cidata.iso $TARGET_IMAGE/cidata.iso
+scp $ISODIR/prepare.sh ubuntu@$IPADDR:/tmp
+ssh ubuntu@$IPADDR sudo /tmp/prepare.sh
 
-CDROM=$(govc device.ls -json -vm $TARGET_IMAGE|grep cdrom|awk '{print $1;exit}')
-
-if [ -z "$(govc device.ls -json -vm $TARGET_IMAGE|grep cdrom)" ]; then
-    IDE=$(govc device.ls -vm $TARGET_IMAGE | grep ide- | awk '{print $1;exit}')
-    govc device.cdrom.add -vm $TARGET_IMAGE -controller $IDE
-    CDROM=$(govc device.ls -json -vm $TARGET_IMAGE|grep cdrom|awk '{print $1;exit}')
-fi
-
-echo "Connect CD-rom to $TARGET_IMAGE"
-govc device.connect -vm $TARGET_IMAGE $CDROM
-govc device.cdrom.insert -vm $TARGET_IMAGE -device $CDROM $TARGET_IMAGE/cidata.iso
+sleep 30
 
 echo "Created image $TARGET_IMAGE with kubernetes version $KUBERNETES_VERSION"
 

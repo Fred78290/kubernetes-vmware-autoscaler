@@ -60,7 +60,7 @@ func (s *AutoScalerServerApp) newNodeGroup(nodeGroupID string, minNodeSize, maxN
 		NodeGroupIdentifier: nodeGroupID,
 		Machine:             machine,
 		Status:              NodegroupNotCreated,
-		PendingNodes:        make(map[string]*AutoScalerServerNode),
+		pendingNodes:        make(map[string]*AutoScalerServerNode),
 		Nodes:               make(map[string]*AutoScalerServerNode),
 		MinNodeSize:         int(minNodeSize),
 		MaxNodeSize:         int(maxNodeSize),
