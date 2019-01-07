@@ -1,11 +1,9 @@
 package vsphere
 
 import (
-	"context"
+	"strings"
 
-	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
-	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
@@ -18,24 +16,38 @@ type Network struct {
 }
 
 // Reference return the network reference
-func (net *Network) Reference(client *vim25.Client, dc *object.Datacenter) (object.NetworkReference, error) {
-	f := find.NewFinder(client, true)
+func (net *Network) Reference(ctx *Context, dc *Datacenter) (object.NetworkReference, error) {
+	f := dc.NewFinder(ctx)
 
-	f.SetDatacenter(dc)
-
-	return f.NetworkOrDefault(context.TODO(), net.Name)
+	return f.NetworkOrDefault(ctx, net.Name)
 }
 
 // Device return a device
-func (net *Network) Device(client *vim25.Client, dc *object.Datacenter) (types.BaseVirtualDevice, error) {
-	network, err := net.Reference(client, dc)
+func (net *Network) Device(ctx *Context, dc *Datacenter) (types.BaseVirtualDevice, error) {
+	var backing types.BaseVirtualDeviceBackingInfo
+
+	network, err := net.Reference(ctx, dc)
+
 	if err != nil {
 		return nil, err
 	}
 
-	backing, err := network.EthernetCardBackingInfo(context.TODO())
+	backing, err = network.EthernetCardBackingInfo(ctx)
+
 	if err != nil {
-		return nil, err
+		strErr := err.Error()
+
+		if strings.Contains(strErr, "no System.Read privilege on:") {
+
+			backing = &types.VirtualEthernetCardNetworkBackingInfo{
+				VirtualDeviceDeviceBackingInfo: types.VirtualDeviceDeviceBackingInfo{
+					DeviceName: net.Name,
+				},
+			}
+
+		} else {
+			return nil, err
+		}
 	}
 
 	device, err := object.EthernetCardTypes().CreateEthernetCard(net.Adapter, backing)
@@ -43,7 +55,14 @@ func (net *Network) Device(client *vim25.Client, dc *object.Datacenter) (types.B
 		return nil, err
 	}
 
-	if net.Address != "" {
+	// Connect the device
+	device.GetVirtualDevice().Connectable = &types.VirtualDeviceConnectInfo{
+		StartConnected:    true,
+		AllowGuestControl: true,
+		Connected:         true,
+	}
+
+	if len(net.Address) != 0 {
 		card := device.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
 		card.AddressType = string(types.VirtualEthernetCardMacTypeManual)
 		card.MacAddress = net.Address

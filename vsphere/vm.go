@@ -28,9 +28,6 @@ type VirtualMachine struct {
 // Must not start with `guestinfo.`
 type GuestInfos map[string]string
 
-// CloudInitConfig contains extra config
-type CloudInitConfig []types.BaseOptionValue
-
 // NetworkAdapter wrapper
 type NetworkAdapter struct {
 	DHCP4 bool              `json:"dhcp4"`
@@ -170,18 +167,18 @@ func (g GuestInfos) isEmpty() bool {
 	return len(g) == 0
 }
 
-func (g GuestInfos) toExtraConfig() CloudInitConfig {
-	extraConfig := make(CloudInitConfig, 0, len(g))
+func (g GuestInfos) toExtraConfig() []types.BaseOptionValue {
+	extraConfig := make([]types.BaseOptionValue, len(g))
 
 	for k, v := range g {
-		extraConfig.set(fmt.Sprintf("guestinfo.%s", k), v)
+		extraConfig = append(extraConfig,
+			&types.OptionValue{
+				Key:   fmt.Sprintf("guestinfo.%s", k),
+				Value: v,
+			})
 	}
 
 	return extraConfig
-}
-
-func (e CloudInitConfig) set(k, v string) {
-	e = append(e, &types.OptionValue{Key: k, Value: v})
 }
 
 // VirtualMachine return govmomi virtual machine
@@ -214,30 +211,18 @@ func (vm *VirtualMachine) VimClient() *vim25.Client {
 }
 
 func (vm *VirtualMachine) addNetwork(ctx *Context, network *Network, devices object.VirtualDeviceList) (object.VirtualDeviceList, error) {
-	var net object.NetworkReference
 	var err error
-	var backing types.BaseVirtualDeviceBackingInfo
 	var device types.BaseVirtualDevice
 
 	if network != nil && len(network.Name) > 0 {
-		f := vm.Datastore.Datacenter.NewFinder(ctx)
+		if device, err = network.Device(ctx, vm.Datastore.Datacenter); err == nil {
 
-		if net, err = f.NetworkOrDefault(ctx, network.Name); err == nil {
-
-			if backing, err = net.EthernetCardBackingInfo(ctx); err == nil {
-
-				if device, err = object.EthernetCardTypes().CreateEthernetCard(network.Adapter, backing); err == nil {
-
-					if len(network.Address) != 0 {
-						card := device.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
-						card.AddressType = string(types.VirtualEthernetCardMacTypeManual)
-						card.MacAddress = network.Address
-					}
-				}
-
-				devices = append(devices, device)
+			if len(network.Address) != 0 {
+				card := device.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
+				card.AddressType = string(types.VirtualEthernetCardMacTypeManual)
+				card.MacAddress = network.Address
 			}
-
+			devices = append(devices, device)
 		}
 	}
 
@@ -451,22 +436,27 @@ func (vm *VirtualMachine) SetGuestInfo(ctx *Context, guestInfos *GuestInfos) err
 	return err
 }
 
-func (vm *VirtualMachine) cloudInit(ctx *Context, hostName string, userName, authKey string, cloudInit interface{}, network *Network) (CloudInitConfig, error) {
+func (vm *VirtualMachine) cloudInit(ctx *Context, hostName string, userName, authKey string, cloudInit interface{}, network *Network) ([]types.BaseOptionValue, error) {
 	var metadata, userdata, vendordata, netconfig string
 	var err error
 	var guestInfos *GuestInfos
 
 	v := vm.VirtualMachine(ctx)
 
+	// go lint compliant
+	if len(netconfig) > 0 {
+
+	}
+
 	// Only DHCP supported
 	if network != nil && len(network.NicName) > 0 {
 		if netconfig, err = encodeObject("networkconfig", buildNetworkConfig(network)); err != nil {
 			err = fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "networkconfig", err)
 		} else if metadata, err = encodeMetadata(map[string]string{
-			"network":          netconfig,
-			"network.encoding": "gzip+base64",
-			"local-hostname":   hostName,
-			"instance-id":      v.UUID(ctx),
+			//"network":          netconfig,
+			//"network.encoding": "gzip+base64",
+			"local-hostname": hostName,
+			"instance-id":    v.UUID(ctx),
 		}); err != nil {
 			err = fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "metadata", err)
 		}

@@ -138,7 +138,11 @@ func Test_powerOnVM(t *testing.T) {
 	err := config.PowerOn(config.New.Name)
 
 	if assert.NoError(t, err, "Can't power on VM") {
-		t.Logf("VM powered")
+		ipaddr, err := config.WaitForIP(config.New.Name)
+
+		if assert.NoError(t, err, "Can't get IP") {
+			t.Logf("VM powered with IP:%s", ipaddr)
+		}
 	}
 }
 
@@ -149,5 +153,15 @@ func Test_powerOffVM(t *testing.T) {
 
 	if assert.NoError(t, err, "Can't power off VM") {
 		t.Logf("VM shutdown")
+	}
+}
+
+func Test_deleteVM(t *testing.T) {
+	config := loadFromJson(confName)
+
+	err := config.Delete(config.New.Name)
+
+	if assert.NoError(t, err, "Can't delete VM") {
+		t.Logf("VM deleted")
 	}
 }

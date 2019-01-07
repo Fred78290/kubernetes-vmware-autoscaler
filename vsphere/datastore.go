@@ -195,35 +195,6 @@ func (ds *Datastore) CreateVirtualMachine(ctx *Context, name string) (*VirtualMa
 				// prepare virtual device config spec for network card
 				configSpecs := []types.BaseVirtualDeviceConfigSpec{}
 
-				if config.Network != nil {
-					var devices object.VirtualDeviceList
-
-					if devices, err = templateVM.Device(ctx); err == nil {
-						op := types.VirtualDeviceConfigSpecOperationAdd
-						card, derr := config.Network.Device(ds.VimClient(), ds.Datacenter.Datacenter(ctx))
-
-						if derr != nil {
-							return nil, derr
-						}
-
-						// search for the first network card of the source
-						for _, device := range devices {
-							if _, ok := device.(types.BaseVirtualEthernetCard); ok {
-								op = types.VirtualDeviceConfigSpecOperationEdit
-								// set new backing info
-								config.Network.Change(device, card)
-								card = device
-								break
-							}
-						}
-
-						configSpecs = append(configSpecs, &types.VirtualDeviceConfigSpec{
-							Operation: op,
-							Device:    card,
-						})
-					}
-				}
-
 				folderref := folder.Reference()
 				poolref := resourcePool.Reference()
 
