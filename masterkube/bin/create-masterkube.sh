@@ -296,6 +296,17 @@ gzip -c9 <./config/metadata.json | $BASE64 | tee > config/metadata.base64
 gzip -c9 <./config/userdata.yaml | $BASE64 | tee > config/userdata.base64
 gzip -c9 <./config/vendordata.yaml | $BASE64 | tee > config/vendordata.base64
 
+#from email.mime.multipart import MIMEMultipart
+#from email.mime.text import MIMEText
+#
+#   def _mime_data(self,contents,filename):
+#        combined_message = MIMEMultipart()
+#        sub_message = MIMEText(contents, 'cloud-config', 'UTF-8')
+#        sub_message.add_header('Content-Disposition', 'attachment; filename="%s"' % (filename))
+#        sub_message.add_header('Content-Type', 'text/cloud-config')
+#        combined_message.attach(sub_message)
+#        return  combined_message.as_string()
+
 echo "Clone $TARGET_IMAGE to $MASTERKUBE"
 
 echo "TARGET_IMAGE=$TARGET_IMAGE"
