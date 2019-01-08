@@ -2,7 +2,7 @@
 
 #
 # usage: install.sh
-#        curl -sSL https://raw.githubusercontent.com/akutz/cloud-init-vmware-guestinfo/master/install.sh | sh -
+#        curl -sSL https://raw.githubusercontent.com/Fred78290/cloud-init-vmware-guestinfo/master/install.sh | sh -
 #
 
 # The script to lookup the path to the cloud-init's datasource directory, "sources".
@@ -32,7 +32,7 @@ CLOUD_INIT_SOURCES=$($PYTHON -c ''"${PY_SCRIPT}"'' 2>/dev/null || (exit_code="${
 echo "Cloud init sources located here: $CLOUD_INIT_SOURCES"
 
 # The repository from which to fetch the cloud-init datasource and config files.
-REPO_SLUG="${REPO_SLUG:-https://raw.githubusercontent.com/akutz/cloud-init-vmware-guestinfo}"
+REPO_SLUG="${REPO_SLUG:-https://raw.githubusercontent.com/Fred78290/cloud-init-vmware-guestinfo}"
 
 # The git reference to use. This can be a branch or tag name as well as a commit ID.
 GIT_REF="${GIT_REF:-master}"
@@ -46,7 +46,7 @@ curl -sSL -o /etc/cloud/cloud.cfg.d/99-DataSourceVMwareGuestInfo.cfg "${REPO_SLU
 
 sed -i 's/None/None, VMwareGuestInfo/g' /etc/cloud/cloud.cfg.d/90_dpkg.cfg
 
-rm /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg
+[ -f /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg ] && rm /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg
 cloud-init clean
 rm /var/log/cloud-ini*
 
