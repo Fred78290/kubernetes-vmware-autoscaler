@@ -55,7 +55,7 @@ while true ; do
     esac
 done
 
-if [ -z "$(govc vm.info $TARGET_IMAGE 2>&1)" ]; then
+if [ ! -z "$(govc vm.info $TARGET_IMAGE 2>&1)" ]; then
     echo "$TARGET_IMAGE already exists!"
     exit 0
 fi
@@ -209,7 +209,7 @@ rm /var/log/cloud-ini*
 shutdown -P now
 EOF
 
-chmod +x prepare.sh
+chmod +x $ISODIR/prepare.sh
 
 gzip -c9 < $ISODIR/meta-data | $BASE64 > metadata.base64
 gzip -c9 < $ISODIR/user-data | $BASE64 > userdata.base64

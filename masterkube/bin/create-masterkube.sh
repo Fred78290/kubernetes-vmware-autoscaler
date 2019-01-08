@@ -315,9 +315,9 @@ echo "MASTERKUBE=$MASTERKUBE"
 #### FOLDER=$(govc folder.info AFP | sed "s/\s\+//g" |  grep "Path\|Types" | sed "s/\nTypes/\|Types/g")
 
 # Due to my vsphere center the folder name refer more path, so I need to precise the path instead
+FOLDER_OPTIONS=
 if [ "$GOVC_FOLDER" ]; then
-    FOLDERS=$(govc folder.info $GOVC_FOLDER|grep Path|wc -l)
-    if [ "$FOLDER" != "1" ]; then
+    if [ ! $(govc folder.info $GOVC_FOLDER|grep Path|wc -l) -eq 1 ]; then
         FOLDER_OPTIONS="-folder=/$GOVC_DATACENTER/vm/$GOVC_FOLDER"
     fi
 fi

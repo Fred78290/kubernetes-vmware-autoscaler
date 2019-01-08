@@ -30,20 +30,20 @@ type GuestInfos map[string]string
 
 // NetworkAdapter wrapper
 type NetworkAdapter struct {
-	DHCP4 bool              `json:"dhcp4"`
+	DHCP4 bool              `json:"dhcp4,omitempty"`
 	Name  string            `json:"set-name,omitempty"`
 	Match map[string]string `json:"match,omitempty"`
 }
 
 // NetworkDeclare wrapper
 type NetworkDeclare struct {
-	Version   int                       `json:"version"`
-	Ethernets map[string]NetworkAdapter `json:"ethernets"`
+	Version   int                       `json:"version,omitempty"`
+	Ethernets map[string]NetworkAdapter `json:"ethernets,omitempty"`
 }
 
 // NetworkConfig wrapper
 type NetworkConfig struct {
-	Network NetworkDeclare `json:"network"`
+	Network NetworkDeclare `json:"network,omitempty"`
 }
 
 func encodeMetadata(object interface{}) (string, error) {
@@ -139,25 +139,35 @@ func buildVendorData(userName, authKey string) interface{} {
 }
 
 func buildNetworkConfig(network *Network) NetworkConfig {
-	var match map[string]string
+	var net NetworkConfig
 
 	if len(network.Address) > 0 {
-		match = map[string]string{
-			"macaddress": network.Address,
-		}
-	}
-
-	net := NetworkConfig{
-		Network: NetworkDeclare{
-			Version: 2,
-			Ethernets: map[string]NetworkAdapter{
-				network.NicName: NetworkAdapter{
-					DHCP4: true,
-					Name:  network.NicName,
-					Match: match,
+		net = NetworkConfig{
+			Network: NetworkDeclare{
+				Version: 2,
+				Ethernets: map[string]NetworkAdapter{
+					network.NicName: NetworkAdapter{
+						DHCP4: true,
+						Name:  network.NicName,
+						Match: map[string]string{
+							"macaddress": network.Address,
+						},
+					},
 				},
 			},
-		},
+		}
+	} else {
+		net = NetworkConfig{
+			Network: NetworkDeclare{
+				Version: 2,
+				Ethernets: map[string]NetworkAdapter{
+					network.NicName: NetworkAdapter{
+						DHCP4: true,
+						Name:  network.NicName,
+					},
+				},
+			},
+		}
 	}
 
 	return net
@@ -453,10 +463,10 @@ func (vm *VirtualMachine) cloudInit(ctx *Context, hostName string, userName, aut
 		if netconfig, err = encodeObject("networkconfig", buildNetworkConfig(network)); err != nil {
 			err = fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "networkconfig", err)
 		} else if metadata, err = encodeMetadata(map[string]string{
-			//"network":          netconfig,
-			//"network.encoding": "gzip+base64",
-			"local-hostname": hostName,
-			"instance-id":    v.UUID(ctx),
+			"network":          netconfig,
+			"network.encoding": "gzip+base64",
+			"local-hostname":   hostName,
+			"instance-id":      v.UUID(ctx),
 		}); err != nil {
 			err = fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "metadata", err)
 		}

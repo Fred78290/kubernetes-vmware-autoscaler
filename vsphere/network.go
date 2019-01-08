@@ -9,10 +9,10 @@ import (
 
 // Network describes a card adapter
 type Network struct {
-	Name    string `json:"name"`
-	Adapter string `json:"adapter"`
-	Address string `json:"address"`
-	NicName string `json:"nic"`
+	Name    string `json:"name,omitempty"`
+	Adapter string `json:"adapter,omitempty"`
+	Address string `json:"address,omitempty"`
+	NicName string `json:"nic,omitempty"`
 }
 
 // Reference return the network reference
