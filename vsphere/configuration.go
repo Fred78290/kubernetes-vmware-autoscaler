@@ -77,7 +77,7 @@ func (conf *Configuration) CreateWithContext(ctx *Context, name string, userName
 	if client, err = conf.GetClient(ctx); err == nil {
 		if dc, err = client.GetDatacenter(ctx, conf.DataCenter); err == nil {
 			if ds, err = dc.GetDatastore(ctx, conf.DataStore); err == nil {
-				if vm, err = ds.CreateVirtualMachine(ctx, name); err == nil {
+				if vm, err = ds.CreateVirtualMachine(ctx, name, conf.TemplateName, conf.VMBasePath, conf.Resource, conf.Template, conf.LinkedClone, network, conf.Customization); err == nil {
 					err = vm.Configure(ctx, userName, authKey, cloudInit, network, annotation, memory, cpus, disk)
 				}
 			}

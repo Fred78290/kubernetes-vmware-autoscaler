@@ -174,7 +174,7 @@ func (ds *Datastore) output(ctx *Context) *flags.OutputFlag {
 }
 
 // CreateVirtualMachine create a new virtual machine
-func (ds *Datastore) CreateVirtualMachine(ctx *Context, name string) (*VirtualMachine, error) {
+func (ds *Datastore) CreateVirtualMachine(ctx *Context, name, templateName, vmFolder, resourceName string, template bool, linkedClone bool, network *Network, customization string) (*VirtualMachine, error) {
 	var templateVM *object.VirtualMachine
 	var folder *object.Folder
 	var resourcePool *object.ResourcePool
@@ -182,25 +182,80 @@ func (ds *Datastore) CreateVirtualMachine(ctx *Context, name string) (*VirtualMa
 	var err error
 	var vm *VirtualMachine
 
-	config := ds.Datacenter.Client.Configuration
+	//	config := ds.Datacenter.Client.Configuration
 	output := ds.output(ctx)
 
-	if templateVM, err = ds.findVM(ctx, config.TemplateName); err == nil {
+	if templateVM, err = ds.findVM(ctx, templateName); err == nil {
 
 		logger := output.ProgressLogger(fmt.Sprintf("Cloning %s to %s...", templateVM.InventoryPath, name))
 		defer logger.Wait()
 
-		if folder, err = ds.vmFolder(ctx, config.VMBasePath); err == nil {
-			if resourcePool, err = ds.resourcePool(ctx, config.Resource); err == nil {
+		if folder, err = ds.vmFolder(ctx, vmFolder); err == nil {
+			if resourcePool, err = ds.resourcePool(ctx, resourceName); err == nil {
 				// prepare virtual device config spec for network card
 				configSpecs := []types.BaseVirtualDeviceConfigSpec{}
+
+				if network != nil {
+					// Change primary card
+					if primary := network.GetPrimaryInterface(); primary != nil {
+						if devices, err := templateVM.Device(ctx); err == nil {
+							found := false
+							//macAddress := primary.GetMacAddress()
+
+							// search for the first network card of the source
+							for _, device := range devices {
+								if _, ok := device.(types.BaseVirtualEthernetCard); ok {
+									newDevice, err := primary.Device(ctx, ds.Datacenter)
+
+									if err != nil {
+										return vm, err
+									}
+
+									primary.Change(device, newDevice)
+
+									configSpecs = append(configSpecs, &types.VirtualDeviceConfigSpec{
+										Operation: types.VirtualDeviceConfigSpecOperationEdit,
+										Device:    device,
+									})
+
+									/*
+										current := device.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
+
+										// We want a macaddress
+										if len(macAddress) > 0 {
+											current.MacAddress = macAddress
+											current.AddressType = string(types.VirtualEthernetCardMacTypeManual)
+
+											// We dont want a mac address but the original card have a macaddress
+										} else if len(current.MacAddress) != 0 {
+											current.MacAddress = macAddress
+											current.AddressType = string(types.VirtualEthernetCardMacTypeGenerated)
+
+											configSpecs = append(configSpecs, &types.VirtualDeviceConfigSpec{
+												Operation: types.VirtualDeviceConfigSpecOperationEdit,
+												Device:    device,
+											})
+										}
+									*/
+									found = true
+									break
+								}
+							}
+
+							// If not found the card will be added on reconfigure
+							if found == false {
+								primary.Primary = false
+							}
+						}
+					}
+				}
 
 				folderref := folder.Reference()
 				poolref := resourcePool.Reference()
 
 				cloneSpec := &types.VirtualMachineCloneSpec{
 					PowerOn:  false,
-					Template: config.Template,
+					Template: template,
 				}
 
 				relocateSpec := types.VirtualMachineRelocateSpec{
@@ -209,7 +264,7 @@ func (ds *Datastore) CreateVirtualMachine(ctx *Context, name string) (*VirtualMa
 					Pool:         &poolref,
 				}
 
-				if config.LinkedClone {
+				if linkedClone {
 					relocateSpec.DiskMoveType = string(types.VirtualMachineRelocateDiskMoveOptionsMoveAllDiskBackingsAndAllowSharing)
 				}
 
@@ -217,19 +272,19 @@ func (ds *Datastore) CreateVirtualMachine(ctx *Context, name string) (*VirtualMa
 				cloneSpec.Location.Datastore = &ds.Ref
 
 				// check if customization specification requested
-				if len(config.Customization) > 0 {
+				if len(customization) > 0 {
 					// get the customization spec manager
 					customizationSpecManager := object.NewCustomizationSpecManager(ds.VimClient())
 					// check if customization specification exists
-					exists, err := customizationSpecManager.DoesCustomizationSpecExist(ctx, config.Customization)
+					exists, err := customizationSpecManager.DoesCustomizationSpecExist(ctx, customization)
 					if err != nil {
 						return nil, err
 					}
 					if exists == false {
-						return nil, fmt.Errorf("Customization specification %s does not exists", config.Customization)
+						return nil, fmt.Errorf("Customization specification %s does not exists", customization)
 					}
 					// get the customization specification
-					customSpecItem, err := customizationSpecManager.GetCustomizationSpec(ctx, config.Customization)
+					customSpecItem, err := customizationSpecManager.GetCustomizationSpec(ctx, customization)
 					if err != nil {
 						return nil, err
 					}

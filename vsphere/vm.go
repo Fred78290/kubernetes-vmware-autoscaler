@@ -28,24 +28,6 @@ type VirtualMachine struct {
 // Must not start with `guestinfo.`
 type GuestInfos map[string]string
 
-// NetworkAdapter wrapper
-type NetworkAdapter struct {
-	DHCP4 bool              `json:"dhcp4,omitempty"`
-	Name  string            `json:"set-name,omitempty"`
-	Match map[string]string `json:"match,omitempty"`
-}
-
-// NetworkDeclare wrapper
-type NetworkDeclare struct {
-	Version   int                       `json:"version,omitempty"`
-	Ethernets map[string]NetworkAdapter `json:"ethernets,omitempty"`
-}
-
-// NetworkConfig wrapper
-type NetworkConfig struct {
-	Network NetworkDeclare `json:"network,omitempty"`
-}
-
 func encodeMetadata(object interface{}) (string, error) {
 	var result string
 	out, err := json.Marshal(object)
@@ -138,41 +120,6 @@ func buildVendorData(userName, authKey string) interface{} {
 	}
 }
 
-func buildNetworkConfig(network *Network) NetworkConfig {
-	var net NetworkConfig
-
-	if len(network.Address) > 0 {
-		net = NetworkConfig{
-			Network: NetworkDeclare{
-				Version: 2,
-				Ethernets: map[string]NetworkAdapter{
-					network.NicName: NetworkAdapter{
-						DHCP4: true,
-						Name:  network.NicName,
-						Match: map[string]string{
-							"macaddress": network.Address,
-						},
-					},
-				},
-			},
-		}
-	} else {
-		net = NetworkConfig{
-			Network: NetworkDeclare{
-				Version: 2,
-				Ethernets: map[string]NetworkAdapter{
-					network.NicName: NetworkAdapter{
-						DHCP4: true,
-						Name:  network.NicName,
-					},
-				},
-			},
-		}
-	}
-
-	return net
-}
-
 func (g GuestInfos) isEmpty() bool {
 	return len(g) == 0
 }
@@ -222,18 +169,9 @@ func (vm *VirtualMachine) VimClient() *vim25.Client {
 
 func (vm *VirtualMachine) addNetwork(ctx *Context, network *Network, devices object.VirtualDeviceList) (object.VirtualDeviceList, error) {
 	var err error
-	var device types.BaseVirtualDevice
 
-	if network != nil && len(network.Name) > 0 {
-		if device, err = network.Device(ctx, vm.Datastore.Datacenter); err == nil {
-
-			if len(network.Address) != 0 {
-				card := device.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
-				card.AddressType = string(types.VirtualEthernetCardMacTypeManual)
-				card.MacAddress = network.Address
-			}
-			devices = append(devices, device)
-		}
+	if network != nil && len(network.Interfaces) > 0 {
+		devices, err = network.Devices(ctx, devices, vm.Datastore.Datacenter)
 	}
 
 	return devices, err
@@ -453,14 +391,9 @@ func (vm *VirtualMachine) cloudInit(ctx *Context, hostName string, userName, aut
 
 	v := vm.VirtualMachine(ctx)
 
-	// go lint compliant
-	if len(netconfig) > 0 {
-
-	}
-
 	// Only DHCP supported
-	if network != nil && len(network.NicName) > 0 {
-		if netconfig, err = encodeObject("networkconfig", buildNetworkConfig(network)); err != nil {
+	if network != nil && len(network.Interfaces) > 0 {
+		if netconfig, err = encodeObject("networkconfig", network.GetCloudInitNetwork()); err != nil {
 			err = fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "networkconfig", err)
 		} else if metadata, err = encodeMetadata(map[string]string{
 			"network":          netconfig,
