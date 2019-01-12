@@ -71,27 +71,26 @@ func (net *Network) GetCloudInitNetwork() *NetworkConfig {
 	for _, n := range net.Interfaces {
 		if len(n.NicName) > 0 {
 			var ethernet *NetworkAdapter
-			var matches *map[string]string
 			var macAddress = n.GetMacAddress()
-
-			if len(macAddress) != 0 {
-				match := make(map[string]string)
-				matches = &match
-
-				match["macaddress"] = macAddress
-			}
 
 			if n.DHCP || len(n.IPAddress) == 0 {
 				ethernet = &NetworkAdapter{
 					DHCP4: n.DHCP,
-					Match: matches,
 				}
 			} else {
 				ethernet = &NetworkAdapter{
-					Gateway4:  &n.Gateway,
 					Addresses: &[]string{n.IPAddress},
-					Match:     matches,
 				}
+			}
+
+			if len(macAddress) != 0 {
+				ethernet.Match = &map[string]string{
+					"macaddress": macAddress,
+				}
+			}
+
+			if len(n.Gateway) > 0 {
+				ethernet.Gateway4 = &n.Gateway
 			}
 
 			if len(n.NicName) > 0 {
@@ -151,7 +150,7 @@ func generateMacAddress() string {
 		return ""
 	}
 
-	return fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[0], buf[1], buf[2])
+	return fmt.Sprintf("00:50:56:%02x:%02x:%02x", buf[0], buf[1], buf[2])
 }
 
 // GetMacAddress return a macaddress
