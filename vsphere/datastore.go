@@ -196,57 +196,40 @@ func (ds *Datastore) CreateVirtualMachine(ctx *Context, name, templateName, vmFo
 				configSpecs := []types.BaseVirtualDeviceConfigSpec{}
 
 				if network != nil {
-					// Change primary card
-					if primary := network.GetPrimaryInterface(); primary != nil {
-						if devices, err := templateVM.Device(ctx); err == nil {
-							found := false
-							//macAddress := primary.GetMacAddress()
+					if devices, err := templateVM.Device(ctx); err == nil {
+						for _, inf := range network.Interfaces {
+							if inf.NeedToReconfigure() {
+								// In case we dont find the preconfigured net card, we add it
+								inf.Existing = false
 
-							// search for the first network card of the source
-							for _, device := range devices {
-								if _, ok := device.(types.BaseVirtualEthernetCard); ok {
-									newDevice, err := primary.Device(ctx, ds.Datacenter)
+								// Find the preconfigured device
+								for _, device := range devices {
+									// It's an ether device?
+									if ethernet, ok := device.(types.BaseVirtualEthernetCard); ok {
+										// Match my network?
+										if match, err := inf.MatchInterface(ctx, ds.Datacenter, ethernet.GetVirtualEthernetCard()); match && err == nil {
 
-									if err != nil {
-										return vm, err
-									}
+											// Change the mac address
+											if inf.ChangeAddress(ethernet.GetVirtualEthernetCard()) {
+												configSpecs = append(configSpecs, &types.VirtualDeviceConfigSpec{
+													Operation: types.VirtualDeviceConfigSpecOperationEdit,
+													Device:    device,
+												})
+											}
 
-									primary.Change(device, newDevice)
+											// Ok don't need to add one
+											inf.Existing = true
 
-									configSpecs = append(configSpecs, &types.VirtualDeviceConfigSpec{
-										Operation: types.VirtualDeviceConfigSpecOperationEdit,
-										Device:    device,
-									})
-
-									/*
-										current := device.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
-
-										// We want a macaddress
-										if len(macAddress) > 0 {
-											current.MacAddress = macAddress
-											current.AddressType = string(types.VirtualEthernetCardMacTypeManual)
-
-											// We dont want a mac address but the original card have a macaddress
-										} else if len(current.MacAddress) != 0 {
-											current.MacAddress = macAddress
-											current.AddressType = string(types.VirtualEthernetCardMacTypeGenerated)
-
-											configSpecs = append(configSpecs, &types.VirtualDeviceConfigSpec{
-												Operation: types.VirtualDeviceConfigSpecOperationEdit,
-												Device:    device,
-											})
+											break
+										} else if err != nil {
+											return vm, err
 										}
-									*/
-									found = true
-									break
+									}
 								}
 							}
-
-							// If not found the card will be added on reconfigure
-							if found == false {
-								primary.Primary = false
-							}
 						}
+					} else {
+						return vm, err
 					}
 				}
 
