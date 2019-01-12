@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	testProviderID = "AutoScaler"
-	testGroupID    = "ca-grpc-AutoScaler"
-	testNodeName   = "ca-grpc-AutoScaler-vm-00"
+	testProviderID = "vmware"
+	testGroupID    = "afp-slyo-ca-k8s"
+	testNodeName   = "afp-slyo-ca-k8s-vm-00"
 )
 
 func newTestServer(addNodeGroup, addTestNode bool) (*AutoScalerServerApp, *AutoScalerServerNodeGroup, context.Context, error) {
