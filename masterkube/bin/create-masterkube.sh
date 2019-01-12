@@ -9,14 +9,16 @@ set -e
 
 CURDIR=$(dirname $0)
 
-export MASTERKUBE="afp-bionic-k8s-masterkube"
+export NODEGROUP_NAME="afp-slyo-ca-k8s"
+export MASTERKUBE="${NODEGROUP_NAME}-masterkube"
 export SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
 export KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 export KUBERNETES_PASSWORD=$(uuidgen)
 export KUBECONFIG=$HOME/.kube/config
-export TARGET_IMAGE=afp-slyo-bionic-kubernetes-$KUBERNETES_VERSION
+export ROOT_IMG_NAME=afp-slyo-bionic-kubernetes
+export TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_VERSION}"
 export CNI_VERSION="v0.7.1"
-export PROVIDERID="vmware://ca-grpc-vmware/object?type=node&name=$MASTERKUBE"
+export PROVIDERID="vmware://${NODEGROUP_NAME}/object?type=node&name=${MASTERKUBE}"
 export MINNODES=0
 export MAXNODES=5
 export MAXTOTALNODES=$MAXNODES
@@ -42,7 +44,7 @@ else
     BASE64="base64"
 fi
 
-TEMP=$(getopt -o i:k:n:p:t:v: --long transport:,no-custom-image,image:,ssh-key:,cni-version:,password:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
+TEMP=$(getopt -o i:k:n:p:s:t: --long transport:,no-custom-image,image:,ssh-key:,cni-version:,password:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
 
 eval set -- "$TEMP"
 
@@ -57,7 +59,7 @@ while true; do
 		TARGET_IMAGE="$2"
 		shift 2
 		;;
-	-k | --ssh-key)
+	-s | --ssh-key)
 		SSH_KEY="$2"
 		shift 2
 		;;
@@ -73,9 +75,9 @@ while true; do
 		TRANSPORT="$2"
 		shift 2
 		;;
-	-v | --kubernetes-version)
+	-k | --kubernetes-version)
 		KUBERNETES_VERSION="$2"
-        TARGET_IMAGE=afp-bionic-k8s-$KUBERNETES_VERSION
+        TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_VERSION}"
 		shift 2
 		;;
 	--max-nodes-total)
@@ -242,15 +244,23 @@ fi
 
 echo "Launch custom $MASTERKUBE instance with $TARGET_IMAGE"
 
+hexchars="0123456789ABCDEF"
+MACADDR1=$( for i in {1..6} ; do echo -n ${hexchars:$(( $RANDOM % 16 )):1} ; done | sed -e 's/\(..\)/:\1/g' )
+MACADDR2=$( for i in {1..6} ; do echo -n ${hexchars:$(( $RANDOM % 16 )):1} ; done | sed -e 's/\(..\)/:\1/g' )
+ADDR1=$(echo "00:16:3E:${MACADDR1}")
+ADDR2=$(echo "00:16:3E:${MACADDR2}")
+
+
 cat > ./config/network.yaml <<EOF
-#cloud-config
 network:
-    version: 2
-    ethernets:
-        eth0:
-            dhcp4: true
-        eth1:
-            dhcp4: true
+  version: 2
+  ethernets:
+    eth0:
+      dhcp4: true
+    eth1:
+      gateway4: 10.65.4.1
+      addresses:
+      - 10.65.4.200/24
 EOF
 
 echo "$KUBERNETES_PASSWORD" > ./config/kubernetes-password.txt
@@ -269,7 +279,7 @@ system_info:
         name: kubernetes
 EOF
 
-cat > ./config/metadata.yaml <<EOF
+cat > ./config/metadata.json <<EOF
 {
     "network": "$(cat ./config/network.yaml | gzip -c9 | $BASE64)",
     "network.encoding": "gzip+base64",
@@ -282,12 +292,8 @@ echo "#cloud-config" > ./config/userdata.yaml
 
 cat <<EOF | tee ./config/userdata.json | python2 -c "import json,sys,yaml; print yaml.safe_dump(json.load(sys.stdin), width=500, indent=4, default_flow_style=False)" >> ./config/userdata.yaml
 {
-    "group": [
-        "kubernetes"
-    ],
-    "users": $KUBERNETES_USER,
     "runcmd": [
-        "echo Kubernetes > /var/log/kubernetes.log"
+        "echo 'Create masterkube' > /var/log/masterkube.log"
     ]
 }
 EOF
@@ -295,17 +301,6 @@ EOF
 gzip -c9 <./config/metadata.json | $BASE64 | tee > config/metadata.base64
 gzip -c9 <./config/userdata.yaml | $BASE64 | tee > config/userdata.base64
 gzip -c9 <./config/vendordata.yaml | $BASE64 | tee > config/vendordata.base64
-
-#from email.mime.multipart import MIMEMultipart
-#from email.mime.text import MIMEText
-#
-#   def _mime_data(self,contents,filename):
-#        combined_message = MIMEMultipart()
-#        sub_message = MIMEText(contents, 'cloud-config', 'UTF-8')
-#        sub_message.add_header('Content-Disposition', 'attachment; filename="%s"' % (filename))
-#        sub_message.add_header('Content-Type', 'text/cloud-config')
-#        combined_message.attach(sub_message)
-#        return  combined_message.as_string()
 
 echo "Clone $TARGET_IMAGE to $MASTERKUBE"
 
@@ -345,7 +340,7 @@ scp -r bin kubernetes@${IPADDR}:~
 
 echo "Start kubernetes masterkube instance master node"
 ssh kubernetes@${IPADDR} sudo mv /home/kubernetes/bin/* /usr/local/bin 
-ssh kubernetes@${IPADDR} sudo create-cluster.sh flannel eth0 "$KUBERNETES_VERSION" "$PROVIDERID" 
+ssh kubernetes@${IPADDR} sudo create-cluster.sh flannel eth0 "$KUBERNETES_VERSION" "\'$PROVIDERID\'" 
 
 scp kubernetes@${IPADDR}:/etc/cluster/* ./cluster
 
@@ -353,8 +348,8 @@ MASTER_IP=$(cat ./cluster/manager-ip)
 TOKEN=$(cat ./cluster/token)
 CACERT=$(cat ./cluster/ca.cert)
 
-kubectl annotate node masterkube "cluster.autoscaler.nodegroup/name=ca-grpc-vmware" "cluster.autoscaler.nodegroup/node-index=0" "cluster.autoscaler.nodegroup/autoprovision=false" "cluster-autoscaler.kubernetes.io/scale-down-disabled=true" --overwrite --kubeconfig=./cluster/config
-kubectl label nodes masterkube "cluster.autoscaler.nodegroup/name=ca-grpc-vmware" "master=true" --overwrite --kubeconfig=./cluster/config
+kubectl annotate node masterkube "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "cluster.autoscaler.nodegroup/node-index=0" "cluster.autoscaler.nodegroup/autoprovision=false" "cluster-autoscaler.kubernetes.io/scale-down-disabled=true" --overwrite --kubeconfig=./cluster/config
+kubectl label nodes masterkube "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "master=true" --overwrite --kubeconfig=./cluster/config
 kubectl create secret tls kube-system -n kube-system --key ./etc/ssl/privkey.pem --cert ./etc/ssl/fullchain.pem --kubeconfig=./cluster/config
 
 ./bin/kubeconfig-merge.sh masterkube cluster/config
@@ -425,14 +420,34 @@ cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
             "template": false,
             "linked": false,
             "customization": "$GOVC_CUSTOMIZATION",
-            "network" :{
-                "name": "$GOVC_NETWORK",
-                "adapter": "E1000",
-                "address": "",
-                "nic": "eth1"
+            "network": {
+                "dns": {
+                    "search": [
+                        "afp.com"
+                    ],
+                    "nameserver": [
+                        "10.65.4.1"
+                    ]
+                },
+                "interfaces": [
+                    {
+                        "exists": true,
+                        "network": "AFP-MAINT-LYO",
+                        "adapter": "vmxnet3",
+                        "nic": "eth0",
+                        "dhcp": true
+                    },
+                    {
+                        "exists": true,
+                        "network": "AFP-PROD-LYO",
+                        "adapter": "vmxnet3",
+                        "nic": "eth1",
+                        "dhcp": true
+                    }
+                ]
             }
         },
-        "ca-grpc-vmware": {
+        "${NODEGROUP_NAME}": {
             "url": "$GOVC_URL",
             "uid": "$GOVC_USERNAME",
             "password": "$GOVC_PASSWORD",
@@ -446,11 +461,33 @@ cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
             "template": false,
             "linked": false,
             "customization": "$GOVC_CUSTOMIZATION",
-            "network" :{
-                "name": "AFP-PROD-LYO",
-                "adapter": "E1000",
-                "address": "",
-                "nic": "eth1"
+            "network": {
+                "dns": {
+                    "search": [
+                        "afp.com"
+                    ],
+                    "nameserver": [
+                        "10.65.4.1"
+                    ]
+                },
+                "interfaces": [
+                    {
+                        "exists": true,
+                        "network": "AFP-MAINT-LYO",
+                        "adapter": "vmxnet3",
+                        "mac-address": "generate",
+                        "nic": "eth0",
+                        "dhcp": true
+                    },
+                    {
+                        "exists": true,
+                        "network": "AFP-PROD-LYO",
+                        "adapter": "vmxnet3",
+                        "mac-address": "generate",
+                        "nic": "eth1",
+                        "dhcp": true
+                    }
+                ]
             }
         }
     }

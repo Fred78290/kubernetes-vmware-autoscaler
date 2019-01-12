@@ -200,13 +200,16 @@ echo 'export PATH=/opt/cni/bin:\$PATH' >> /etc/profile.d/apps-bin-path.sh
 systemctl enable kubelet
 systemctl restart kubelet
 
+usermod -aG docker kubernetes
+
 /usr/local/bin/kubeadm config images pull --kubernetes-version=${KUBERNETES_VERSION}
 
 [ -f /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg ] && rm /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg
 rm /etc/netplan/*
 cloud-init clean
 rm /var/log/cloud-ini*
-shutdown -P now
+rm /var/log/syslog
+exit 0
 EOF
 
 chmod +x $ISODIR/prepare.sh
@@ -242,8 +245,12 @@ IPADDR=$(govc vm.ip -wait 5m "${TARGET_IMAGE}")
 scp $ISODIR/prepare.sh ubuntu@$IPADDR:/tmp
 ssh ubuntu@$IPADDR sudo /tmp/prepare.sh
 
-sleep 30
+govc vm.power -off "${TARGET_IMAGE}"
+
+sleep 10
 
 echo "Created image $TARGET_IMAGE with kubernetes version $KUBERNETES_VERSION"
 
 popd
+
+exit 0

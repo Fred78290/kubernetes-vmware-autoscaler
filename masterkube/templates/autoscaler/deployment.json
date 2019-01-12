@@ -49,7 +49,7 @@
                             "--stderrthreshold=info",
                             "--cloud-provider=grpc",
                             "--cloud-config=/etc/cluster-autoscaler/grpc-config.json",
-                            "--nodes=$MINNODES:$MAXNODES:true/ca-grpc-AutoScaler",
+                            "--nodes=$MINNODES:$MAXNODES:true/afp-slyo-k8s",
                             "--max-nodes-total=$MAXTOTALNODES",
                             "--cores-total=$CORESTOTAL",
                             "--memory-total=$MEMORYTOTAL",

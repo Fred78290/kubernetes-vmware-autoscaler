@@ -1,15 +1,16 @@
 #!/bin/bash
 
+set -e
+
 CNI=flannel
 NET_IF==$(ip route get 1|awk '{print $5;exit}')
-KUBERNETES_VERION=
-DRY_RUN=false
+KUBERNETES_VERSION=
 CLUSTER_DIR=/etc/cluster
 PROVIDERID=
 
 [ -z "$1" ] || CNI=$1
 [ -z "$2" ] || NET_IF=$2
-[ -z "$3" ] || KUBERNETES_VERION=$3
+[ -z "$3" ] || KUBERNETES_VERSION=$3
 [ -z "$4" ] || PROVIDERID=$4
 
 # Check if interface exists, else take inet default gateway
@@ -20,8 +21,10 @@ mkdir -p $CLUSTER_DIR
 
 echo -n "$IPADDR:6443" > $CLUSTER_DIR/manager-ip
 
-if [ "x$KUBERNETES_VERION" != "x" ]; then
-    K8_OPTIONS="--token-ttl 0 --ignore-preflight-errors=All --apiserver-advertise-address $IPADDR --kubernetes-version $KUBERNETES_VERION"
+sed -i "2i${IPADDR} $(hostname)" /etc/hosts
+
+if [ "x$KUBERNETES_VERSION" != "x" ]; then
+    K8_OPTIONS="--token-ttl 0 --ignore-preflight-errors=All --apiserver-advertise-address $IPADDR --kubernetes-version $KUBERNETES_VERSION"
 else
     K8_OPTIONS="--token-ttl 0 --ignore-preflight-errors=All --apiserver-advertise-address $IPADDR"
 fi
@@ -92,14 +95,14 @@ if [ ! -f /etc/kubernetes/kubelet.conf ]; then
         exit -1
     fi
 
-    echo "Init K8 cluster with options:$K8_OPTIONS"
+    echo "Init K8 cluster with options:$K8_OPTIONS, PROVIDERID=${PROVIDERID}"
 
-    kubeadm init $K8_OPTIONS
+    kubeadm init $K8_OPTIONS 2>&1
 
     echo "Retrieve token infos"
 
     openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt | openssl rsa -pubin -outform der 2>/dev/null | openssl dgst -sha256 -hex | sed 's/^.* //' | tr -d '\n' > $CLUSTER_DIR/ca.cert
-    kubeadm token list | grep "authentication,signing" | awk '{print $1}'  | tr -d '\n' > $CLUSTER_DIR/token
+    kubeadm token list 2>&1 | grep "authentication,signing" | awk '{print $1}'  | tr -d '\n' > $CLUSTER_DIR/token 
 
     echo "Set local K8 environement"
 
@@ -112,51 +115,51 @@ if [ ! -f /etc/kubernetes/kubelet.conf ]; then
     chmod +r $CLUSTER_DIR/*
     
     echo "Allow master to host pod"
-    kubectl taint nodes --all node-role.kubernetes.io/master-
+    kubectl taint nodes --all node-role.kubernetes.io/master- 2>&1
 
     if [ "$CNI" = "calico" ]; then
 
         echo "Install calico network"
 
-        kubectl apply --dry-run=$DRY_RUN -f https://docs.projectcalico.org/v3.2/getting-started/kubernetes/installation/hosted/etcd.yaml
+        kubectl apply -f https://docs.projectcalico.org/v3.2/getting-started/kubernetes/installation/hosted/etcd.yaml 2>&1
         
-        kubectl apply --dry-run=$DRY_RUN -f https://docs.projectcalico.org/v3.2/getting-started/kubernetes/installation/rbac.yaml
+        kubectl apply -f https://docs.projectcalico.org/v3.2/getting-started/kubernetes/installation/rbac.yaml 2>&1
 
-        kubectl apply --dry-run=$DRY_RUN -f https://docs.projectcalico.org/v3.2/getting-started/kubernetes/installation/hosted/calico.yaml
+        kubectl apply -f https://docs.projectcalico.org/v3.2/getting-started/kubernetes/installation/hosted/calico.yaml 2>&1
 
-        kubectl apply --dry-run=$DRY_RUN -f https://docs.projectcalico.org/v3.2/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calicoctl.yaml
+        kubectl apply -f https://docs.projectcalico.org/v3.2/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calicoctl.yaml 2>&1
 
     elif [ "$CNI" = "flannel" ]; then
 
         echo "Install flannel network"
 
-        kubectl create -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml --dry-run=$DRY_RUN
+        kubectl create -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml 2>&1
 
     elif [ "$CNI" = "weave" ]; then
 
         echo "Install weave network for K8"
 
-        kubectl apply --dry-run=$DRY_RUN -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+        kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')" 2>&1
 
     elif [ "$CNI" = "canal" ]; then
 
         echo "Install canal network"
 
-        kubectl apply --dry-run=$DRY_RUN -f https://raw.githubusercontent.com/projectcalico/canal/master/k8s-install/1.7/rbac.yaml
-        kubectl apply --dry-run=$DRY_RUN -f https://raw.githubusercontent.com/projectcalico/canal/master/k8s-install/1.7/canal.yaml
+        kubectl apply -f https://raw.githubusercontent.com/projectcalico/canal/master/k8s-install/1.7/rbac.yaml 2>&1
+        kubectl apply -f https://raw.githubusercontent.com/projectcalico/canal/master/k8s-install/1.7/canal.yaml 2>&1
 
     elif [ "$CNI" = "kube" ]; then
 
         echo "Install kube network"
 
-        kubectl apply --dry-run=$DRY_RUN -f https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml
-        kubectl apply --dry-run=$DRY_RUN -f https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter-all-features.yaml
+        kubectl apply -f https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter.yaml 2>&1
+        kubectl apply -f https://raw.githubusercontent.com/cloudnativelabs/kube-router/master/daemonset/kubeadm-kuberouter-all-features.yaml 2>&1
 
     elif [ "$CNI" = "romana" ]; then
 
         echo "Install romana network"
 
-        kubectl apply --dry-run=$DRY_RUN -f https://raw.githubusercontent.com/romana/romana/master/containerize/specs/romana-kubeadm.yml
+        kubectl apply -f https://raw.githubusercontent.com/romana/romana/master/containerize/specs/romana-kubeadm.yml 2>&1
 
     fi
 

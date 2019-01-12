@@ -152,7 +152,7 @@ spec:
             - --cloud-provider=grpc
             - --cloud-config=/etc/cluster-autoscaler/grpc.conf
             - --nodes=$(MINNODES):$(MAXNODES):true/$(NODEGROUP_ID)
-            - --nodes=0:3:true/ca-grpc-AutoScaler
+            - --nodes=0:3:true/ca-grpc-autoscaler
             - --max-nodes-total=3
             - --cores-total=0:16
             - --memory-total=2:24

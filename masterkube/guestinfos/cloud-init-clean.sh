@@ -3,4 +3,5 @@
 rm /etc/netplan/*
 cloud-init clean
 rm /var/log/cloud-ini*
+rm /var/log/syslog
 shutdown -P now

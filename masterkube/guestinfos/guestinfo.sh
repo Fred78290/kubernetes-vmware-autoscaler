@@ -19,15 +19,6 @@ else
     VMX="$VMHOME/clone-afp-slyo-bionic-server-seed.vmwarevm/clone-afp-slyo-bionic-server-seed.vmx"
 fi
 
-if [ ! -f "$VMX" ]; then
-	echo "Clone VM $SOURCEVMX"
-	mkdir -p $(dirname "$VMX")
-	vmrun clone "$SOURCEVMX" "$VMX" full -cloneName="Test VMWareGuestInfo datasource"
-elif [ ! -z "$(vmrun list | grep $VMX)" ]; then
-	echo "Stop VM $VMX"
-	vmrun stop $VMX
-fi
-
 cat > ${CURDIR}/userdata.yaml <<EOF
 #cloud-config
 group:
@@ -77,24 +68,19 @@ network:
       dhcp4: true
       set-name: eth0
       match:
-        macaddress: 00:50:56:a7:ca:61
-      nameservers:
-        search:
-        - afp.com
-        addresses:
-        - 158.50.0.1
+        macaddress: 00:50:56:38:2A:26
     eth1:
       set-name: eth1
       match:
-        macaddress: 00:50:56:9d:3f:0a
-      gateway4: 10.129.155.1
+        macaddress: 00:50:56:3F:78:A5
+      gateway4: 10.0.0.1
       addresses:
-      - 10.129.155.61/24
+      - 10.0.0.70/24
       nameservers:
         search:
-        - afp.com
+        - aldune.com
         addresses:
-        - 158.50.0.1
+        - 10.0.0.1
 EOF
 
 cat > $CURDIR/vendordata.yaml <<EOF
@@ -128,25 +114,18 @@ cat > $CURDIR/xmetadata.json <<EOF
 EOF
 
 
-if [ -f "${VMX}.org" ]; then
-	cp "${VMX}.org" "${VMX}"
-else
-	cp "${VMX}" "${VMX}.org"
-fi
-
-cat "${VMX}.org" | sed \
-    -e "/ethernet0.addressType/d" \
-    -e "/ethernet1.addressType/d" \
-    -e "/ethernet0.address/d" \
-    -e "/ethernet0.address/d" > "${VMX}"
-
-exit
-
-cat <<EOF | tee "${CURDIR}/guestinfo.txt" >> "$VMX"
+cat <<EOF > "${CURDIR}/guestinfo.txt"
 ethernet0.addressType = "static"
+ethernet0.connectionType = "nat"
+ethernet0.address = "00:50:56:38:2A:26"
+ethernet0.pciSlotNumber = "33"
+ethernet0.present = "TRUE"
+ethernet0.virtualDev = "e1000"
 ethernet1.addressType = "static"
-ethernet0.address = "00:50:56:a7:ca:61"
-ethernet1.address = "00:50:56:9d:3f:0a"
+ethernet1.address = "00:50:56:3F:78:A5"
+ethernet1.pciSlotNumber = "34"
+ethernet1.present = "TRUE"
+ethernet1.virtualDev = "e1000"
 guestinfo.metadata="$(cat ${CURDIR}/metadata.json | gzip -c9 | ${BASE64})"
 guestinfo.metadata.encoding="gzip+base64"
 guestinfo.userdata="$(cat ${CURDIR}/userdata.yaml | gzip -c9 | ${BASE64})"
@@ -154,5 +133,25 @@ guestinfo.userdata.encoding="gzip+base64"
 guestinfo.vendordata="$(cat ${CURDIR}/vendordata.yaml | gzip -c9 | ${BASE64})"
 guestinfo.vendordata.encoding="gzip+base64"
 EOF
+
+if [ ! -f "$VMX" ]; then
+	echo "Clone VM $SOURCEVMX"
+	mkdir -p $(dirname "$VMX")
+elif [ ! -z "$(vmrun list | grep $VMX)" ]; then
+	echo "Stop VM $VMX"
+	vmrun stop $VMX
+fi
+
+rm -rf $(dirname "$VMX")
+
+vmrun clone "$SOURCEVMX" "$VMX" full -cloneName="Test VMWareGuestInfo datasource"
+
+cp "${VMX}" "${VMX}.org"
+
+cat "${VMX}.org" | sed \
+    -e "/ethernet0/d" \
+    -e "/ethernet1/d"  > "${VMX}"
+
+cat "${CURDIR}/guestinfo.txt" >> "${VMX}"
 
 vmrun start "$VMX"
