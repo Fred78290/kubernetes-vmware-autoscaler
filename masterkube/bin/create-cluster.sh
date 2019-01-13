@@ -3,10 +3,10 @@
 set -e
 
 CNI=flannel
-NET_IF==$(ip route get 1|awk '{print $5;exit}')
-KUBERNETES_VERSION=
+NET_IF=$(ip route get 1|awk '{print $5;exit}')
+KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 CLUSTER_DIR=/etc/cluster
-PROVIDERID=
+PROVIDERID="vmware://afp-slyo-ca-k8s/object?type=node&name=${HOSTNAME}"
 
 [ -z "$1" ] || CNI=$1
 [ -z "$2" ] || NET_IF=$2
@@ -133,7 +133,7 @@ if [ ! -f /etc/kubernetes/kubelet.conf ]; then
 
         echo "Install flannel network"
 
-        kubectl create -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml 2>&1
+        kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml 2>&1
 
     elif [ "$CNI" = "weave" ]; then
 
