@@ -218,7 +218,7 @@ func (conf *Configuration) PowerOffWithContext(ctx *Context, name string) error 
 		return err
 	}
 
-	return vm.PowerOff(ctx)
+	return vm.ShutdownGuest(ctx)
 }
 
 // PowerOff power off a VM by name

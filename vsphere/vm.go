@@ -248,7 +248,7 @@ func (vm *VirtualMachine) Configure(ctx *Context, userName, authKey string, clou
 
 		err = fmt.Errorf(constantes.ErrUnableToReconfigureVM, vm.Name, err)
 
-	} else if _, err = task.WaitForResult(ctx, nil); err != nil {
+	} else if err = task.Wait(ctx); err != nil {
 
 		err = fmt.Errorf(constantes.ErrUnableToReconfigureVM, vm.Name, err)
 
@@ -286,9 +286,9 @@ func (vm *VirtualMachine) PowerOn(ctx *Context) error {
 
 	if powerState, err = v.PowerState(ctx); err == nil {
 		if powerState != types.VirtualMachinePowerStatePoweredOn {
-			task, err = v.PowerOn(ctx)
-
-			_, err = task.WaitForResult(ctx, nil)
+			if task, err = v.PowerOn(ctx); err == nil {
+				err = task.Wait(ctx)
+			}
 		} else {
 			err = fmt.Errorf("The VM: %s is already powered", v.InventoryPath)
 		}
@@ -297,8 +297,8 @@ func (vm *VirtualMachine) PowerOn(ctx *Context) error {
 	return err
 }
 
-// PowerOff power off a virtual machine
-func (vm *VirtualMachine) PowerOff(ctx *Context) error {
+// ShutdownGuest power off a virtual machine
+func (vm *VirtualMachine) ShutdownGuest(ctx *Context) error {
 	var powerState types.VirtualMachinePowerState
 	var err error
 	var task *object.Task
@@ -307,9 +307,11 @@ func (vm *VirtualMachine) PowerOff(ctx *Context) error {
 
 	if powerState, err = v.PowerState(ctx); err == nil {
 		if powerState == types.VirtualMachinePowerStatePoweredOn {
-			task, err = v.PowerOff(ctx)
-
-			_, err = task.WaitForResult(ctx, nil)
+			if err = v.ShutdownGuest(ctx); err != nil {
+				if task, err = v.PowerOff(ctx); err == nil {
+					err = task.Wait(ctx)
+				}
+			}
 		} else {
 			err = fmt.Errorf("The VM: %s is already power off", v.InventoryPath)
 		}
@@ -328,9 +330,9 @@ func (vm *VirtualMachine) Delete(ctx *Context) error {
 
 	if powerState, err = v.PowerState(ctx); err == nil {
 		if powerState != types.VirtualMachinePowerStatePoweredOn {
-			task, err = v.Destroy(ctx)
-
-			_, err = task.WaitForResult(ctx, nil)
+			if task, err = v.Destroy(ctx); err == nil {
+				err = task.Wait(ctx)
+			}
 		} else {
 			err = fmt.Errorf("The VM: %s is powered", v.InventoryPath)
 		}
