@@ -35,6 +35,7 @@ export DEFAULT_MACHINE="medium"
 export UNREMOVABLENODERECHECKTIMEOUT="1m"
 export OSDISTRO=$(uname -s)
 export TRANSPORT="tcp"
+export USER=ubuntu
 
 if [ "$OSDISTRO" == "Linux" ]; then
     TZ=$(cat /etc/timezone)
@@ -293,7 +294,7 @@ echo "#cloud-config" > ./config/userdata.yaml
 cat <<EOF | tee ./config/userdata.json | python2 -c "import json,sys,yaml; print yaml.safe_dump(json.load(sys.stdin), width=500, indent=4, default_flow_style=False)" >> ./config/userdata.yaml
 {
     "runcmd": [
-        "echo 'Create masterkube' > /var/log/masterkube.log"
+        "echo 'Create $MASTERKUBE' > /var/log/masterkube.log"
     ]
 }
 EOF
@@ -335,24 +336,24 @@ govc vm.power -on "${MASTERKUBE}"
 echo "Wait for IP from $MASTERKUBE"
 IPADDR=$(govc vm.ip -wait 5m "${MASTERKUBE}")
 
-echo "Prepare masterkube instance"
-scp -r bin kubernetes@${IPADDR}:~
+echo "Prepare ${MASTERKUBE} instance"
+scp -r bin $USER@${IPADDR}:~
 
-echo "Start kubernetes masterkube instance master node"
-ssh kubernetes@${IPADDR} sudo mv /home/kubernetes/bin/* /usr/local/bin 
-ssh kubernetes@${IPADDR} sudo create-cluster.sh flannel eth0 "$KUBERNETES_VERSION" "\'$PROVIDERID\'" 
+echo "Start kubernetes ${MASTERKUBE} instance master node"
+ssh $USER@${IPADDR} sudo mv /home/ubuntu/bin/* /usr/local/bin 
+ssh $USER@${IPADDR} sudo create-cluster.sh flannel eth0 "$KUBERNETES_VERSION" "\'$PROVIDERID\'" 
 
-scp kubernetes@${IPADDR}:/etc/cluster/* ./cluster
+scp $USER@${IPADDR}:/etc/cluster/* ./cluster
 
 MASTER_IP=$(cat ./cluster/manager-ip)
 TOKEN=$(cat ./cluster/token)
 CACERT=$(cat ./cluster/ca.cert)
 
-kubectl annotate node masterkube "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "cluster.autoscaler.nodegroup/node-index=0" "cluster.autoscaler.nodegroup/autoprovision=false" "cluster-autoscaler.kubernetes.io/scale-down-disabled=true" --overwrite --kubeconfig=./cluster/config
-kubectl label nodes masterkube "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "master=true" --overwrite --kubeconfig=./cluster/config
+kubectl annotate node ${MASTERKUBE} "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "cluster.autoscaler.nodegroup/node-index=0" "cluster.autoscaler.nodegroup/autoprovision=false" "cluster-autoscaler.kubernetes.io/scale-down-disabled=true" --overwrite --kubeconfig=./cluster/config
+kubectl label nodes ${MASTERKUBE} "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "master=true" --overwrite --kubeconfig=./cluster/config
 kubectl create secret tls kube-system -n kube-system --key ./etc/ssl/privkey.pem --cert ./etc/ssl/fullchain.pem --kubeconfig=./cluster/config
 
-./bin/kubeconfig-merge.sh masterkube cluster/config
+./bin/kubeconfig-merge.sh ${MASTERKUBE} cluster/config
 
 echo "Write vmware cloud autoscaler provider config"
 
@@ -500,7 +501,7 @@ else
 	sudo sed -i '' '/masterkube/d' /etc/hosts
 fi
 
-sudo bash -c "echo '${IPADDR} masterkube.$DOMAIN_NAME masterkube-dashboard.$DOMAIN_NAME' >> /etc/hosts"
+sudo bash -c "echo '${IPADDR} ${MASTERKUBE}.${DOMAIN_NAME} masterkube.$DOMAIN_NAME masterkube-dashboard.$DOMAIN_NAME' >> /etc/hosts"
 
 ./bin/create-ingress-controller.sh
 ./bin/create-dashboard.sh

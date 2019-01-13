@@ -46,11 +46,11 @@ curl -sSL -o /etc/cloud/cloud.cfg.d/99-DataSourceVMwareGuestInfo.cfg "${REPO_SLU
 
 sed -i 's/None/None, VMwareGuestInfo/g' /etc/cloud/cloud.cfg.d/90_dpkg.cfg
 
+sed -i 's/^GRUB_CMDLINE_LINUX=\"\"/GRUB_CMDLINE_LINUX=\"ipv6.disable=1 net.ifnames=0 biosdevname=0\"/g' /etc/default/grub
+update-grub2
+
+# Clean cloud-init
 [ -f /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg ] && rm /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg
 cloud-init clean
 rm /var/log/cloud-ini*
-
-sed -i 's/^GRUB_CMDLINE_LINUX=\"/GRUB_CMDLINE_LINUX=\"ipv6.disable=1 net.ifnames=0 biosdevname=0/g' /etc/default/grub
-update-grub2
-
-shutdown -P now
+rm /var/log/syslog

@@ -22,6 +22,7 @@ SEEDIMAGE=afp-slyo-bionic-server-seed
 IMPORTMODE="govc"
 TEMP=`getopt -o i:k:n:op:s:v: --long ovftool,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
 CURDIR=$(dirname $0)
+USER=ubuntu
 
 eval set -- "$TEMP"
 
@@ -48,7 +49,7 @@ while true ; do
         -n|--cni-version) CNI_VERSION=$2 ; shift 2;;
         -o|--ovftool) IMPORTMODE=ovftool ; shift 2;;
         -p|--password) KUBERNETES_PASSWORD=$2 ; shift 2;;
-        -s|--seed) afp-slyo-cloud-init-guestinfo=$2 ; shift 2;;
+        -s|--seed) SEEDIMAGE=$2 ; shift 2;;
         -v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
         --) shift ; break ;;
         *) echo "$1 - Internal error!" ; exit 1 ;;
@@ -122,10 +123,11 @@ if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
         fi
 
         echo "Install cloud-init VMWareGuestInfo datasource"
-        scp $CURDIR/../guestinfos/install-guestinfo-datasource.sh $CURDIR/../guestinfos/cloud-init-clean.sh ubuntu@$IPADDR:/tmp
-        ssh ubuntu@$IPADDR sudo update-grub2
-        ssh ubuntu@$IPADDR sudo mv /tmp/cloud-init-clean.sh /tmp/install-guestinfo-datasource.sh /usr/local/bin
-        ssh ubuntu@$IPADDR sudo /usr/local/bin/install-guestinfo-datasource.sh
+        scp $CURDIR/../guestinfos/install-guestinfo-datasource.sh $CURDIR/../guestinfos/cloud-init-clean.sh $USER@$IPADDR:/tmp
+        ssh -t $USER@$IPADDR sudo mv /tmp/cloud-init-clean.sh /tmp/install-guestinfo-datasource.sh /usr/local/bin
+        ssh -t $USER@$IPADDR sudo /usr/local/bin/install-guestinfo-datasource.sh
+
+        govc vm.power -persist-session=false -s "${SEEDIMAGE}"
 
         sleep 10
 
@@ -172,7 +174,7 @@ cat > $ISODIR/meta-data <<EOF
 }
 EOF
 
-cat > $ISODIR/prepare.sh <<EOF
+cat > $ISODIR/prepare-image.sh <<EOF
 #!/bin/bash
 
 apt-get update
@@ -182,7 +184,12 @@ apt-get autoremove -y
 mkdir -p /opt/cni/bin
 mkdir -p /usr/local/bin
 
+echo "Prepare to install Docker"
+
 curl https://get.docker.com | bash
+
+echo "Prepare to install CNI plugins"
+
 curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-amd64-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
 
 cd /usr/local/bin
@@ -204,15 +211,21 @@ usermod -aG docker kubernetes
 
 /usr/local/bin/kubeadm config images pull --kubernetes-version=${KUBERNETES_VERSION}
 
+cat >> /etc/vmware-tools/tools.conf <<SHELL
+[guestinfo]
+exclude-nics=docker*,veth*,vEthernet*,flannel*,cni*,calico*
+primary-nics=eth0
+low-priority-nics=eth1,eth2,eth3
+SHELL
+
 [ -f /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg ] && rm /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg
 rm /etc/netplan/*
 cloud-init clean
 rm /var/log/cloud-ini*
 rm /var/log/syslog
-exit 0
 EOF
 
-chmod +x $ISODIR/prepare.sh
+chmod +x $ISODIR/prepare-image.sh
 
 gzip -c9 < $ISODIR/meta-data | $BASE64 > metadata.base64
 gzip -c9 < $ISODIR/user-data | $BASE64 > userdata.base64
@@ -242,12 +255,11 @@ govc vm.power -on "${TARGET_IMAGE}"
 echo "Wait for IP from $TARGET_IMAGE"
 IPADDR=$(govc vm.ip -wait 5m "${TARGET_IMAGE}")
 
-scp $ISODIR/prepare.sh ubuntu@$IPADDR:/tmp
-ssh ubuntu@$IPADDR sudo /tmp/prepare.sh
+scp $ISODIR/prepare-image.sh $USER@$IPADDR:~
 
-govc vm.power -off "${TARGET_IMAGE}"
+ssh -t $USER@$IPADDR sudo ./prepare-image.sh
 
-sleep 10
+govc vm.power -persist-session=false -s "${TARGET_IMAGE}"
 
 echo "Created image $TARGET_IMAGE with kubernetes version $KUBERNETES_VERSION"
 

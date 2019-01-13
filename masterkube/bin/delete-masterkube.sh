@@ -9,9 +9,9 @@ if [ -f ./cluster/config ]; then
     for vm in $(kubectl get node -o json --kubeconfig ./cluster/config | jq '.items| .[] | .metadata.labels["kubernetes.io/hostname"]')
     do
         vm=$(echo -n $vm | tr -d '"')
-        echo "Delete VM: $vm"
-        if [ -z "$(govc vm.info $vm 2>&1)" ]; then
-            govc vm.power -off $vm
+        if [ ! -z "$(govc vm.info $vm 2>&1)" ]; then
+            echo "Delete VM: $vm"
+            govc vm.power -persist-session=false -s $vm
             govc vm.destroy $vm
         fi
     done
