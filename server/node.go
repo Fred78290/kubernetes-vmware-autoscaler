@@ -265,7 +265,7 @@ func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabe
 	glog.V(5).Infof("AutoScalerNode::launchVM, node:%s", vm.NodeName)
 
 	var err error
-	var status *vsphere.Status
+	var status AutoScalerServerNodeState
 	var output string
 
 	vsphere := vm.getVSphere()
@@ -294,11 +294,11 @@ func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabe
 
 		err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
 
-	} else if status, err = vsphere.Status(vm.NodeName); err != nil {
+	} else if status, err = vm.statusVM(); err != nil {
 
 		err = fmt.Errorf(constantes.ErrGetVMInfoFailed, vm.NodeName, err)
 
-	} else if status.Powered == false {
+	} else if status != AutoScalerServerNodeStateRunning {
 
 		err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
 
