@@ -61,7 +61,7 @@ func NodeGroupIDFromProviderID(serverIdentifier string, providerID string) (stri
 	}
 
 	if nodeIdentifier.Scheme != serverIdentifier {
-		return "", fmt.Errorf(constantes.ErrWrongSchemeInProviderID, providerID, nodeIdentifier.Scheme)
+		return "", fmt.Errorf(constantes.ErrWrongSchemeInProviderID, providerID, serverIdentifier, nodeIdentifier.Scheme)
 	}
 
 	if nodeIdentifier.Path != "object" && nodeIdentifier.Path != "/object" {
@@ -85,7 +85,7 @@ func NodeNameFromProviderID(serverIdentifier string, providerID string) (string,
 	}
 
 	if nodeIdentifier.Scheme != serverIdentifier {
-		return "", fmt.Errorf(constantes.ErrWrongSchemeInProviderID, providerID, nodeIdentifier.Scheme)
+		return "", fmt.Errorf(constantes.ErrWrongSchemeInProviderID, providerID, serverIdentifier, nodeIdentifier.Scheme)
 	}
 
 	if nodeIdentifier.Path != "object" && nodeIdentifier.Path != "/object" {
