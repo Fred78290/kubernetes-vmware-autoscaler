@@ -29,7 +29,7 @@ var phBuildDate = ""
 func main() {
 	versionPtr := flag.Bool("version", false, "Give the version")
 	savePtr := flag.String("save", "", "The file to persists the server")
-	configPtr := flag.String("config", "/etc/default/AutoScaler-cluster-autoscaler.json", "The config for the server")
+	configPtr := flag.String("config", "/etc/default/vmware-cluster-autoscaler.json", "The config for the server")
 	flag.Parse()
 
 	if *versionPtr {

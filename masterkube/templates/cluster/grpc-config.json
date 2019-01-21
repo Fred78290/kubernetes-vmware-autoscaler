@@ -1,6 +1,6 @@
 {
     "address": "$CONNECTTO",
-    "secret": "AutoScaler",
+    "secret": "vmware",
     "timeout": 300,
     "config": {
         "kubeAdmAddress": "$MASTER_IP",

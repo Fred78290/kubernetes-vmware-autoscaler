@@ -1,8 +1,8 @@
 #/bin/bash
 
-# This script create every thing to deploy a simple kubernetes autoscaled cluster with AutoScaler.
+# This script create every thing to deploy a simple kubernetes autoscaled cluster with vmware.
 # It will generate:
-# Custom AutoScaler image with every thing for kubernetes
+# Custom vmware image with every thing for kubernetes
 # Config file to deploy the cluster autoscaler.
 
 set -e
@@ -339,9 +339,9 @@ IPADDR=$(govc vm.ip -wait 5m "${MASTERKUBE}")
 echo "Prepare ${MASTERKUBE} instance"
 scp -r bin $USER@${IPADDR}:~
 
-echo "Start kubernetes ${MASTERKUBE} instance master node"
+echo "Start kubernetes ${MASTERKUBE} instance master node, kubernetes version=${KUBERNETES_VERSION}, providerID=${PROVIDERID}"
 ssh $USER@${IPADDR} sudo mv /home/ubuntu/bin/* /usr/local/bin 
-ssh $USER@${IPADDR} sudo create-cluster.sh flannel eth0 "$KUBERNETES_VERSION" "\'$PROVIDERID\'" 
+ssh $USER@${IPADDR} sudo create-cluster.sh flannel eth0 "${KUBERNETES_VERSION}" "\"${PROVIDERID}\"" 
 
 scp $USER@${IPADDR}:/etc/cluster/* ./cluster
 
@@ -406,17 +406,17 @@ cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
         "user": "kubernetes",
         "ssh-key": "$SSH_KEY"
     },
-    "vsphere": {
+    "vmware": {
         "default": {
             "url": "$GOVC_URL",
             "uid": "$GOVC_USERNAME",
             "password": "$GOVC_PASSWORD",
-            "insecure": "$INSECURE",
+            "insecure": $INSECURE,
             "dc" : "$GOVC_DATACENTER",
             "datastore": "$GOVC_DATASTORE",
             "resource-pool": "$GOVC_RESOURCE_POOL",
             "vmFolder": "$GOVC_FOLDER",
-            "timeout": "300",
+            "timeout": 300,
             "template-name": "$TARGET_IMAGE",
             "template": false,
             "linked": false,
@@ -452,12 +452,12 @@ cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
             "url": "$GOVC_URL",
             "uid": "$GOVC_USERNAME",
             "password": "$GOVC_PASSWORD",
-            "insecure": "$INSECURE",
+            "insecure": $INSECURE,
             "dc" : "$GOVC_DATACENTER",
             "datastore": "$GOVC_DATASTORE",
             "resource-pool": "$GOVC_RESOURCE_POOL",
             "vmFolder": "$GOVC_FOLDER",
-            "timeout": "300",
+            "timeout": 300,
             "template-name": "$TARGET_IMAGE",
             "template": false,
             "linked": false,
@@ -502,6 +502,8 @@ else
 fi
 
 sudo bash -c "echo '${IPADDR} ${MASTERKUBE}.${DOMAIN_NAME} masterkube.$DOMAIN_NAME masterkube-dashboard.$DOMAIN_NAME' >> /etc/hosts"
+
+scp -r ../masterkube $USER@${IPADDR}:~
 
 ./bin/create-ingress-controller.sh
 ./bin/create-dashboard.sh
