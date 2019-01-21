@@ -8,10 +8,10 @@ KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 CLUSTER_DIR=/etc/cluster
 PROVIDERID="vmware://afp-slyo-ca-k8s/object?type=node&name=${HOSTNAME}"
 
-[ -z "$1" ] || CNI=$1
-[ -z "$2" ] || NET_IF=$2
-[ -z "$3" ] || KUBERNETES_VERSION=$3
-[ -z "$4" ] || PROVIDERID=$4
+[ -z "$1" ] || CNI="$1"
+[ -z "$2" ] || NET_IF="$2"
+[ -z "$3" ] || KUBERNETES_VERSION="$3"
+[ -z "$4" ] || PROVIDERID="$4"
 
 # Check if interface exists, else take inet default gateway
 ifconfig $NET_IF &> /dev/null || NET_IF=$(ip route get 1|awk '{print $5;exit}')

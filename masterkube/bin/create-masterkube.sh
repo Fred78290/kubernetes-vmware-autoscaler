@@ -371,7 +371,7 @@ cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
 {
     "network": "$TRANSPORT",
     "listen": "$LISTEN",
-    "secret": "vsphere",
+    "secret": "vmware",
     "minNode": $MINNODES,
     "maxNode": $MAXNODES,
     "nodePrice": 0.0,
