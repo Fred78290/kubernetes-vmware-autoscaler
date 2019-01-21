@@ -80,7 +80,7 @@ const (
 	ErrUnableToDeleteVM = "Unable to delete the VM owned by node: %s, reason: %v"
 
 	// ErrWrongSchemeInProviderID error msg
-	ErrWrongSchemeInProviderID = "Wrong scheme in providerID %s. expect AutoScaler, got: %s"
+	ErrWrongSchemeInProviderID = "Wrong scheme in providerID %s. expect %s, got: %s"
 
 	// ErrWrongPathInProviderID error msg
 	ErrWrongPathInProviderID = "Wrong path in providerID: %s. expect object, got: %s"

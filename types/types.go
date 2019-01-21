@@ -72,5 +72,5 @@ type AutoScalerServerConfig struct {
 	SyncFolders        *AutoScalerServerSyncFolders      `json:"sync-folder"`                           // Optional, do rsync between host and guest
 	Optionals          *AutoScalerServerOptionals        `json:"optionals"`
 	SSH                *AutoScalerServerSSH              `json:"ssh-infos"`
-	VMwareInfos        map[string]*vsphere.Configuration `json:"vsphere"`
+	VMwareInfos        map[string]*vsphere.Configuration `json:"vmware"`
 }
