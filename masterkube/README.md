@@ -9,13 +9,13 @@ Ensure that you have sudo right
 You must also install
 
 Linux Plateform
-    AutoScaler
+    govc
     libvirt
     python
     python-yaml
 
 Darwin Plateform
-    AutoScaler
+    govc
     python
     python-yaml
     gnu-getopt
@@ -32,9 +32,9 @@ Some needed file are located in:
 | `etc/ssl`  | Your CERT for https. Autosigned will be generated if empty  |
 | `template`  | Templates files to deploy pod & service |
 
-The first thing done by this script is to create a Ubuntu-18.04.1 image with kubernetes and docker installed. The image will be located here [~/.local/AutoScaler/cache](file://~/.local/AutoScaler/cache)
+The first thing done by this script is to create a Ubuntu-18.04.1 image with kubernetes and docker installed. The image will be located here [~/.local/vmware/cache](file://~/.local/vmware/cache)
 
-Next step will be to launch a AutoScaler VM and create a master node. It will also deploy a dashboard at the URL https://masterkube-dashboard.@your-domain@/
+Next step will be to launch a vmware VM and create a master node. It will also deploy a dashboard at the URL https://masterkube-dashboard.@your-domain@/
 
 To connect to the dashboard, copy paste the token from file [cluster/dashboard-token](./cluster/dashboard-token)
 
