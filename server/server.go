@@ -67,6 +67,7 @@ func (s *AutoScalerServerApp) newNodeGroup(nodeGroupID string, minNodeSize, maxN
 		NodeLabels:          labels,
 		SystemLabels:        systemLabels,
 		AutoProvision:       autoProvision,
+		configuration:       s.Configuration,
 	}
 
 	s.Groups[nodeGroupID] = nodeGroup
