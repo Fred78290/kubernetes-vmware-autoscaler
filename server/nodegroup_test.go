@@ -46,6 +46,7 @@ func createTestNode(ng *AutoScalerServerNodeGroup) *AutoScalerServerNode {
 		},
 		State:            AutoScalerServerNodeStateNotCreated,
 		AutoProvisionned: true,
+		VSphereConfig:    ng.configuration.GetVSphereConfiguration(testGroupID),
 		serverConfig:     ng.configuration,
 	}
 }

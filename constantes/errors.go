@@ -183,4 +183,7 @@ const (
 
 	// ErrUnableToReconfigureVM error msg
 	ErrUnableToReconfigureVM = "Unable to reconfigure VM:%s, reason: %v"
+
+	// WarnFailedVMNotDeleted warn msg
+	WarnFailedVMNotDeleted = "The failed VM:%s is not deleted because status is:%V"
 )

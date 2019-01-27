@@ -20,9 +20,11 @@ PASSWORD=$(uuidgen)
 OSDISTRO=$(uname -s)
 SEEDIMAGE=afp-slyo-bionic-server-seed
 IMPORTMODE="govc"
-TEMP=`getopt -o i:k:n:op:s:v: --long ovftool,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
+TEMP=`getopt -o i:k:n:op:s:u:v: --long user:,adapter:,network:,ovftool,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
 CURDIR=$(dirname $0)
 USER=ubuntu
+NETWORK_ADAPTER=vmxnet3
+VM_NETWORK=
 
 eval set -- "$TEMP"
 
@@ -50,7 +52,10 @@ while true ; do
         -o|--ovftool) IMPORTMODE=ovftool ; shift 2;;
         -p|--password) KUBERNETES_PASSWORD=$2 ; shift 2;;
         -s|--seed) SEEDIMAGE=$2 ; shift 2;;
+        -u|--user) USER=$2 ; shift 2;;
         -v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
+        --adapter) NETWORK_ADAPTER=$2 ; shift 2;;
+        --network) VM_NETWORK=$2 ; shift 2;;
         --) shift ; break ;;
         *) echo "$1 - Internal error!" ; exit 1 ;;
     esac
@@ -111,6 +116,15 @@ if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
     fi
 
     if [ $? -eq 0 ]; then
+    
+        echo "Add second network card on $SEEDIMAGE"
+
+        if [ -z "$VM_NETWORK" ]; then
+            govc vm.network.add -vm "${SEEDIMAGE}" -net=$VM_NETWORK -net.adapter=$NETWORK_ADAPTER
+        else
+            govc vm.network.add -vm "${SEEDIMAGE}" -net=$VM_NETWORK -net.adapter=$NETWORK_ADAPTER
+        fi
+
         echo "Power On $SEEDIMAGE"
         govc vm.power -on "${SEEDIMAGE}"
 

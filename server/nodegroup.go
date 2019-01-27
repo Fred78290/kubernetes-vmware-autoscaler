@@ -156,25 +156,32 @@ func (g *AutoScalerServerNodeGroup) addNodes(delta int) error {
 
 		nodeName := g.nodeName(g.LastCreatedNodeIndex)
 
-		node := &AutoScalerServerNode{
-			ProviderID:       g.providerIDForNode(nodeName),
-			NodeGroupID:      g.NodeGroupIdentifier,
-			NodeName:         nodeName,
-			NodeIndex:        g.LastCreatedNodeIndex,
-			Memory:           g.Machine.Memory,
-			CPU:              g.Machine.Vcpu,
-			Disk:             g.Machine.Disk,
-			AutoProvisionned: true,
-			serverConfig:     g.configuration,
+		// Clone the vsphere config to allow increment IP address
+		if vsphereConfig, err := g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Clone(g.LastCreatedNodeIndex); err == nil {
+
+			node := &AutoScalerServerNode{
+				ProviderID:       g.providerIDForNode(nodeName),
+				NodeGroupID:      g.NodeGroupIdentifier,
+				NodeName:         nodeName,
+				NodeIndex:        g.LastCreatedNodeIndex,
+				Memory:           g.Machine.Memory,
+				CPU:              g.Machine.Vcpu,
+				Disk:             g.Machine.Disk,
+				AutoProvisionned: true,
+				VSphereConfig:    vsphereConfig,
+				serverConfig:     g.configuration,
+			}
+
+			tempNodes = append(tempNodes, node)
+
+			if g.pendingNodes == nil {
+				g.pendingNodes = make(map[string]*AutoScalerServerNode)
+			}
+
+			g.pendingNodes[node.NodeName] = node
+		} else {
+			return err
 		}
-
-		tempNodes = append(tempNodes, node)
-
-		if g.pendingNodes == nil {
-			g.pendingNodes = make(map[string]*AutoScalerServerNode)
-		}
-
-		g.pendingNodes[node.NodeName] = node
 	}
 
 	for _, node := range tempNodes {
@@ -189,10 +196,12 @@ func (g *AutoScalerServerNodeGroup) addNodes(delta int) error {
 			for _, node := range tempNodes {
 				delete(g.pendingNodes, node.NodeName)
 
-				if status, _ := node.statusVM(); status == AutoScalerServerNodeStateRunning {
-					if err := node.deleteVM(); err != nil {
-						glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, err)
+				if status, _ := node.statusVM(); status != AutoScalerServerNodeStateNotCreated {
+					if e := node.deleteVM(); e != nil {
+						glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, e)
 					}
+				} else {
+					glog.Warningf(constantes.WarnFailedVMNotDeleted, node.NodeName, status)
 				}
 
 				g.pendingNodesWG.Done()
@@ -237,6 +246,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 
 	g.Nodes = make(map[string]*AutoScalerServerNode)
 	g.pendingNodes = make(map[string]*AutoScalerServerNode)
+	g.LastCreatedNodeIndex = 0
 
 	for _, nodeInfo := range nodeInfos.Items {
 		var providerID = utils.GetNodeProviderID(g.ServiceIdentifier, &nodeInfo)
@@ -276,6 +286,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 							NodeIndex:        lastNodeIndex,
 							State:            AutoScalerServerNodeStateRunning,
 							AutoProvisionned: nodeInfo.Annotations[constantes.AnnotationNodeAutoProvisionned] == "true",
+							VSphereConfig:    g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier),
 							Addresses: []string{
 								runningIP,
 							},

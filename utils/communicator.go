@@ -12,18 +12,34 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// PublicKeyFile read public key
-func PublicKeyFile(file string) ssh.AuthMethod {
-	buffer, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil
+// AuthMethodFromPrivateKeyFile read public key
+func AuthMethodFromPrivateKeyFile(file string) ssh.AuthMethod {
+	if buffer, err := ioutil.ReadFile(file); err == nil {
+		if key, err := ssh.ParsePrivateKey(buffer); err == nil {
+			return ssh.PublicKeys(key)
+		} else {
+			glog.Fatalf("Can't parse key file:%s, reason:%v", file, err)
+		}
+	} else {
+		glog.Fatalf("Can't read key file:%s, reason:%v", file, err)
 	}
 
-	key, err := ssh.ParsePrivateKey(buffer)
-	if err != nil {
-		return nil
+	return nil
+}
+
+// AuthMethodFromPrivateKey read public key
+func AuthMethodFromPrivateKey(key string) ssh.AuthMethod {
+	if pub, err := ssh.ParsePrivateKey([]byte(key)); err == nil {
+		if signer, err := ssh.NewSignerFromKey(pub); err == nil {
+			return ssh.PublicKeys(signer)
+		} else {
+			glog.Fatalf("AuthMethodFromPublicKey fatal error:%v", err)
+		}
+	} else {
+		glog.Fatalf("AuthMethodFromPublicKey fatal error:%v", err)
 	}
-	return ssh.PublicKeys(key)
+
+	return nil
 }
 
 // Pipe execute local command and return output
@@ -67,8 +83,13 @@ func Shell(args ...string) error {
 }
 
 // Scp copy file
-func Scp(host, src, dst string) error {
-	return Shell(fmt.Sprintf("scp %s %s@:%s", src, host, dst))
+func Scp(connect *types.AutoScalerServerSSH, host, src, dst string) error {
+	return Shell("scp",
+		"-i", connect.AuthKeys,
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null",
+		src,
+		fmt.Sprintf("%s@%s:%s", connect.UserName, host, dst))
 }
 
 // Sudo exec ssh command as sudo
@@ -78,16 +99,18 @@ func Sudo(connect *types.AutoScalerServerSSH, host string, command ...string) (s
 
 	if len(connect.Password) > 0 {
 		sshConfig = &ssh.ClientConfig{
-			User: connect.UserName,
+			User:            connect.UserName,
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 			Auth: []ssh.AuthMethod{
 				ssh.Password(connect.Password),
 			},
 		}
 	} else {
 		sshConfig = &ssh.ClientConfig{
-			User: connect.UserName,
+			User:            connect.UserName,
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 			Auth: []ssh.AuthMethod{
-				PublicKeyFile(connect.AuthKeys),
+				AuthMethodFromPrivateKeyFile(connect.AuthKeys),
 			},
 		}
 	}
@@ -110,7 +133,7 @@ func Sudo(connect *types.AutoScalerServerSSH, host string, command ...string) (s
 		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
 	}
 
-	if err := session.RequestPty("xterm", 80, 40, modes); err != nil {
+	if err := session.RequestPty("xterm", 80, 200, modes); err != nil {
 		return "", fmt.Errorf("request for pseudo terminal failed: %s", err)
 	}
 

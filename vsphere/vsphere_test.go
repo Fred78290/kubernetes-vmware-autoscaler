@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/vsphere"
 )
 
@@ -70,6 +71,36 @@ func loadFromJson(fileName string) *ConfigurationTest {
 	}
 
 	return testConfig
+}
+
+func Test_AuthMethodKey(t *testing.T) {
+	config := loadFromJson(confName)
+
+	signer := utils.AuthMethodFromPrivateKeyFile(config.SSH.AuthKeys)
+
+	if assert.NotNil(t, signer) {
+
+	}
+}
+
+func Test_Sudo(t *testing.T) {
+	config := loadFromJson(confName)
+
+	out, err := utils.Sudo(&config.SSH, "localhost", "ls")
+
+	if assert.NoError(t, err) {
+		t.Log(out)
+	}
+}
+
+func Test_CIDR(t *testing.T) {
+
+	cidr := vsphere.ToCIDR("10.65.4.201", "255.255.255.0")
+
+	if assert.Equal(t, cidr, "10.65.4.201/24") {
+		cidr := vsphere.ToCIDR("10.65.4.201", "")
+		assert.Equal(t, cidr, "10.65.4.201/8")
+	}
 }
 
 func Test_getVM(t *testing.T) {

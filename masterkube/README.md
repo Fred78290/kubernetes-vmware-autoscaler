@@ -55,7 +55,7 @@ During the process the script will create many files located in
 | `-c|--no-custom-image` | Use standard image  | NO |
 | `-d|--default-machine`  | Kind of machine to launch if not speficied  | medium |
 | `-i|--image`  | Alternate image  ||
-| `-k|--ssh-key`  |Alternate ssh key file |~/.ssh/id_rsa|
+| `-k|--ssh-private-key`  |Alternate ssh key file |~/.ssh/id_rsa|
 | `-n|--cni-version`  |CNI version |0.71
 | `-p|--password`  |Define the kubernetes user password |randomized|
 | `-v|--kubernetes-version`  |Which version of kubernetes to use |latest|

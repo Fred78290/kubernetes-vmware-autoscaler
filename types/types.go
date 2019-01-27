@@ -1,6 +1,9 @@
 package types
 
-import "github.com/Fred78290/kubernetes-vmware-autoscaler/vsphere"
+import (
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/vsphere"
+	"github.com/golang/glog"
+)
 
 // ResourceLimiter define limit, not really used
 type ResourceLimiter struct {
@@ -37,7 +40,7 @@ type AutoScalerServerOptionals struct {
 type AutoScalerServerSSH struct {
 	UserName string `json:"user"`
 	Password string `json:"password"`
-	AuthKeys string `json:"ssh-key"`
+	AuthKeys string `json:"ssh-private-key"`
 }
 
 // AutoScalerServerRsync declare an rsync operation
@@ -73,4 +76,19 @@ type AutoScalerServerConfig struct {
 	Optionals          *AutoScalerServerOptionals        `json:"optionals"`
 	SSH                *AutoScalerServerSSH              `json:"ssh-infos"`
 	VMwareInfos        map[string]*vsphere.Configuration `json:"vmware"`
+}
+
+// GetVSphereConfiguration returns the vsphere named conf or default
+func (conf *AutoScalerServerConfig) GetVSphereConfiguration(name string) *vsphere.Configuration {
+	var vsphere *vsphere.Configuration
+
+	if vsphere = conf.VMwareInfos[name]; vsphere == nil {
+		vsphere = conf.VMwareInfos["default"]
+	}
+
+	if vsphere == nil {
+		glog.Fatalf("Unable to find vmware config for name:%s", name)
+	}
+
+	return vsphere
 }

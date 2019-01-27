@@ -1,9 +1,13 @@
 package vsphere
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 
 	"github.com/vmware/govmomi/object"
@@ -20,6 +24,7 @@ type NetworkInterface struct {
 	NicName          string `json:"nic,omitempty" yaml:"nic,omitempty"`
 	DHCP             bool   `json:"dhcp,omitempty" yaml:"dhcp,omitempty"`
 	IPAddress        string `json:"address,omitempty" yaml:"address,omitempty"`
+	Netmask          string `json:"netmask,omitempty" yaml:"netmask,omitempty"`
 	Gateway          string `json:"gateway,omitempty" yaml:"gateway,omitempty"`
 	networkReference object.NetworkReference
 	networkBacking   types.BaseVirtualDeviceBackingInfo
@@ -64,6 +69,31 @@ type NetworkConfig struct {
 	Network *NetworkDeclare `json:"network,omitempty" yaml:"network,omitempty"`
 }
 
+// Converts IP mask to 16 bit unsigned integer.
+func addressToInteger(mask net.IP) uint32 {
+	var i uint32
+
+	buf := bytes.NewReader(mask)
+
+	binary.Read(buf, binary.BigEndian, &i)
+
+	return i
+}
+
+// ToCIDR returns address in cidr format ww.xx.yy.zz/NN
+func ToCIDR(address, netmask string) string {
+
+	if len(netmask) == 0 {
+		mask := net.ParseIP(address).DefaultMask()
+		netmask = net.IPv4(mask[0], mask[1], mask[2], mask[3]).To4().String()
+	}
+
+	mask := net.ParseIP(netmask)
+	netmask = strconv.FormatUint(uint64(addressToInteger(mask.To4())), 2)
+
+	return fmt.Sprintf("%s/%d", address, strings.Count(netmask, "1"))
+}
+
 // GetCloudInitNetwork create cloud-init object
 func (net *Network) GetCloudInitNetwork() *NetworkConfig {
 
@@ -84,7 +114,7 @@ func (net *Network) GetCloudInitNetwork() *NetworkConfig {
 			} else {
 				ethernet = &NetworkAdapter{
 					Addresses: &[]string{
-						n.IPAddress,
+						ToCIDR(n.IPAddress, n.Netmask),
 					},
 				}
 			}

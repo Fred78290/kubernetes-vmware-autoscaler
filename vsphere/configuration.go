@@ -1,6 +1,9 @@
 package vsphere
 
 import (
+	"encoding/json"
+	"fmt"
+	"net"
 	"net/url"
 	"time"
 
@@ -32,6 +35,31 @@ type Status struct {
 	Powered bool
 }
 
+// Copy Make a deep copy from src into dst.
+func Copy(dst interface{}, src interface{}) error {
+	if dst == nil {
+		return fmt.Errorf("dst cannot be nil")
+	}
+
+	if src == nil {
+		return fmt.Errorf("src cannot be nil")
+	}
+
+	bytes, err := json.Marshal(src)
+
+	if err != nil {
+		return fmt.Errorf("Unable to marshal src: %s", err)
+	}
+
+	err = json.Unmarshal(bytes, dst)
+
+	if err != nil {
+		return fmt.Errorf("Unable to unmarshal into dst: %s", err)
+	}
+
+	return nil
+}
+
 func (conf *Configuration) getURL() (string, error) {
 	u, err := url.Parse(conf.URL)
 
@@ -42,6 +70,30 @@ func (conf *Configuration) getURL() (string, error) {
 	u.User = url.UserPassword(conf.UserName, conf.Password)
 
 	return u.String(), err
+}
+
+// Clone duplicate the conf, change ip address in network config if needed
+func (conf *Configuration) Clone(nodeIndex int) (*Configuration, error) {
+
+	var dup Configuration
+
+	if err := Copy(&dup, conf); err != nil {
+		return nil, err
+	}
+
+	if dup.Network != nil {
+		for _, inf := range dup.Network.Interfaces {
+			if inf.DHCP == false {
+				ip := net.ParseIP(inf.IPAddress)
+				address := ip.To4()
+				address[3] += byte(nodeIndex)
+
+				inf.IPAddress = ip.String()
+			}
+		}
+	}
+
+	return &dup, nil
 }
 
 // GetClient create a new govomi client
