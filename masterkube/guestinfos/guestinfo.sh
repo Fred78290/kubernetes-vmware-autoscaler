@@ -15,8 +15,8 @@ else
     TZ=$(sudo systemsetup -gettimezone | awk '{print $2}')
     BASE64=base64
     VMHOME=~/Documents/Virtual\ Machines.localized
-    SOURCEVMX="$VMHOME/afp-slyo-bionic-server-seed.vmwarevm/afp-slyo-bionic-server-seed.vmx"
-    VMX="$VMHOME/clone-afp-slyo-bionic-server-seed.vmwarevm/clone-afp-slyo-bionic-server-seed.vmx"
+    SOURCEVMX="$VMHOME/afp-bionic-minimal.vmwarevm/afp-bionic-minimal.vmx"
+    VMX="$VMHOME/clone-afp-bionic-minimal.vmwarevm/clone-afp-bionic-minimal.vmx"
 fi
 
 cat > ${CURDIR}/userdata.yaml <<EOF
