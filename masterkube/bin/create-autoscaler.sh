@@ -1,7 +1,7 @@
 #/bin/bash
 CURDIR=$(dirname $0)
 
-[ $(uname -s) = "Darwin" ] && GOOS=darwin || GOOS=linux
+[ $(uname -s) == "Darwin" ] && GOOS=darwin || GOOS=linux
 
 pushd $CURDIR/../
 
