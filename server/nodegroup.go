@@ -115,6 +115,8 @@ func (g *AutoScalerServerNodeGroup) refresh() {
 func (g *AutoScalerServerNodeGroup) deleteNodes(delta int) error {
 	glog.V(5).Infof("AutoScalerServerNodeGroup::deleteNodes, nodeGroupID:%s", g.NodeGroupIdentifier)
 
+	var err error
+
 	startIndex := len(g.Nodes) - 1
 	endIndex := startIndex + delta
 	tempNodes := make([]*AutoScalerServerNode, 0, -delta)
@@ -123,12 +125,12 @@ func (g *AutoScalerServerNodeGroup) deleteNodes(delta int) error {
 		nodeName := g.nodeName(nodeIndex)
 
 		if node := g.Nodes[nodeName]; node != nil {
-			if err := node.deleteVM(); err != nil {
-				glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, err)
-				return err
-			}
-
 			tempNodes = append(tempNodes, node)
+
+			if err = node.deleteVM(); err != nil {
+				glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, err)
+				break
+			}
 		}
 	}
 
@@ -136,7 +138,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodes(delta int) error {
 		delete(g.Nodes, node.NodeName)
 	}
 
-	return nil
+	return err
 }
 
 func (g *AutoScalerServerNodeGroup) addNodes(delta int) error {
@@ -342,16 +344,17 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 func (g *AutoScalerServerNodeGroup) deleteNodeByName(nodeName string) error {
 	glog.V(5).Infof("AutoScalerServerNodeGroup::deleteNodeByName, nodeGroupID:%s, nodeName:%s", g.NodeGroupIdentifier, nodeName)
 
+	var err error
+
 	if node := g.Nodes[nodeName]; node != nil {
 
-		if err := node.deleteVM(); err != nil {
+		if err = node.deleteVM(); err != nil {
 			glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, err)
-			return err
 		}
 
 		delete(g.Nodes, nodeName)
 
-		return nil
+		return err
 	}
 
 	return fmt.Errorf(constantes.ErrNodeNotFoundInNodeGroup, nodeName, g.NodeGroupIdentifier)
