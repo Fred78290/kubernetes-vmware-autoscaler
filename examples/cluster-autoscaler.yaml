@@ -136,7 +136,7 @@ spec:
     spec:
       serviceAccountName: cluster-autoscaler
       containers:
-        - image: fred78290/cluster-autoscaler:v1.12.4
+        - image: fred78290/cluster-autoscaler:v1.13.1
           name: cluster-autoscaler
           resources:
             limits:
@@ -152,7 +152,6 @@ spec:
             - --cloud-provider=grpc
             - --cloud-config=/etc/cluster-autoscaler/grpc.conf
             - --nodes=$(MINNODES):$(MAXNODES):true/$(NODEGROUP_ID)
-            - --nodes=0:3:true/ca-grpc-autoscaler
             - --max-nodes-total=3
             - --cores-total=0:16
             - --memory-total=2:24
@@ -171,7 +170,7 @@ spec:
           - name: MAXNODES
             value: "5"
           - name: NODEGROUP_ID
-            value: grpc-cloudprovider-id
+            value: vmware-ca-k8s
           volumeMounts:
             - name: ssl-certs
               mountPath: /etc/ssl/certs/ca-certificates.crt

@@ -2,29 +2,31 @@
 
 set -e
 
-# This script customize bionic-server-cloudimg-amd64.img to include docker+kubernetes
-# Before running this script, you must install some elements with the command below
-# sudo apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils virt-manager
-# This process disable netplan and use old /etc/network/interfaces because I don't now why each VM instance running the customized image
-# have the same IP with different mac address.
+# This script will create 2 VM used as template
+# The first one is the seed VM customized to use vmware guestinfos cloud-init datasource instead ovf datasource.
+# This step is done by importing https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.ova
+# If don't have the right to import OVA with govc to your vpshere you can try with ovftool import method else you must build manually this seed
+# Jump to Prepare seed VM comment.
+# Very important, shutdown the seed VM by using shutdown guest or shutdown -P now. Never use PowerOff vsphere command
+# This VM will be used to create the kubernetes template VM 
 
-# /usr/lib/python3/dist-packages/cloudinit/net/netplan.py
+# The second VM will contains everything to run kubernetes
 
 KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 KUBERNETES_PASSWORD=$(uuidgen)
 CNI_VERSION=v0.7.1
 SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
 CACHE=~/.local/vmware/cache
-TARGET_IMAGE=afp-slyo-bionic-kubernetes-$KUBERNETES_VERSION
+TARGET_IMAGE=bionic-kubernetes-$KUBERNETES_VERSION
 PASSWORD=$(uuidgen)
 OSDISTRO=$(uname -s)
-SEEDIMAGE=afp-slyo-bionic-server-seed
+SEEDIMAGE=bionic-server-cloudimg-seed
 IMPORTMODE="govc"
-TEMP=`getopt -o i:k:n:op:s:u:v: --long user:,adapter:,network:,ovftool,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
+TEMP=`getopt -o i:k:n:op:s:u:v: --long user:,adapter:,vm-network:,ovftool,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
 CURDIR=$(dirname $0)
 USER=ubuntu
 NETWORK_ADAPTER=vmxnet3
-VM_NETWORK=
+VM_NETWORK='VM Network'
 
 eval set -- "$TEMP"
 
@@ -55,7 +57,7 @@ while true ; do
         -u|--user) USER=$2 ; shift 2;;
         -v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
         --adapter) NETWORK_ADAPTER=$2 ; shift 2;;
-        --network) VM_NETWORK=$2 ; shift 2;;
+        --vm-network) VM_NETWORK=$2 ; shift 2;;
         --) shift ; break ;;
         *) echo "$1 - Internal error!" ; exit 1 ;;
     esac
@@ -75,92 +77,93 @@ if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
         
     MAPPED_NETWORK=$(govc import.spec bionic-server-cloudimg-amd64.ova | jq .NetworkMapping[0].Name)
 
-    if [ "$IMPORTMODE" == "govc" ]; then        
+    if [ "${IMPORTMODE}" == "govc" ]; then        
         govc import.spec bionic-server-cloudimg-amd64.ova \
-            | jq --arg GOVC_NETWORK "$GOVC_NETWORK" --arg MAPPED_NETWORK "$MAPPED_NETWORK" '.NetworkMapping |= [ { Name: $MAPPED_NETWORK, Network: $GOVC_NETWORK } ]' \
+            | jq --arg GOVC_NETWORK "${GOVC_NETWORK}" --arg MAPPED_NETWORK "${MAPPED_NETWORK}" '.NetworkMapping |= [ { Name: $MAPPED_NETWORK, Network: $GOVC_NETWORK } ]' \
             > bionic-server-cloudimg-amd64.spec
         
         cat bionic-server-cloudimg-amd64.spec \
-            | jq --arg SSH_KEY "$SSH_KEY" \
-                --arg SSH_KEY "$SSH_KEY" \
+            | jq --arg SSH_KEY "${SSH_KEY}" \
+                --arg SSH_KEY "${SSH_KEY}" \
                 --arg USERDATA "" \
-                --arg PASSWORD "$PASSWORD" \
-                --arg NAME "$SEEDIMAGE" \
+                --arg PASSWORD "${PASSWORD}" \
+                --arg NAME "${SEEDIMAGE}" \
                 --arg INSTANCEID $(uuidgen) \
-                '.Name = $NAME | .PropertyMapping |= [ { Key: "instance-id", Value: $INSTANCEID }, { Key: "hostname", Value: $TARGET_IMAGE }, { Key: "public-keys", Value: $SSH_KEY }, { Key: "user-data", Value: $USERDATA }, { Key: "password", Value: $PASSWORD } ]' \
+                '.Name = $NAME | .PropertyMapping |= [ { Key: "instance-id", Value: $INSTANCEID }, { Key: "hostname", Value: $TARGET_IMAGE }, { Key: "public-keys", Value: $SSH_KEY }, { Key: "user-data", Value: ${USER}DATA }, { Key: "password", Value: $PASSWORD } ]' \
                 > bionic-server-cloudimg-amd64.txt
 
-        echo "Import bionic-server-cloudimg-amd64.ova to $SEEDIMAGE with govc"
+        echo "Import bionic-server-cloudimg-amd64.ova to ${SEEDIMAGE} with govc"
         govc import.ova \
             -options=bionic-server-cloudimg-amd64.txt \
-            -folder=/$GOVC_DATACENTER/vm/$GOVC_FOLDER \
-            -ds=/$GOVC_DATACENTER/datastore/$GOVC_CLUSTER/CUSTOMER/$GOVC_FOLDER/$GOVC_DATASTORE \
-            -name=$SEEDIMAGE bionic-server-cloudimg-amd64.ova
+            -folder="/${GOVC_DATACENTER}/vm/${GOVC_FOLDER}" \
+            -ds="/${GOVC_DATACENTER}/datastore/${GOVC_CLUSTER}/CUSTOMER/${GOVC_FOLDER}/${GOVC_DATASTORE}" \
+            -name="${SEEDIMAGE}" \
+            bionic-server-cloudimg-amd64.ova
     else
-        echo "Import bionic-server-cloudimg-amd64.ova to $SEEDIMAGE with ovftool"
+        echo "Import bionic-server-cloudimg-amd64.ova to ${SEEDIMAGE} with ovftool"
 
         ovftool \
             --acceptAllEulas \
-            --name=$SEEDIMAGE \
-            --datastore=$GOVC_DATASTORE \
-            --vmFolder=$GOVC_FOLDER \
+            --name="${SEEDIMAGE}" \
+            --datastore="${GOVC_DATASTORE}" \
+            --vmFolder="${GOVC_FOLDER}" \
             --diskMode=thin \
             --prop:instance-id="$(uuidgen)" \
-            --prop:hostname="$SEEDIMAGE" \
-            --prop:public-keys="$SSH_KEY" \
+            --prop:hostname="${SEEDIMAGE}" \
+            --prop:public-keys="${SSH_KEY}" \
             --prop:user-data="" \
-            --prop:password="$PASSWORD" \
-            --net:"$MAPPED_NETWORK"="$GOVC_NETWORK" \
+            --prop:password="${PASSWORD}" \
+            --net:"${MAPPED_NETWORK}"="${GOVC_NETWORK}" \
             https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.ova \
-            vi://$GOVC_USERNAME:$GOVC_PASSWORD@$GOVC_HOST/$GOVC_RESOURCE_POOL/
+            "vi://${GOVC_USERNAME}:${GOVC_PASSWORD}@${GOVC_HOST}/${GOVC_RESOURCE_POOL}/"
     fi
 
     if [ $? -eq 0 ]; then
     
-        echo "Add second network card on $SEEDIMAGE"
+        if [ ! -z "${VM_NETWORK}" ]; then
+            echo "Add second network card on ${SEEDIMAGE}"
 
-        if [ -z "$VM_NETWORK" ]; then
-            govc vm.network.add -vm "${SEEDIMAGE}" -net=$VM_NETWORK -net.adapter=$NETWORK_ADAPTER
-        else
-            govc vm.network.add -vm "${SEEDIMAGE}" -net=$VM_NETWORK -net.adapter=$NETWORK_ADAPTER
+            govc vm.network.add -vm "${SEEDIMAGE}" -net="${VM_NETWORK}" -net.adapter="${NETWORK_ADAPTER}"
         fi
 
-        echo "Power On $SEEDIMAGE"
+        echo "Power On ${SEEDIMAGE}"
         govc vm.power -on "${SEEDIMAGE}"
 
         echo "Wait for IP from $SEEDIMAGE"
         IPADDR=$(govc vm.ip -wait 5m "${SEEDIMAGE}")
 
-        if [ -z "$IPADDR" ]; then
+        if [ -z "${IPADDR}" ]; then
             echo "Can't get IP!"
             exit -1
         fi
 
+        # Prepare seed VM
         echo "Install cloud-init VMWareGuestInfo datasource"
-        scp $CURDIR/../guestinfos/install-guestinfo-datasource.sh $CURDIR/../guestinfos/cloud-init-clean.sh $USER@$IPADDR:/tmp
-        ssh -t $USER@$IPADDR sudo mv /tmp/cloud-init-clean.sh /tmp/install-guestinfo-datasource.sh /usr/local/bin
-        ssh -t $USER@$IPADDR sudo /usr/local/bin/install-guestinfo-datasource.sh
+        scp "${CURDIR}/../guestinfos/install-guestinfo-datasource.sh" "${CURDIR}/../guestinfos/cloud-init-clean.sh" "${USER}@${IPADDR}:/tmp"
+        ssh -t "${USER}@${IPADDR}" sudo mv /tmp/cloud-init-clean.sh /tmp/install-guestinfo-datasource.sh /usr/local/bin
+        ssh -t "${USER}@${IPADDR}" sudo /usr/local/bin/install-guestinfo-datasource.sh
 
+        # Shutdown the guest
         govc vm.power -persist-session=false -s "${SEEDIMAGE}"
 
         sleep 10
 
-        echo "$SEEDIMAGE is ready"
+        echo "${SEEDIMAGE} is ready"
     else
         echo "Import failed!"
         exit -1
     fi 
 else
-    echo "$SEEDIMAGE already exists, nothing to do!"
+    echo "${SEEDIMAGE} already exists, nothing to do!"
 fi
 
-echo "Prepare $TARGET_IMAGE image"
+echo "Prepare ${TARGET_IMAGE} image"
 
-cat > $ISODIR/user-data <<EOF
+cat > "${ISODIR}/user-data" <<EOF
 #cloud-config
 EOF
 
-cat > $ISODIR/network.yaml <<EOF
+cat > "${ISODIR}/network.yaml" <<EOF
 #cloud-config
 network:
     version: 2
@@ -169,7 +172,7 @@ network:
             dhcp4: true
 EOF
 
-cat > $ISODIR/vendor-data <<EOF
+cat > "${ISODIR}/vendor-data" <<EOF
 #cloud-config
 timezone: $TZ
 ssh_authorized_keys:
@@ -181,14 +184,14 @@ system_info:
         name: kubernetes
 EOF
 
-cat > $ISODIR/meta-data <<EOF
+cat > "${ISODIR}/meta-data" <<EOF
 {
     "local-hostname": "$TARGET_IMAGE",
     "instance-id": "$(uuidgen)"
 }
 EOF
 
-cat > $ISODIR/prepare-image.sh <<EOF
+cat > "${ISODIR}/prepare-image.sh" <<EOF
 #!/bin/bash
 
 apt-get update
@@ -239,21 +242,21 @@ rm /var/log/cloud-ini*
 rm /var/log/syslog
 EOF
 
-chmod +x $ISODIR/prepare-image.sh
+chmod +x "${ISODIR}/prepare-image.sh"
 
-gzip -c9 < $ISODIR/meta-data | $BASE64 > metadata.base64
-gzip -c9 < $ISODIR/user-data | $BASE64 > userdata.base64
-gzip -c9 < $ISODIR/vendor-data | $BASE64 > vendordata.base64
+gzip -c9 < "${ISODIR}/meta-data" | $BASE64 > metadata.base64
+gzip -c9 < "${ISODIR}/user-data" | $BASE64 > userdata.base64
+gzip -c9 < "${ISODIR}/vendor-data" | $BASE64 > vendordata.base64
 
 # Due to my vsphere center the folder name refer more path, so I need to precise the path instead
-if [ "$GOVC_FOLDER" ]; then
-    FOLDERS=$(govc folder.info $GOVC_FOLDER|grep Path|wc -l)
-    if [ "$FOLDER" != "1" ]; then
-        FOLDER_OPTIONS="-folder=/$GOVC_DATACENTER/vm/$GOVC_FOLDER"
+if [ "${GOVC_FOLDER}" ]; then
+    FOLDERS=$(govc folder.info ${GOVC_FOLDER}|grep Path|wc -l)
+    if [ "${FOLDERS}" != "1" ]; then
+        FOLDER_OPTIONS="-folder=/${GOVC_DATACENTER}/vm/${GOVC_FOLDER}"
     fi
 fi
 
-govc vm.clone -link=false -on=false $FOLDER_OPTIONS -c=2 -m=4096 -vm=$SEEDIMAGE $TARGET_IMAGE
+govc vm.clone -link=false -on=false "${FOLDER_OPTIONS}" -c=2 -m=4096 -vm="${SEEDIMAGE}" "${TARGET_IMAGE}"
 
 govc vm.change -vm "${TARGET_IMAGE}" \
     -e guestinfo.metadata="$(cat metadata.base64)" \
@@ -263,19 +266,19 @@ govc vm.change -vm "${TARGET_IMAGE}" \
     -e guestinfo.vendordata="$(cat vendordata.base64)" \
     -e guestinfo.vendordata.encoding="gzip+base64"
 
-echo "Power On $TARGET_IMAGE"
+echo "Power On ${TARGET_IMAGE}"
 govc vm.power -on "${TARGET_IMAGE}"
 
-echo "Wait for IP from $TARGET_IMAGE"
+echo "Wait for IP from ${TARGET_IMAGE}"
 IPADDR=$(govc vm.ip -wait 5m "${TARGET_IMAGE}")
 
-scp $ISODIR/prepare-image.sh $USER@$IPADDR:~
+scp "${ISODIR}/prepare-image.sh" "${USER}@${IPADDR}:~"
 
-ssh -t $USER@$IPADDR sudo ./prepare-image.sh
+ssh -t "${USER}@${IPADDR}" sudo ./prepare-image.sh
 
 govc vm.power -persist-session=false -s "${TARGET_IMAGE}"
 
-echo "Created image $TARGET_IMAGE with kubernetes version $KUBERNETES_VERSION"
+echo "Created image ${TARGET_IMAGE} with kubernetes version ${KUBERNETES_VERSION}"
 
 popd
 

@@ -24,7 +24,7 @@ EOF") | jq . > $ETC_DIR/$1.json
 kubectl apply -f $ETC_DIR/$1.json --kubeconfig=./cluster/config
 }
 
-nohup ../out/vmware-autoscaler-$GOOS-amd64 \
+nohup ../out/vsphere-autoscaler-$GOOS-amd64 \
     --config=$PWD/config/kubernetes-vmware-autoscaler.json \
     --save=$PWD/config/vmware-autoscaler-state.json \
     -v=1 \

@@ -31,7 +31,7 @@
                 },
                 "containers": [
                     {
-                        "image": "fred78290/cluster-autoscaler:v1.12.4",
+                        "image": "fred78290/cluster-autoscaler:v1.13.1",
                         "name": "cluster-autoscaler",
                         "resources": {
                             "limits": {
@@ -49,7 +49,7 @@
                             "--stderrthreshold=info",
                             "--cloud-provider=grpc",
                             "--cloud-config=/etc/cluster-autoscaler/grpc-config.json",
-                            "--nodes=$MINNODES:$MAXNODES:true/afp-slyo-k8s",
+                            "--nodes=$MINNODES:$MAXNODES:true/$NODEGROUP_NAME",
                             "--max-nodes-total=$MAXTOTALNODES",
                             "--cores-total=$CORESTOTAL",
                             "--memory-total=$MEMORYTOTAL",

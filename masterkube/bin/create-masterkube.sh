@@ -9,17 +9,20 @@ set -e
 
 CURDIR=$(dirname $0)
 
-export NODEGROUP_NAME="afp-slyo-ca-k8s"
+export SCHEME="vmware"
+export NODEGROUP_NAME="vmware-ca-k8s"
 export MASTERKUBE="${NODEGROUP_NAME}-masterkube"
+export PROVIDERID="${SCHEME}://${NODEGROUP_NAME}/object?type=node&name=${MASTERKUBE}"
 export SSH_PRIVATE_KEY=~/.ssh/id_rsa
 export SSH_KEY=$(cat "${SSH_PRIVATE_KEY}.pub")
 export KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 export KUBERNETES_PASSWORD=$(uuidgen)
 export KUBECONFIG=$HOME/.kube/config
-export ROOT_IMG_NAME=afp-slyo-bionic-kubernetes
+export SEED_USER=ubuntu
+export SEED_IMAGE="bionic-server-cloudimg-seed"
+export ROOT_IMG_NAME=bionic-kubernetes
 export TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_VERSION}"
 export CNI_VERSION="v0.7.1"
-export PROVIDERID="vmware://${NODEGROUP_NAME}/object?type=node&name=${MASTERKUBE}"
 export MINNODES=0
 export MAXNODES=5
 export MAXTOTALNODES=$MAXNODES
@@ -37,6 +40,12 @@ export UNREMOVABLENODERECHECKTIMEOUT="1m"
 export OSDISTRO=$(uname -s)
 export TRANSPORT="tcp"
 export USER=ubuntu
+export NET_DOMAIN=example.com
+export NET_IP=10.0.0.200
+export NET_GATEWAY=10.0.0.1
+export NET_DNS=10.0.0.1
+export VC_NETWORK_PRIVATE="VM Network"
+export VC_NETWORK_PUBLIC="VM Public"
 
 if [ "$OSDISTRO" == "Linux" ]; then
     TZ=$(cat /etc/timezone)
@@ -46,19 +55,68 @@ else
     BASE64="base64"
 fi
 
-TEMP=$(getopt -o i:k:n:p:s:t: --long transport:,no-custom-image,image:,ssh-private-key:,cni-version:,password:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
+TEMP=$(getopt -o k:n:p:s:t: --long node-group:,target-image:,seed-image:,seed-user:,vm-public-network:,vm-private-network:,net-address:,net-gateway:,net-dns:,net-domain:,transport:,ssh-private-key:,cni-version:,password:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
 
 eval set -- "$TEMP"
 
 # extract options and their arguments into variables.
 while true; do
 	case "$1" in
-	-d | --default-machine)
-		DEFAULT_MACHINE="$2"
+	--node-group)
+		NODEGROUP_NAME="$2"
+        MASTERKUBE="${NODEGROUP_NAME}-masterkube"
+        PROVIDERID="${SCHEME}://${NODEGROUP_NAME}/object?type=node&name=${MASTERKUBE}"
 		shift 2
 		;;
-	-i | --image)
-		TARGET_IMAGE="$2"
+
+	--target-image)
+		ROOT_IMG_NAME="$2"
+        TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_VERSION}"
+		shift 2
+		;;
+
+	--seed-image)
+		SEED_IMAGE="$2"
+		shift 2
+		;;
+
+	--seed-user)
+		SEED_USER="$2"
+		shift 2
+		;;
+
+	--vm-private-network)
+		VC_NETWORK_PRIVATE="$2"
+		shift 2
+		;;
+
+	--vm-public-network)
+		VC_NETWORK_PUBLIC="$2"
+		shift 2
+		;;
+
+	--net-address)
+		NET_IP="$2"
+		shift 2
+		;;
+
+	--net-gateway)
+		NET_GATEWAY="$2"
+		shift 2
+		;;
+
+	--net-dns)
+		NET_DNS="$2"
+		shift 2
+		;;
+
+	--net-domain)
+		NET_DOMAIN="$2"
+		shift 2
+		;;
+
+	-d | --default-machine)
+		DEFAULT_MACHINE="$2"
 		shift 2
 		;;
 	-s | --ssh-private-key)
@@ -82,6 +140,8 @@ while true; do
         TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_VERSION}"
 		shift 2
 		;;
+
+    # Same argument as cluster-autoscaler
 	--max-nodes-total)
 		MAXTOTALNODES="$2"
 		shift 2
@@ -166,8 +226,10 @@ MOUNTPOINTS=$(cat <<EOF
 EOF
 )
 
+# Cloud init fragment
 PACKAGE_UPGRADE="true"
 
+# Cloud init fragment
 KUBERNETES_USER=$(
 	cat <<EOF
 [
@@ -190,6 +252,7 @@ KUBERNETES_USER=$(
 EOF
 )
 
+# Sample machine definition
 MACHINE_DEFS=$(
 	cat <<EOF
 {
@@ -221,10 +284,10 @@ pushd ${CURDIR}/../
 
 [ -d config ] || mkdir -p configSSH_KEY
 [ -d cluster ] || mkdir -p cluster
-[ -d kubernetes ] || mkdir -p kubernetes
 
-export PATH=$CURDIR:$PATH
+export PATH=./bin:$PATH
 
+# If CERT doesn't exist, create one autosigned
 if [ ! -f ./etc/ssl/privkey.pem ]; then
 	mkdir -p ./etc/ssl/
 	openssl genrsa 2048 >./etc/ssl/privkey.pem
@@ -233,8 +296,10 @@ if [ ! -f ./etc/ssl/privkey.pem ]; then
 	chmod 644 ./etc/ssl/*
 fi
 
+# Extract the domain name from CERT
 export DOMAIN_NAME=$(openssl x509 -noout -fingerprint -text <./etc/ssl/cert.pem | grep 'Subject: CN' | tr '=' ' ' | awk '{print $3}' | sed 's/\*\.//g')
 
+# If the VM template doesn't exists, build it from scrash
 if [ -z "$(govc vm.info ${TARGET_IMAGE} 2>&1)" ]; then
     echo "Create vmware preconfigured image"
 
@@ -242,20 +307,14 @@ if [ -z "$(govc vm.info ${TARGET_IMAGE} 2>&1)" ]; then
         --cni-version=${CNI_VERSION} \
         --custom-image=${TARGET_IMAGE} \
         --kubernetes-version=${KUBERNETES_VERSION} \
-        --seed="afp-slyo-bionic-minimal-1.0.0" \
-        --user=vagrant
+        --seed=${SEED_IMAGE} \
+        --user=${SEED_USER}
 fi
 
-./bin/delete-masterkube.sh
+# Delete previous exixting version
+delete-masterkube.sh
 
 echo "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
-
-hexchars="0123456789ABCDEF"
-MACADDR1=$( for i in {1..6} ; do echo -n ${hexchars:$(( $RANDOM % 16 )):1} ; done | sed -e 's/\(..\)/:\1/g' )
-MACADDR2=$( for i in {1..6} ; do echo -n ${hexchars:$(( $RANDOM % 16 )):1} ; done | sed -e 's/\(..\)/:\1/g' )
-ADDR1=$(echo "00:16:3E:${MACADDR1}")
-ADDR2=$(echo "00:16:3E:${MACADDR2}")
-
 
 cat > ./config/network.yaml <<EOF
 network:
@@ -264,13 +323,14 @@ network:
     eth0:
       dhcp4: true
     eth1:
-      gateway4: 10.65.4.1
+      gateway4: $NET_GATEWAY
       addresses:
-      - 10.65.4.200/24
+      - $NET_IP/24
 EOF
 
 echo "${KUBERNETES_PASSWORD}" > ./config/kubernetes-password.txt
 
+# Cloud init vendor-data
 cat > ./config/vendordata.yaml <<EOF
 #cloud-config
 package_update: true
@@ -285,6 +345,7 @@ system_info:
         name: kubernetes
 EOF
 
+# Cloud init meta-data
 cat > ./config/metadata.json <<EOF
 {
     "network": "$(cat ./config/network.yaml | gzip -c9 | $BASE64)",
@@ -294,8 +355,8 @@ cat > ./config/metadata.json <<EOF
 }
 EOF
 
+# Cloud init user-data
 echo "#cloud-config" > ./config/userdata.yaml
-
 cat <<EOF | tee ./config/userdata.json | python2 -c "import json,sys,yaml; print yaml.safe_dump(json.load(sys.stdin), width=500, indent=4, default_flow_style=False)" >> ./config/userdata.yaml
 {
     "runcmd": [
@@ -313,8 +374,6 @@ echo "Clone ${TARGET_IMAGE} to ${MASTERKUBE}"
 echo "TARGET_IMAGE=${TARGET_IMAGE}"
 echo "MASTERKUBE=${MASTERKUBE}"
 
-#### FOLDER=$(govc folder.info AFP | sed "s/\s\+//g" |  grep "Path\|Types" | sed "s/\nTypes/\|Types/g")
-
 # Due to my vsphere center the folder name refer more path, so I need to precise the path instead
 FOLDER_OPTIONS=
 if [ "${GOVC_FOLDER}" ]; then
@@ -323,10 +382,12 @@ if [ "${GOVC_FOLDER}" ]; then
     fi
 fi
 
+# Clone my template
 govc vm.clone -link=false -on=false ${FOLDER_OPTIONS} -c=2 -m=4096 -vm=${TARGET_IMAGE} ${MASTERKUBE}
 
 echo "Set cloud-init settings for ${MASTERKUBE}"
 
+# Inject cloud-init elements
 govc vm.change -vm "${MASTERKUBE}" \
     -e guestinfo.metadata="$(cat config/metadata.base64)" \
     -e guestinfo.metadata.encoding="gzip+base64" \
@@ -358,9 +419,9 @@ kubectl annotate node ${MASTERKUBE} "cluster.autoscaler.nodegroup/name=${NODEGRO
 kubectl label nodes ${MASTERKUBE} "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "master=true" --overwrite --kubeconfig=./cluster/config
 kubectl create secret tls kube-system -n kube-system --key ./etc/ssl/privkey.pem --cert ./etc/ssl/fullchain.pem --kubeconfig=./cluster/config
 
-./bin/kubeconfig-merge.sh ${MASTERKUBE} cluster/config
+kubeconfig-merge.sh ${MASTERKUBE} cluster/config
 
-echo "Write vmware cloud autoscaler provider config"
+echo "Write vsphere autoscaler provider config"
 
 echo $(eval "cat <<EOF
 $(<./templates/cluster/grpc-config.json)
@@ -376,7 +437,7 @@ cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
 {
     "network": "${TRANSPORT}",
     "listen": "${LISTEN}",
-    "secret": "vmware",
+    "secret": "${SCHEME}",
     "minNode": ${MINNODES},
     "maxNode": ${MAXNODES},
     "nodePrice": 0.0,
@@ -412,49 +473,6 @@ cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
         "ssh-private-key": "${SSH_PRIVATE_KEY}"
     },
     "vmware": {
-        "default": {
-            "url": "${GOVC_URL}",
-            "uid": "${GOVC_USERNAME}",
-            "password": "${GOVC_PASSWORD}",
-            "insecure": ${INSECURE},
-            "dc" : "${GOVC_DATACENTER}",
-            "datastore": "${GOVC_DATASTORE}",
-            "resource-pool": "${GOVC_RESOURCE_POOL}",
-            "vmFolder": "${GOVC_FOLDER}",
-            "timeout": 300,
-            "template-name": "${TARGET_IMAGE}",
-            "template": false,
-            "linked": false,
-            "customization": "${GOVC_CUSTOMIZATION}",
-            "network": {
-                "dns": {
-                    "search": [
-                        "afp.com"
-                    ],
-                    "nameserver": [
-                        "10.65.4.1"
-                    ]
-                },
-                "interfaces": [
-                    {
-                        "exists": true,
-                        "network": "AFP-MAINT-LYO",
-                        "adapter": "vmxnet3",
-                        "nic": "eth0",
-                        "dhcp": true
-                    },
-                    {
-                        "exists": true,
-                        "network": "AFP-PROD-LYO",
-                        "adapter": "vmxnet3",
-                        "nic": "eth1",
-                        "dhcp": false,
-                        "address": "10.65.4.200",
-                        "netmask": "255.255.255.0"
-                    }
-                ]
-            }
-        },
         "${NODEGROUP_NAME}": {
             "url": "${GOVC_URL}",
             "uid": "${GOVC_USERNAME}",
@@ -472,16 +490,16 @@ cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
             "network": {
                 "dns": {
                     "search": [
-                        "afp.com"
+                        "${NET_DOMAIN}"
                     ],
                     "nameserver": [
-                        "10.65.4.1"
+                        "${NET_DNS}"
                     ]
                 },
                 "interfaces": [
                     {
                         "exists": true,
-                        "network": "AFP-MAINT-LYO",
+                        "network": "${VC_NETWORK_PRIVATE}",
                         "adapter": "vmxnet3",
                         "mac-address": "generate",
                         "nic": "eth0",
@@ -489,12 +507,12 @@ cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
                     },
                     {
                         "exists": true,
-                        "network": "AFP-PROD-LYO",
+                        "network": "${VC_NETWORK_PUBLIC}",
                         "adapter": "vmxnet3",
                         "mac-address": "generate",
                         "nic": "eth1",
                         "dhcp": false,
-                        "address": "10.65.4.200",
+                        "address": "${NET_IP}",
                         "netmask": "255.255.255.0"
                     }
                 ]
@@ -504,6 +522,7 @@ cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
 }
 EOF
 
+# Update /etc/hosts
 if [ "${OSDISTRO}" == "Linux" ]; then
 	sudo sed -i '/masterkube/d' /etc/hosts
 else
@@ -512,11 +531,12 @@ fi
 
 sudo bash -c "echo '${IPADDR} ${MASTERKUBE}.${DOMAIN_NAME} masterkube.${DOMAIN_NAME} masterkube-dashboard.${DOMAIN_NAME}' >> /etc/hosts"
 
-scp -r ../masterkube ${USER}@${IPADDR}:~
+#scp -r ../masterkube ${USER}@${IPADDR}:~
 
-./bin/create-ingress-controller.sh
-./bin/create-dashboard.sh
-./bin/create-autoscaler.sh
-./bin/create-helloworld.sh
+# Create Pods
+create-ingress-controller.sh
+create-dashboard.sh
+create-autoscaler.sh
+create-helloworld.sh
 
 popd
