@@ -297,6 +297,27 @@ func (vm *VirtualMachine) PowerOn(ctx *Context) error {
 	return err
 }
 
+// PowerOff power off a virtual machine
+func (vm *VirtualMachine) PowerOff(ctx *Context) error {
+	var powerState types.VirtualMachinePowerState
+	var err error
+	var task *object.Task
+
+	v := vm.VirtualMachine(ctx)
+
+	if powerState, err = v.PowerState(ctx); err == nil {
+		if powerState == types.VirtualMachinePowerStatePoweredOn {
+			if task, err = v.PowerOff(ctx); err == nil {
+				err = task.Wait(ctx)
+			}
+		} else {
+			err = fmt.Errorf("The VM: %s is already off", v.InventoryPath)
+		}
+	}
+
+	return err
+}
+
 // ShutdownGuest power off a virtual machine
 func (vm *VirtualMachine) ShutdownGuest(ctx *Context) error {
 	var powerState types.VirtualMachinePowerState

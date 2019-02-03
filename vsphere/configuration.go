@@ -270,6 +270,17 @@ func (conf *Configuration) PowerOffWithContext(ctx *Context, name string) error 
 		return err
 	}
 
+	return vm.PowerOff(ctx)
+}
+
+// ShutdownGuestWithContext power off a VM by name
+func (conf *Configuration) ShutdownGuestWithContext(ctx *Context, name string) error {
+	vm, err := conf.VirtualMachineWithContext(ctx, name)
+
+	if err != nil {
+		return err
+	}
+
 	return vm.ShutdownGuest(ctx)
 }
 
@@ -279,6 +290,14 @@ func (conf *Configuration) PowerOff(name string) error {
 	defer ctx.Cancel()
 
 	return conf.PowerOffWithContext(ctx, name)
+}
+
+// ShutdownGuest power off a VM by name
+func (conf *Configuration) ShutdownGuest(name string) error {
+	ctx := NewContext(conf.Timeout)
+	defer ctx.Cancel()
+
+	return conf.ShutdownGuestWithContext(ctx, name)
 }
 
 // StatusWithContext return the current status of VM by name

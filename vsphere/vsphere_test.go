@@ -187,6 +187,16 @@ func Test_powerOffVM(t *testing.T) {
 	}
 }
 
+func Test_shutdonwGuest(t *testing.T) {
+	config := loadFromJson(confName)
+
+	err := config.ShutdownGuest(config.New.Name)
+
+	if assert.NoError(t, err, "Can't power off VM") {
+		t.Logf("VM shutdown")
+	}
+}
+
 func Test_deleteVM(t *testing.T) {
 	config := loadFromJson(confName)
 
