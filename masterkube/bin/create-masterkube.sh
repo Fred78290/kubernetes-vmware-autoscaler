@@ -277,7 +277,7 @@ EOF
 
 pushd ${CURDIR}/../
 
-[ -d config ] || mkdir -p configSSH_KEY
+[ -d config ] || mkdir -p config
 [ -d cluster ] || mkdir -p cluster
 
 export PATH=./bin:$PATH
