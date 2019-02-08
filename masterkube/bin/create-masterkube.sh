@@ -221,11 +221,6 @@ fi
 
 echo "Transport set to:${TRANSPORT}, listen endpoint at ${LISTEN}"
 
-MOUNTPOINTS=$(cat <<EOF
-    "${PWD}/config": "/etc/cluster-autoscaler"
-EOF
-)
-
 # Cloud init fragment
 PACKAGE_UPGRADE="true"
 
