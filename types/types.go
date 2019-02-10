@@ -67,7 +67,7 @@ type AutoScalerServerConfig struct {
 	MaxNode            int                               `json:"maxNode"`                       // Mandatory, Max AutoScaler VM
 	NodePrice          float64                           `json:"nodePrice"`                     // Optional, The VM price
 	PodPrice           float64                           `json:"podPrice"`                      // Optional, The pod price
-	KubeCtlConfig      string                            `default:"/etc/kubernetes/config" json:"kubeconfig"`
+	KubeConfig         string                            `json:"-"`
 	KubeAdm            KubeJoinConfig                    `json:"kubeadm"`
 	DefaultMachineType string                            `default:"{\"standard\": {}}" json:"default-machine"`
 	Machines           map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
