@@ -61,140 +61,140 @@ eval set -- "$TEMP"
 
 # extract options and their arguments into variables.
 while true; do
-	case "$1" in
-	--node-group)
-		NODEGROUP_NAME="$2"
+    case "$1" in
+    --node-group)
+        NODEGROUP_NAME="$2"
         MASTERKUBE="${NODEGROUP_NAME}-masterkube"
         PROVIDERID="${SCHEME}://${NODEGROUP_NAME}/object?type=node&name=${MASTERKUBE}"
-		shift 2
-		;;
+        shift 2
+        ;;
 
-	--target-image)
-		ROOT_IMG_NAME="$2"
+    --target-image)
+        ROOT_IMG_NAME="$2"
         TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_VERSION}"
-		shift 2
-		;;
+        shift 2
+        ;;
 
-	--seed-image)
-		SEED_IMAGE="$2"
-		shift 2
-		;;
+    --seed-image)
+        SEED_IMAGE="$2"
+        shift 2
+        ;;
 
-	--seed-user)
-		SEED_USER="$2"
-		shift 2
-		;;
+    --seed-user)
+        SEED_USER="$2"
+        shift 2
+        ;;
 
-	--vm-private-network)
-		VC_NETWORK_PRIVATE="$2"
-		shift 2
-		;;
+    --vm-private-network)
+        VC_NETWORK_PRIVATE="$2"
+        shift 2
+        ;;
 
-	--vm-public-network)
-		VC_NETWORK_PUBLIC="$2"
-		shift 2
-		;;
+    --vm-public-network)
+        VC_NETWORK_PUBLIC="$2"
+        shift 2
+        ;;
 
-	--net-address)
-		NET_IP="$2"
-		shift 2
-		;;
+    --net-address)
+        NET_IP="$2"
+        shift 2
+        ;;
 
-	--net-gateway)
-		NET_GATEWAY="$2"
-		shift 2
-		;;
+    --net-gateway)
+        NET_GATEWAY="$2"
+        shift 2
+        ;;
 
-	--net-dns)
-		NET_DNS="$2"
-		shift 2
-		;;
+    --net-dns)
+        NET_DNS="$2"
+        shift 2
+        ;;
 
-	--net-domain)
-		NET_DOMAIN="$2"
-		shift 2
-		;;
+    --net-domain)
+        NET_DOMAIN="$2"
+        shift 2
+        ;;
 
-	-d | --default-machine)
-		DEFAULT_MACHINE="$2"
-		shift 2
-		;;
-	-s | --ssh-private-key)
+    -d | --default-machine)
+        DEFAULT_MACHINE="$2"
+        shift 2
+        ;;
+    -s | --ssh-private-key)
         SSH_PRIVATE_KEY=$2
-		shift 2
-		;;
-	-n | --cni-version)
-		CNI_VERSION="$2"
-		shift 2
-		;;
-	-p | --password)
-		KUBERNETES_PASSWORD="$2"
-		shift 2
-		;;
-	-t | --transport)
-		TRANSPORT="$2"
-		shift 2
-		;;
-	-k | --kubernetes-version)
-		KUBERNETES_VERSION="$2"
+        shift 2
+        ;;
+    -n | --cni-version)
+        CNI_VERSION="$2"
+        shift 2
+        ;;
+    -p | --password)
+        KUBERNETES_PASSWORD="$2"
+        shift 2
+        ;;
+    -t | --transport)
+        TRANSPORT="$2"
+        shift 2
+        ;;
+    -k | --kubernetes-version)
+        KUBERNETES_VERSION="$2"
         TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_VERSION}"
-		shift 2
-		;;
+        shift 2
+        ;;
 
-    # Same argument as cluster-autoscaler
-	--max-nodes-total)
-		MAXTOTALNODES="$2"
-		shift 2
-		;;
-	--cores-total)
-		CORESTOTAL="$2"
-		shift 2
-		;;
-	--memory-total)
-		MEMORYTOTAL="$2"
-		shift 2
-		;;
-	--max-autoprovisioned-node-group-count)
-		MAXAUTOPROVISIONNEDNODEGROUPCOUNT="$2"
-		shift 2
-		;;
-	--scale-down-enabled)
-		SCALEDOWNENABLED="$2"
-		shift 2
-		;;
-	--scale-down-delay-after-add)
-		SCALEDOWNDELAYAFTERADD="$2"
-		shift 2
-		;;
-	--scale-down-delay-after-delete)
-		SCALEDOWNDELAYAFTERDELETE="$2"
-		shift 2
-		;;
-	--scale-down-delay-after-failure)
-		SCALEDOWNDELAYAFTERFAILURE="$2"
-		shift 2
-		;;
-	--scale-down-unneeded-time)
-		SCALEDOWNUNEEDEDTIME="$2"
-		shift 2
-		;;
-	--scale-down-unready-time)
-		SCALEDOWNUNREADYTIME="$2"
-		shift 2
-		;;
-	--unremovable-node-recheck-timeout)
-		UNREMOVABLENODERECHECKTIMEOUT="$2"
-		shift 2
-		;;
-	--)
-		shift
-		break
-		;;
-	*)
-		echo "$1 - Internal error!"
-		exit 1
-		;;
-	esac
+        # Same argument as cluster-autoscaler
+    --max-nodes-total)
+        MAXTOTALNODES="$2"
+        shift 2
+        ;;
+    --cores-total)
+        CORESTOTAL="$2"
+        shift 2
+        ;;
+    --memory-total)
+        MEMORYTOTAL="$2"
+        shift 2
+        ;;
+    --max-autoprovisioned-node-group-count)
+        MAXAUTOPROVISIONNEDNODEGROUPCOUNT="$2"
+        shift 2
+        ;;
+    --scale-down-enabled)
+        SCALEDOWNENABLED="$2"
+        shift 2
+        ;;
+    --scale-down-delay-after-add)
+        SCALEDOWNDELAYAFTERADD="$2"
+        shift 2
+        ;;
+    --scale-down-delay-after-delete)
+        SCALEDOWNDELAYAFTERDELETE="$2"
+        shift 2
+        ;;
+    --scale-down-delay-after-failure)
+        SCALEDOWNDELAYAFTERFAILURE="$2"
+        shift 2
+        ;;
+    --scale-down-unneeded-time)
+        SCALEDOWNUNEEDEDTIME="$2"
+        shift 2
+        ;;
+    --scale-down-unready-time)
+        SCALEDOWNUNREADYTIME="$2"
+        shift 2
+        ;;
+    --unremovable-node-recheck-timeout)
+        UNREMOVABLENODERECHECKTIMEOUT="$2"
+        shift 2
+        ;;
+    --)
+        shift
+        break
+        ;;
+    *)
+        echo "$1 - Internal error!"
+        exit 1
+        ;;
+    esac
 done
 
 export SSH_KEY=$(cat "${SSH_PRIVATE_KEY}.pub")
@@ -226,7 +226,7 @@ PACKAGE_UPGRADE="true"
 
 # Cloud init fragment
 KUBERNETES_USER=$(
-	cat <<EOF
+    cat <<EOF
 [
     {
         "name": "kubernetes",
@@ -249,7 +249,7 @@ EOF
 
 # Sample machine definition
 MACHINE_DEFS=$(
-	cat <<EOF
+    cat <<EOF
 {
     "tiny": {
         "memsize": 4096,
@@ -284,11 +284,11 @@ export PATH=./bin:$PATH
 
 # If CERT doesn't exist, create one autosigned
 if [ ! -f ./etc/ssl/privkey.pem ]; then
-	mkdir -p ./etc/ssl/
-	openssl genrsa 2048 >./etc/ssl/privkey.pem
-	openssl req -new -x509 -nodes -sha1 -days 3650 -key ./etc/ssl/privkey.pem >./etc/ssl/cert.pem
-	cat ./etc/ssl/cert.pem ./etc/ssl/privkey.pem >./etc/ssl/fullchain.pem
-	chmod 644 ./etc/ssl/*
+    mkdir -p ./etc/ssl/
+    openssl genrsa 2048 >./etc/ssl/privkey.pem
+    openssl req -new -x509 -nodes -sha1 -days 3650 -key ./etc/ssl/privkey.pem >./etc/ssl/cert.pem
+    cat ./etc/ssl/cert.pem ./etc/ssl/privkey.pem >./etc/ssl/fullchain.pem
+    chmod 644 ./etc/ssl/*
 fi
 
 # Extract the domain name from CERT
@@ -296,7 +296,7 @@ export DOMAIN_NAME=$(openssl x509 -noout -fingerprint -text <./etc/ssl/cert.pem 
 
 # If the VM template doesn't exists, build it from scrash
 if [ -z "$(govc vm.info ${TARGET_IMAGE} 2>&1)" ]; then
-    echo "Create vmware preconfigured image"
+    echo "Create vmware preconfigured image ${TARGET_IMAGE}"
 
     create-image.sh --password=${KUBERNETES_PASSWORD} \
         --cni-version=${CNI_VERSION} \
@@ -311,7 +311,7 @@ delete-masterkube.sh
 
 echo "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 
-cat > ./config/network.yaml <<EOF
+cat >./config/network.yaml <<EOF
 network:
   version: 2
   ethernets:
@@ -323,10 +323,10 @@ network:
       - $NET_IP/24
 EOF
 
-echo "${KUBERNETES_PASSWORD}" > ./config/kubernetes-password.txt
+echo "${KUBERNETES_PASSWORD}" >./config/kubernetes-password.txt
 
 # Cloud init vendor-data
-cat > ./config/vendordata.yaml <<EOF
+cat >./config/vendordata.yaml <<EOF
 #cloud-config
 package_update: true
 package_upgrade: true
@@ -341,7 +341,7 @@ system_info:
 EOF
 
 # Cloud init meta-data
-cat > ./config/metadata.json <<EOF
+cat >./config/metadata.json <<EOF
 {
     "network": "$(cat ./config/network.yaml | gzip -c9 | $BASE64)",
     "network.encoding": "gzip+base64",
@@ -351,8 +351,8 @@ cat > ./config/metadata.json <<EOF
 EOF
 
 # Cloud init user-data
-echo "#cloud-config" > ./config/userdata.yaml
-cat <<EOF | tee ./config/userdata.json | python2 -c "import json,sys,yaml; print yaml.safe_dump(json.load(sys.stdin), width=500, indent=4, default_flow_style=False)" >> ./config/userdata.yaml
+echo "#cloud-config" >./config/userdata.yaml
+cat <<EOF | python2 -c "import json,sys,yaml; print yaml.safe_dump(json.load(sys.stdin), width=500, indent=4, default_flow_style=False)" >>./config/userdata.yaml
 {
     "runcmd": [
         "echo 'Create ${MASTERKUBE}' > /var/log/masterkube.log"
@@ -360,9 +360,9 @@ cat <<EOF | tee ./config/userdata.json | python2 -c "import json,sys,yaml; print
 }
 EOF
 
-gzip -c9 <./config/metadata.json | $BASE64 | tee > config/metadata.base64
-gzip -c9 <./config/userdata.yaml | $BASE64 | tee > config/userdata.base64
-gzip -c9 <./config/vendordata.yaml | $BASE64 | tee > config/vendordata.base64
+gzip -c9 <./config/metadata.json | $BASE64 | tee >config/metadata.base64
+gzip -c9 <./config/userdata.yaml | $BASE64 | tee >config/userdata.base64
+gzip -c9 <./config/vendordata.yaml | $BASE64 | tee >config/vendordata.base64
 
 echo "Clone ${TARGET_IMAGE} to ${MASTERKUBE}"
 
@@ -372,7 +372,7 @@ echo "MASTERKUBE=${MASTERKUBE}"
 # Due to my vsphere center the folder name refer more path, so I need to precise the path instead
 FOLDER_OPTIONS=
 if [ "${GOVC_FOLDER}" ]; then
-    if [ ! $(govc folder.info ${GOVC_FOLDER}|grep Path|wc -l) -eq 1 ]; then
+    if [ ! $(govc folder.info ${GOVC_FOLDER} | grep Path | wc -l) -eq 1 ]; then
         FOLDER_OPTIONS="-folder=/${GOVC_DATACENTER}/vm/${GOVC_FOLDER}"
     fi
 fi
@@ -389,7 +389,7 @@ govc vm.change -vm "${MASTERKUBE}" \
     -e guestinfo.userdata="$(cat config/userdata.base64)" \
     -e guestinfo.userdata.encoding="gzip+base64" \
     -e guestinfo.vendordata="$(cat config/vendordata.base64)" \
-    -e guestinfo.vendordata.encoding="gzip+base64" \
+    -e guestinfo.vendordata.encoding="gzip+base64"
 
 echo "Power On ${MASTERKUBE}"
 govc vm.power -on "${MASTERKUBE}"
@@ -401,8 +401,8 @@ echo "Prepare ${MASTERKUBE} instance"
 scp -r bin $USER@${IPADDR}:~
 
 echo "Start kubernetes ${MASTERKUBE} instance master node, kubernetes version=${KUBERNETES_VERSION}, providerID=${PROVIDERID}"
-ssh $USER@${IPADDR} sudo mv /home/ubuntu/bin/* /usr/local/bin 
-ssh $USER@${IPADDR} sudo create-cluster.sh flannel eth1 "${KUBERNETES_VERSION}" "\"${PROVIDERID}\"" 
+ssh $USER@${IPADDR} sudo mv /home/ubuntu/bin/* /usr/local/bin
+ssh $USER@${IPADDR} sudo create-cluster.sh flannel eth1 "${KUBERNETES_VERSION}" "\"${PROVIDERID}\""
 
 scp $USER@${IPADDR}:/etc/cluster/* ./cluster
 
@@ -428,7 +428,7 @@ else
     INSECURE=false
 fi
 
-cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
+cat <<EOF | jq . >config/kubernetes-vmware-autoscaler.json
 {
     "network": "${TRANSPORT}",
     "listen": "${LISTEN}",
@@ -516,21 +516,26 @@ cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
 }
 EOF
 
+# Recopy config file on master node
+scp ./config/grpc-config.json $USER@${IPADDR}:/etc/cluster/
+scp ./config/kubernetes-vmware-autoscaler.json $USER@${IPADDR}:/etc/cluster/
+
 # Update /etc/hosts
 if [ "${OSDISTRO}" == "Linux" ]; then
-	sudo sed -i '/masterkube/d' /etc/hosts
+    sudo sed -i '/masterkube/d' /etc/hosts
 else
-	sudo sed -i '' '/masterkube/d' /etc/hosts
+    sudo sed -i'' '/masterkube/d' /etc/hosts
 fi
 
 sudo bash -c "echo '${IPADDR} ${MASTERKUBE}.${DOMAIN_NAME} masterkube.${DOMAIN_NAME} masterkube-dashboard.${DOMAIN_NAME}' >> /etc/hosts"
 
-#scp -r ../masterkube ${USER}@${IPADDR}:~
-
 # Create Pods
 create-ingress-controller.sh
 create-dashboard.sh
-create-autoscaler.sh
 create-helloworld.sh
+
+if [ "$LAUNCH_CA" == "YES" ]; then
+    create-autoscaler.sh
+fi
 
 popd

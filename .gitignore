@@ -28,3 +28,5 @@ masterkube/guestinfos/*\.json
 masterkube/guestinfos/*\.yaml
 
 launch\.sh
+
+kubernetes-vmware-autoscaler
