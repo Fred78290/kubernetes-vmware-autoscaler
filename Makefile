@@ -1,7 +1,7 @@
 all: build
 VERSION_MAJOR ?= 0
 VERSION_MINOR ?= 1
-VERSION_BUILD ?= 0
+VERSION_BUILD ?= 1
 VERSION ?= v$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_BUILD)
 DEB_VERSION ?= $(VERSION_MAJOR).$(VERSION_MINOR)-$(VERSION_BUILD)
 TAG?=v$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_BUILD)
@@ -25,7 +25,8 @@ else
 endif
 
 deps:
-	go get github.com/tools/godep
+	wget "https://raw.githubusercontent.com/Fred78290/autoscaler/master/cluster-autoscaler/cloudprovider/grpc/grpc.proto" -O grpc/grpc.proto
+	protoc -I . -I vendor grpc/grpc.proto --go_out=plugins=grpc:.
 
 build:
 	$(ENVVAR) GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-X main.phVersion=$(VERSION) -X main.phBuildDate=$(BUILD_DATE)" -a -o out/vsphere-autoscaler-$(GOOS)-$(GOARCH) ${TAGS_FLAG}
@@ -62,7 +63,7 @@ build-in-docker: docker-builder
 release: build-in-docker execute-release
 	@echo "Full in-docker release ${TAG}${FOR_PROVIDER} completed"
 
-container: clean build-in-docker make-image
+container: clean deps build-in-docker make-image
 	@echo "Created in-docker image ${TAG}${FOR_PROVIDER}"
 
 test-in-docker: clean docker-builder
