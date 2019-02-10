@@ -14,6 +14,7 @@ import (
 	"github.com/vmware/govmomi/vim25"
 	yaml "gopkg.in/yaml.v2"
 
+	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
@@ -257,6 +258,34 @@ func (vm *VirtualMachine) Configure(ctx *Context, userName, authKey string, clou
 	return err
 }
 
+func (vm VirtualMachine) isToolsRunning(ctx *Context, v *object.VirtualMachine) (bool, error) {
+	var o mo.VirtualMachine
+
+	err := v.Properties(ctx, v.Reference(), []string{"guest.toolsStatus"}, &o)
+	if err != nil {
+		return false, err
+	}
+
+	return o.Guest.ToolsRunningStatus == string(types.VirtualMachineToolsRunningStatusGuestToolsRunning), nil
+}
+
+// IsToolsRunning returns true if VMware Tools is currently running in the guest OS, and false otherwise.
+func (vm VirtualMachine) IsToolsRunning(ctx *Context) (bool, error) {
+	v := vm.VirtualMachine(ctx)
+
+	return vm.isToolsRunning(ctx, v)
+}
+
+func (vm *VirtualMachine) waitForIP(ctx *Context, v *object.VirtualMachine) (string, error) {
+	if running, err := vm.isToolsRunning(ctx, v); running {
+		return v.WaitForIP(ctx)
+	} else if err != nil {
+		return "", err
+	}
+
+	return "", nil
+}
+
 // WaitForIP wait ip
 func (vm *VirtualMachine) WaitForIP(ctx *Context) (string, error) {
 	var powerState types.VirtualMachinePowerState
@@ -267,7 +296,7 @@ func (vm *VirtualMachine) WaitForIP(ctx *Context) (string, error) {
 
 	if powerState, err = v.PowerState(ctx); err == nil {
 		if powerState == types.VirtualMachinePowerStatePoweredOn {
-			ip, err = v.WaitForIP(ctx)
+			ip, err = vm.waitForIP(ctx, v)
 		} else {
 			err = fmt.Errorf("The VM: %s is not powered", v.InventoryPath)
 		}
@@ -374,7 +403,7 @@ func (vm *VirtualMachine) Status(ctx *Context) (*Status, error) {
 		address := ""
 
 		if powerState == types.VirtualMachinePowerStatePoweredOn {
-			address, err = v.WaitForIP(ctx)
+			address, err = vm.waitForIP(ctx, v)
 		}
 
 		status = &Status{
