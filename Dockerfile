@@ -17,9 +17,15 @@ FROM $BASEIMAGE
 LABEL maintainer="Frederic Boltz <frederic.boltz@gmail.com>"
 
 ENV DEBIAN_FRONTEND noninteractive
-RUN clean-install ca-certificates tzdata
+RUN clean-install ca-certificates tzdata; \
+    apt-get update; apt-get install curl -y; \
+    cd /usr/local/bin; \
+    KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt); \
+    curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kubectl; chmod +x kubectl
 
 ADD out/vsphere-autoscaler-linux-amd64 vsphere-autoscaler
 ADD run.sh run.sh
+
+EXPOSE 5200
 
 CMD ./run.sh

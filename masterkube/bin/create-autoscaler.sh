@@ -1,4 +1,6 @@
 #/bin/bash
+LOCAL=$1
+
 CURDIR=$(dirname $0)
 
 [ $(uname -s) == "Darwin" ] && GOOS=darwin || GOOS=linux
@@ -24,14 +26,19 @@ EOF") | jq . > $ETC_DIR/$1.json
 kubectl apply -f $ETC_DIR/$1.json --kubeconfig=./cluster/config
 }
 
-nohup ../out/vsphere-autoscaler-$GOOS-amd64 \
-    --config=$PWD/config/kubernetes-vmware-autoscaler.json \
-    --save=$PWD/config/vmware-autoscaler-state.json \
-    -v=1 \
-    -logtostderr=true  1>>config/vmware-autoscaler.log 2>&1 &
-pid="$!"
+if [ "$LOCAL" == "LOCAL" ]; then
+    nohup ../out/vsphere-autoscaler-$GOOS-amd64 \
+        --kubeconfig=$KUBECONFIG \
+        --config=$PWD/config/kubernetes-vmware-autoscaler.json \
+        --save=$PWD/config/vmware-autoscaler-state.json \
+        -v=1 \
+        -logtostderr=true  1>>config/vmware-autoscaler.log 2>&1 &
+    pid="$!"
 
-echo -n "$pid" > config/vmware-autoscaler.pid
+    echo -n "$pid" > config/vmware-autoscaler.pid
+else
+    deploy vsphere
+fi
 
 deploy service-account
 deploy cluster-role
