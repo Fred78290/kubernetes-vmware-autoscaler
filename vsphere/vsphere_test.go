@@ -31,7 +31,7 @@ type NewVirtualMachineConf struct {
 }
 
 var testConfig *ConfigurationTest
-var confName = "agora.json"
+var confName = "test.json"
 
 func saveToJson(fileName string, config *ConfigurationTest) error {
 	file, err := os.Create(fileName)
@@ -166,13 +166,15 @@ func Test_statusVM(t *testing.T) {
 func Test_powerOnVM(t *testing.T) {
 	config := loadFromJson(confName)
 
-	err := config.PowerOn(config.New.Name)
+	if status, _ := config.Status(config.New.Name); status.Powered == false {
+		err := config.PowerOn(config.New.Name)
 
-	if assert.NoError(t, err, "Can't power on VM") {
-		ipaddr, err := config.WaitForIP(config.New.Name)
+		if assert.NoError(t, err, "Can't power on VM") {
+			ipaddr, err := config.WaitForIP(config.New.Name)
 
-		if assert.NoError(t, err, "Can't get IP") {
-			t.Logf("VM powered with IP:%s", ipaddr)
+			if assert.NoError(t, err, "Can't get IP") {
+				t.Logf("VM powered with IP:%s", ipaddr)
+			}
 		}
 	}
 }
@@ -180,20 +182,24 @@ func Test_powerOnVM(t *testing.T) {
 func Test_powerOffVM(t *testing.T) {
 	config := loadFromJson(confName)
 
-	err := config.PowerOff(config.New.Name)
+	if status, _ := config.Status(config.New.Name); status.Powered {
+		err := config.PowerOff(config.New.Name)
 
-	if assert.NoError(t, err, "Can't power off VM") {
-		t.Logf("VM shutdown")
+		if assert.NoError(t, err, "Can't power off VM") {
+			t.Logf("VM shutdown")
+		}
 	}
 }
 
 func Test_shutdonwGuest(t *testing.T) {
 	config := loadFromJson(confName)
 
-	err := config.ShutdownGuest(config.New.Name)
+	if status, _ := config.Status(config.New.Name); status.Powered {
+		err := config.ShutdownGuest(config.New.Name)
 
-	if assert.NoError(t, err, "Can't power off VM") {
-		t.Logf("VM shutdown")
+		if assert.NoError(t, err, "Can't power off VM") {
+			t.Logf("VM shutdown")
+		}
 	}
 }
 
