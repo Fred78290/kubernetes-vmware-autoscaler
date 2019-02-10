@@ -29,12 +29,14 @@ var phBuildDate = ""
 func main() {
 	versionPtr := flag.Bool("version", false, "Give the version")
 	savePtr := flag.String("save", "", "The file to persists the server")
-	configPtr := flag.String("config", "/etc/default/vmware-cluster-autoscaler.json", "The config for the server")
+	configPtr := flag.String("config", "/etc/cluster/vmware-cluster-autoscaler.json", "The config for the server")
+	kubeConfigPtr := flag.String("kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+
 	flag.Parse()
 
 	if *versionPtr {
 		log.Printf("The current version is:%s, build at:%s", phVersion, phBuildDate)
 	} else {
-		server.StartServer(*savePtr, *configPtr)
+		server.StartServer(*kubeConfigPtr, *savePtr, *configPtr)
 	}
 }
