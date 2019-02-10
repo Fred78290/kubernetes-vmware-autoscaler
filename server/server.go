@@ -9,6 +9,8 @@ import (
 	"os"
 	"time"
 
+	"k8s.io/client-go/util/homedir"
+
 	apigrc "github.com/Fred78290/kubernetes-vmware-autoscaler/grpc"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
@@ -1251,9 +1253,17 @@ func (s *AutoScalerServerApp) Load(fileName string) error {
 }
 
 // StartServer start the service
-func StartServer(saveState string, configFileName string) {
+func StartServer(kubeConfig, saveState, configFileName string) {
 	var config types.AutoScalerServerConfig
 	var autoScalerServer *AutoScalerServerApp
+
+	if len(kubeConfig) == 0 {
+		kubeConfig = fmt.Sprintf("%s/.kube/config", homedir.HomeDir())
+	}
+
+	if _, err := os.Stat(kubeConfig); err != nil {
+		glog.Fatalf(fmt.Sprintf("Can't stat kubeconfig:%s, error:%v", kubeConfig, err))
+	}
 
 	if len(saveState) > 0 {
 		phSavedState = saveState
@@ -1270,6 +1280,8 @@ func StartServer(saveState string, configFileName string) {
 	if err != nil {
 		glog.Fatalf("failed to decode config file:%s, error:%v", configFileName, err)
 	}
+
+	config.KubeConfig = kubeConfig
 
 	if config.Optionals == nil {
 		config.Optionals = &types.AutoScalerServerOptionals{
