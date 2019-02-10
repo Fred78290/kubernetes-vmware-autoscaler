@@ -1,0 +1,84 @@
+{
+    "apiVersion": "extensions/v1beta1",
+    "kind": "Deployment",
+    "metadata": {
+        "name": "vsphere-autoscaler",
+        "namespace": "kube-system",
+        "labels": {
+            "k8s-app": "vsphere-autoscaler"
+        }
+    },
+    "spec": {
+        "replicas": 1,
+        "selector": {
+            "matchLabels": {
+                "k8s-app": "vsphere-autoscaler"
+            }
+        },
+        "template": {
+            "metadata": {
+                "labels": {
+                    "k8s-app": "vsphere-autoscaler"
+                },
+                "annotations": {
+                    "scheduler.alpha.kubernetes.io/critical-pod": ""
+                }
+            },
+            "spec": {
+                "nodeSelector": {
+                    "master": "true"
+                },
+                "containers": [
+                    {
+                        "image": "fred78290/vsphere-autoscaler:v0.1.1",
+                        "name": "vsphere-autoscaler",
+                        "resources": {
+                            "limits": {
+                                "cpu": "100m",
+                                "memory": "300Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "300Mi"
+                            }
+                        },
+                        "command": [
+                            "./vsphere-autoscaler",
+                            "--kubeconfig=/etc/kubernetes/config",
+                            "--config=/etc/cluster/kubernetes-vmware-autoscaler.json",
+                            "--save=/etc/cluster/vmware-autoscaler-state.json",
+                            "-v=1",
+                            "-logtostderr=true"
+                        ],
+                        "imagePullPolicy": "Always",
+                        "volumeMounts": [
+                            {
+                                "name": "kubernetes",
+                                "mountPath": "/etc/kubernetes/config",
+                                "readOnly": true
+                            },
+                            {
+                                "name": "vsphere-autoscaler",
+                                "mountPath": "/etc/cluster"
+                            }
+                        ]
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "vsphere-autoscaler",
+                        "hostPath": {
+                            "path": "/etc/cluster"
+                        }
+                    },
+                    {
+                        "name": "kubernetes",
+                        "hostPath": {
+                            "path": "/etc/kubernetes/admin.conf"
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}
