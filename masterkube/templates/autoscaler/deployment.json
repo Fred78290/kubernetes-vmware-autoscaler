@@ -73,7 +73,12 @@
                             },
                             {
                                 "name": "cluster-autoscaler",
-                                "mountPath": "/etc/cluster-autoscaler",
+                                "mountPath": "/etc/cluster",
+                                "readOnly": true
+                            },
+                            {
+                                "name": "kubernetes",
+                                "mountPath": "/etc/kubernetes/config",
                                 "readOnly": true
                             }
                         ]
@@ -83,7 +88,13 @@
                     {
                         "name": "cluster-autoscaler",
                         "hostPath": {
-                            "path": "/etc/cluster-autoscaler"
+                            "path": "/etc/cluster"
+                        }
+                    },
+                    {
+                        "name": "kubernetes",
+                        "hostPath": {
+                            "path": "/etc/kubernetes/admin.conf"
                         }
                     },
                     {
