@@ -99,7 +99,7 @@ func (vm *AutoScalerServerNode) prepareKubelet() (string, error) {
 func (vm *AutoScalerServerNode) waitReady() error {
 	glog.V(5).Infof("AutoScalerNode::waitReady, node:%s", vm.NodeName)
 
-	kubeconfig := vm.serverConfig.KubeCtlConfig
+	kubeconfig := vm.serverConfig.KubeConfig
 
 	// Max 60s
 	for index := 0; index < 12; index++ {
@@ -190,7 +190,7 @@ func (vm *AutoScalerServerNode) setNodeLabels(nodeLabels, systemLabels Kubernete
 		}
 
 		args = append(args, "--kubeconfig")
-		args = append(args, vm.serverConfig.KubeCtlConfig)
+		args = append(args, vm.serverConfig.KubeConfig)
 
 		if out, err := utils.Pipe(args...); err != nil {
 			return fmt.Errorf(constantes.ErrKubeCtlReturnError, vm.NodeName, out, err)
@@ -207,7 +207,7 @@ func (vm *AutoScalerServerNode) setNodeLabels(nodeLabels, systemLabels Kubernete
 		fmt.Sprintf("%s=%d", constantes.AnnotationNodeIndex, vm.NodeIndex),
 		"--overwrite",
 		"--kubeconfig",
-		vm.serverConfig.KubeCtlConfig,
+		vm.serverConfig.KubeConfig,
 	}
 
 	if out, err := utils.Pipe(args...); err != nil {
@@ -353,7 +353,7 @@ func (vm *AutoScalerServerNode) startVM() error {
 
 	glog.Infof("Start VM:%s", vm.NodeName)
 
-	kubeconfig := vm.serverConfig.KubeCtlConfig
+	kubeconfig := vm.serverConfig.KubeConfig
 	vsphere := vm.VSphereConfig
 
 	if vm.AutoProvisionned == false {
@@ -420,7 +420,7 @@ func (vm *AutoScalerServerNode) stopVM() error {
 
 	glog.Infof("Stop VM:%s", vm.NodeName)
 
-	kubeconfig := vm.serverConfig.KubeCtlConfig
+	kubeconfig := vm.serverConfig.KubeConfig
 	vsphere := vm.VSphereConfig
 
 	if vm.AutoProvisionned == false {
@@ -475,7 +475,7 @@ func (vm *AutoScalerServerNode) deleteVM() error {
 	if vm.AutoProvisionned == false {
 		err = fmt.Errorf(constantes.ErrVMNotProvisionnedByMe, vm.NodeName)
 	} else {
-		kubeconfig := vm.serverConfig.KubeCtlConfig
+		kubeconfig := vm.serverConfig.KubeConfig
 		vsphere := vm.VSphereConfig
 
 		if status, err = vsphere.Status(vm.NodeName); err == nil {

@@ -438,7 +438,6 @@ cat <<EOF | jq . > config/kubernetes-vmware-autoscaler.json
     "nodePrice": 0.0,
     "podPrice": 0.0,
     "image": "${TARGET_IMAGE}",
-    "kubeconfig": "${KUBECONFIG}",
     "optionals": {
         "pricing": false,
         "getAvailableMachineTypes": false,

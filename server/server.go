@@ -152,7 +152,7 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 				if ng, err = s.newNodeGroup(nodeGroupIdentifier, node.MinSize, node.MaxSize, s.Configuration.DefaultMachineType, labels, systemLabels, true); err == nil {
 					if ng, err = s.createNodeGroup(nodeGroupIdentifier); err == nil {
 						if node.GetIncludeExistingNode() {
-							if err = ng.autoDiscoveryNodes(true, s.Configuration.KubeCtlConfig); err == nil {
+							if err = ng.autoDiscoveryNodes(true, s.Configuration.KubeConfig); err == nil {
 								return err
 							}
 						}
@@ -165,7 +165,7 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 			} else {
 				// If the nodegroup already exists, reparse nodes
 				if node.GetIncludeExistingNode() {
-					if err = ng.autoDiscoveryNodes(true, s.Configuration.KubeCtlConfig); err == nil {
+					if err = ng.autoDiscoveryNodes(true, s.Configuration.KubeConfig); err == nil {
 						return err
 					}
 				}
