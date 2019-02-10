@@ -75,7 +75,7 @@ fi
 if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
     wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.ova -O bionic-server-cloudimg-amd64.ova
         
-    MAPPED_NETWORK=$(govc import.spec bionic-server-cloudimg-amd64.ova | jq .NetworkMapping[0].Name)
+    MAPPED_NETWORK=$(govc import.spec bionic-server-cloudimg-amd64.ova | jq .NetworkMapping[0].Name | tr -d '"')
 
     if [ "${IMPORTMODE}" == "govc" ]; then        
         govc import.spec bionic-server-cloudimg-amd64.ova \
@@ -89,7 +89,8 @@ if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
                 --arg PASSWORD "${PASSWORD}" \
                 --arg NAME "${SEEDIMAGE}" \
                 --arg INSTANCEID $(uuidgen) \
-                '.Name = $NAME | .PropertyMapping |= [ { Key: "instance-id", Value: $INSTANCEID }, { Key: "hostname", Value: $TARGET_IMAGE }, { Key: "public-keys", Value: $SSH_KEY }, { Key: "user-data", Value: ${USER}DATA }, { Key: "password", Value: $PASSWORD } ]' \
+                --arg TARGET_IMAGE "$TARGET_IMAGE" \
+                '.Name = $NAME | .PropertyMapping |= [ { Key: "instance-id", Value: $INSTANCEID }, { Key: "hostname", Value: $TARGET_IMAGE }, { Key: "public-keys", Value: $SSH_KEY }, { Key: "user-data", Value: $USERDATA }, { Key: "password", Value: $PASSWORD } ]' \
                 > bionic-server-cloudimg-amd64.txt
 
         echo "Import bionic-server-cloudimg-amd64.ova to ${SEEDIMAGE} with govc"
