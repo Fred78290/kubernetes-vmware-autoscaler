@@ -85,11 +85,11 @@ func Shell(args ...string) error {
 // Scp copy file
 func Scp(connect *types.AutoScalerServerSSH, host, src, dst string) error {
 	return Shell("scp",
-		"-i", connect.AuthKeys,
+		"-i", connect.GetAuthKeys(),
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null",
 		src,
-		fmt.Sprintf("%s@%s:%s", connect.UserName, host, dst))
+		fmt.Sprintf("%s@%s:%s", connect.GetUserName(), host, dst))
 }
 
 // Sudo exec ssh command as sudo
@@ -99,7 +99,7 @@ func Sudo(connect *types.AutoScalerServerSSH, host string, command ...string) (s
 
 	if len(connect.Password) > 0 {
 		sshConfig = &ssh.ClientConfig{
-			User:            connect.UserName,
+			User:            connect.GetUserName(),
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 			Auth: []ssh.AuthMethod{
 				ssh.Password(connect.Password),
@@ -107,10 +107,10 @@ func Sudo(connect *types.AutoScalerServerSSH, host string, command ...string) (s
 		}
 	} else {
 		sshConfig = &ssh.ClientConfig{
-			User:            connect.UserName,
+			User:            connect.GetUserName(),
 			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 			Auth: []ssh.AuthMethod{
-				AuthMethodFromPrivateKeyFile(connect.AuthKeys),
+				AuthMethodFromPrivateKeyFile(connect.GetAuthKeys()),
 			},
 		}
 	}

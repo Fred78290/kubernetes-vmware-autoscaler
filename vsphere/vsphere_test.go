@@ -76,7 +76,7 @@ func loadFromJson(fileName string) *ConfigurationTest {
 func Test_AuthMethodKey(t *testing.T) {
 	config := loadFromJson(confName)
 
-	signer := utils.AuthMethodFromPrivateKeyFile(config.SSH.AuthKeys)
+	signer := utils.AuthMethodFromPrivateKeyFile(config.SSH.GetAuthKeys())
 
 	if assert.NotNil(t, signer) {
 
@@ -146,7 +146,7 @@ func Test_listVM(t *testing.T) {
 func Test_createVM(t *testing.T) {
 	config := loadFromJson(confName)
 
-	_, err := config.Create(config.New.Name, config.SSH.UserName, config.SSH.AuthKeys, config.CloudInit, config.New.Network, config.New.Annotation, config.New.Memory, config.New.CPUS, config.New.Disk)
+	_, err := config.Create(config.New.Name, config.SSH.GetUserName(), config.SSH.GetAuthKeys(), config.CloudInit, config.New.Network, config.New.Annotation, config.New.Memory, config.New.CPUS, config.New.Disk)
 
 	if assert.NoError(t, err, "Can't create VM") {
 		t.Logf("VM created")

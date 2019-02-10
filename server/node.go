@@ -296,7 +296,7 @@ func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabe
 
 		err = fmt.Errorf(constantes.ErrVMAlreadyCreated, vm.NodeName)
 
-	} else if _, err = vsphere.Create(vm.NodeName, userInfo.UserName, userInfo.AuthKeys, vm.serverConfig.CloudInit, network, "", vm.Memory, vm.CPU, vm.Disk); err != nil {
+	} else if _, err = vsphere.Create(vm.NodeName, userInfo.GetUserName(), userInfo.GetAuthKeys(), vm.serverConfig.CloudInit, network, "", vm.Memory, vm.CPU, vm.Disk); err != nil {
 
 		err = fmt.Errorf(constantes.ErrUnableToLaunchVM, vm.NodeName, err)
 
