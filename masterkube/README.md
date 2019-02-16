@@ -57,8 +57,8 @@ During the process the script will create many files located in
 | `-p|--password`  |Define the kubernetes user password |randomized|
 | `-v|--kubernetes-version`  |Which version of kubernetes to use |latest|
 | `--max-nodes-total` | Maximum number of nodes in all node groups. Cluster autoscaler will not grow the cluster beyond this number. | 5 |
-| `--cores-total` | Minimum and maximum number of cores in cluster, in the format <min>:<max>. Cluster autoscaler will not scale the cluster beyond these numbers. | 0:16 |
-| `--memory-total` | Minimum and maximum number of gigabytes of memory in cluster, in the format <min>:<max>. Cluster autoscaler will not scale the cluster beyond these numbers. | 0:24 |
+| `--cores-total` | Minimum and maximum number of cores in cluster, in the format < min >:< max >. Cluster autoscaler will not scale the cluster beyond these numbers. | 0:16 |
+| `--memory-total` | Minimum and maximum number of gigabytes of memory in cluster, in the format < min >:< max >. Cluster autoscaler will not scale the cluster beyond these numbers. | 0:24 |
 | `--max-autoprovisioned-node-group-count` | The maximum number of autoprovisioned groups in the cluster | 1 |
 | `--scale-down-enabled` | Should CA scale down the cluster | true |
 | `--scale-down-delay-after-add` | How long after scale up that scale down evaluation resumes | 1 minutes |

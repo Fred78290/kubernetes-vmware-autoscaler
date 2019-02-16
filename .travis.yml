@@ -1,0 +1,18 @@
+language: minimal
+services:
+  - docker
+before_install:
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+install:
+  - make -e REGISTRY=fred78290 -e TAG=$TRAVIS_TAG container
+after_deploy:
+  - docker push fred78290/vsphere-autoscaler:$TRAVIS_TAG
+deploy:
+  provider: releases
+  api_key: $GITHUB_OAUTH_TOKEN
+  on:
+    tags: true
+    repo: Fred78290/kubernetes-vmware-autoscaler
+  file:
+  - out/vsphere-autoscaler-darwin-amd64
+  - out/vsphere-autoscaler-linux-amd64

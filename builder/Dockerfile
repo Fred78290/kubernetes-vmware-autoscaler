@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.11.2
+FROM golang:1.11.5
 LABEL maintainer="Marcin Wielgus <mwielgus@google.com>"
 
 ENV GOPATH /gopath/
@@ -20,6 +20,6 @@ ENV PATH $GOPATH/bin:$PATH
 
 RUN apt-get update && apt-get --yes install libseccomp-dev
 RUN go version
-RUN go get github.com/tools/godep
-RUN godep version
+RUN go get -u github.com/kardianos/govendor
+RUN govendor -version
 CMD ["/bin/bash"]

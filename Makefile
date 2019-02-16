@@ -25,8 +25,9 @@ else
 endif
 
 deps:
-	wget "https://raw.githubusercontent.com/Fred78290/autoscaler/master/cluster-autoscaler/cloudprovider/grpc/grpc.proto" -O grpc/grpc.proto
-	protoc -I . -I vendor grpc/grpc.proto --go_out=plugins=grpc:.
+	govendor fetch +missing
+#	wget "https://raw.githubusercontent.com/Fred78290/autoscaler/master/cluster-autoscaler/cloudprovider/grpc/grpc.proto" -O grpc/grpc.proto
+#	protoc -I . -I vendor grpc/grpc.proto --go_out=plugins=grpc:.
 
 build:
 	$(ENVVAR) GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-X main.phVersion=$(VERSION) -X main.phBuildDate=$(BUILD_DATE)" -a -o out/vsphere-autoscaler-$(GOOS)-$(GOARCH) ${TAGS_FLAG}
@@ -35,7 +36,7 @@ make-image:
 	docker build --pull --build-arg BASEIMAGE=${BASEIMAGE} \
 	    -t ${REGISTRY}/vsphere-autoscaler${PROVIDER}:${TAG} .
 
-build-binary: clean
+build-binary: clean deps
 	make -e GOOS=linux -e GOARCH=amd64 build
 	make -e GOOS=darwin -e GOARCH=amd64 build
 
@@ -53,22 +54,22 @@ format:
     test -z "$$(find . -path ./vendor -prune -type f -o -name '*.go' -exec gofmt -s -w {} + | tee /dev/stderr)"
 
 docker-builder:
-	docker build -t autoscaling-builder ./builder
+	docker build -t kubernetes-vmware-autoscaler-builder ./builder
 
 build-in-docker: docker-builder
-	docker run --rm -v `pwd`:/gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler/ autoscaling-builder:latest bash \
+	docker run --rm -v `pwd`:/gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler/ kubernetes-vmware-autoscaler-builder:latest bash \
 		-c 'cd /gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler \
 		&& BUILD_TAGS=${BUILD_TAGS} make -e BUILD_DATE=`date +%Y-%m-%dT%H:%M:%SZ` build-binary'
 
 release: build-in-docker execute-release
 	@echo "Full in-docker release ${TAG}${FOR_PROVIDER} completed"
 
-container: clean deps build-in-docker make-image
+container: clean build-in-docker make-image
 	@echo "Created in-docker image ${TAG}${FOR_PROVIDER}"
 
 test-in-docker: clean docker-builder
 	docker run -v `pwd`:/gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler/ \
-		autoscaling-builder:latest bash \
+		kubernetes-vmware-autoscaler-builder:latest bash \
 		-c 'cd /gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler \
 		&& godep go test ./... ${TAGS_FLAG}'
 
