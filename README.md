@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/Fred78290/kubernetes-vmware-autoscaler
+.svg?branch=master)](https://travis-ci.org/Fred78290/kubernetes-vmware-autoscaler)
+
 # kubernetes-vmware-autoscaler
 
 Kubernetes autoscaler for vsphere/esxi
