@@ -1,8 +1,9 @@
+.EXPORT_ALL_VARIABLES:
+
 all: build
 VERSION_MAJOR ?= 0
 VERSION_MINOR ?= 1
 VERSION_BUILD ?= 1
-VERSION ?= v$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_BUILD)
 DEB_VERSION ?= $(VERSION_MAJOR).$(VERSION_MINOR)-$(VERSION_BUILD)
 TAG?=v$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_BUILD)
 FLAGS=
@@ -12,7 +13,7 @@ GOARCH?=amd64
 REGISTRY?=fred78290
 BASEIMAGE?=k8s.gcr.io/debian-base-amd64:0.4.0
 BUILD_DATE?=`date +%Y-%m-%dT%H:%M:%SZ`
-VERSION_LDFLAGS=-X main.phVersion=$(VERSION)
+VERSION_LDFLAGS=-X main.phVersion=$(TAGS)
 
 ifdef BUILD_TAGS
   TAGS_FLAG=--tags ${BUILD_TAGS}
@@ -30,15 +31,15 @@ deps:
 #	protoc -I . -I vendor grpc/grpc.proto --go_out=plugins=grpc:.
 
 build:
-	$(ENVVAR) GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-X main.phVersion=$(VERSION) -X main.phBuildDate=$(BUILD_DATE)" -a -o out/vsphere-autoscaler-$(GOOS)-$(GOARCH) ${TAGS_FLAG}
+	$(ENVVAR) GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-X main.phVersion=$(TAG) -X main.phBuildDate=$(BUILD_DATE)" -a -o out/vsphere-autoscaler-$(GOOS)-$(GOARCH) ${TAGS_FLAG}
 
 make-image:
 	docker build --pull --build-arg BASEIMAGE=${BASEIMAGE} \
 	    -t ${REGISTRY}/vsphere-autoscaler${PROVIDER}:${TAG} .
 
 build-binary: clean deps
-	make -e GOOS=linux -e GOARCH=amd64 build
-	make -e GOOS=darwin -e GOARCH=amd64 build
+	$(ENVVAR) make -e BUILD_DATE=${BUILD_DATE} -e REGISTRY=${REGISTRY} -e TAG=${TAG} -e GOOS=linux -e GOARCH=amd64 build
+	$(ENVVAR) make -e BUILD_DATE=${BUILD_DATE} -e REGISTRY=${REGISTRY} -e TAG=${TAG} -e GOOS=darwin -e GOARCH=amd64 build
 
 test-unit: clean deps
 	./scripts/run-tests.sh'
@@ -59,7 +60,7 @@ docker-builder:
 build-in-docker: docker-builder
 	docker run --rm -v `pwd`:/gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler/ kubernetes-vmware-autoscaler-builder:latest bash \
 		-c 'cd /gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler \
-		&& BUILD_TAGS=${BUILD_TAGS} make -e BUILD_DATE=`date +%Y-%m-%dT%H:%M:%SZ` build-binary'
+		&& BUILD_TAGS=${BUILD_TAGS} make -e REGISTRY=${REGISTRY} -e TAG=${TAG} -e BUILD_DATE=`date +%Y-%m-%dT%H:%M:%SZ` build-binary'
 
 release: build-in-docker execute-release
 	@echo "Full in-docker release ${TAG}${FOR_PROVIDER} completed"
