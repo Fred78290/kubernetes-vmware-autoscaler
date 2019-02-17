@@ -40,8 +40,9 @@ build-binary: clean deps
 	make -e GOOS=linux -e GOARCH=amd64 build
 	make -e GOOS=darwin -e GOARCH=amd64 build
 
-test-unit: clean deps build
-	$(ENVVAR) go test --test.short -race ./... $(FLAGS) ${TAGS_FLAG}
+test-unit: clean deps
+	docker run --rm -v `pwd`:/gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler/ kubernetes-vmware-autoscaler-builder:latest bash \
+		-c 'cd /gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler && bash ./scripts/run-tests.sh'
 
 dev-release: build-binary execute-release
 	@echo "Release ${TAG}${FOR_PROVIDER} completed"

@@ -21,5 +21,6 @@ ENV PATH $GOPATH/bin:$PATH
 RUN apt-get update && apt-get --yes install libseccomp-dev
 RUN go version
 RUN go get -u github.com/kardianos/govendor
+RUN go get -u github.com/vmware/govmomi/vcsim
 RUN govendor -version
 CMD ["/bin/bash"]
