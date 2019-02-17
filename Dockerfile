@@ -18,7 +18,7 @@ LABEL maintainer="Frederic Boltz <frederic.boltz@gmail.com>"
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN clean-install ca-certificates tzdata; \
-    apt-get update; 
+    apt-get update; \
     apt-get install curl -y; \
     cd /usr/local/bin; \
     KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt); \
