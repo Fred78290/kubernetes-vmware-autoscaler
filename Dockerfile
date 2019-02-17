@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors. All rights reserved
+# Copyright 2019 Frederic Boltz Author. All rights reserved
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,8 @@ LABEL maintainer="Frederic Boltz <frederic.boltz@gmail.com>"
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN clean-install ca-certificates tzdata; \
-    apt-get update; apt-get install curl -y; \
+    apt-get update; 
+    apt-get install curl -y; \
     cd /usr/local/bin; \
     KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt); \
     curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kubectl; chmod +x kubectl

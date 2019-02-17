@@ -25,7 +25,7 @@ else
 endif
 
 deps:
-	govendor fetch +missing
+	govendor fetch +missing +external
 #	wget "https://raw.githubusercontent.com/Fred78290/autoscaler/master/cluster-autoscaler/cloudprovider/grpc/grpc.proto" -O grpc/grpc.proto
 #	protoc -I . -I vendor grpc/grpc.proto --go_out=plugins=grpc:.
 
@@ -41,8 +41,7 @@ build-binary: clean deps
 	make -e GOOS=darwin -e GOARCH=amd64 build
 
 test-unit: clean deps
-	docker run --rm -v `pwd`:/gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler/ kubernetes-vmware-autoscaler-builder:latest bash \
-		-c 'cd /gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler && bash ./scripts/run-tests.sh'
+	./scripts/run-tests.sh'
 
 dev-release: build-binary execute-release
 	@echo "Release ${TAG}${FOR_PROVIDER} completed"
@@ -69,10 +68,8 @@ container: clean build-in-docker make-image
 	@echo "Created in-docker image ${TAG}${FOR_PROVIDER}"
 
 test-in-docker: clean docker-builder
-	docker run -v `pwd`:/gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler/ \
-		kubernetes-vmware-autoscaler-builder:latest bash \
-		-c 'cd /gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler \
-		&& godep go test ./... ${TAGS_FLAG}'
+	docker run --rm -v `pwd`:/gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler/ kubernetes-vmware-autoscaler-builder:latest bash \
+		-c 'cd /gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler && bash ./scripts/run-tests.sh'
 
 .PHONY: all deps build test-unit clean format execute-release dev-release docker-builder build-in-docker release generate
 

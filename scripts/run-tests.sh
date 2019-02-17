@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+govendor fetch +missing +external
+
 export Test_AuthMethodKey=NO
 export Test_Sudo=NO
 export Test_CIDR=YES
