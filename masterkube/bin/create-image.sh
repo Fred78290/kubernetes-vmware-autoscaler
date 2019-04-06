@@ -14,7 +14,7 @@ set -e
 
 KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 KUBERNETES_PASSWORD=$(uuidgen)
-CNI_VERSION=v0.7.1
+CNI_VERSION=v0.7.5
 SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
 CACHE=~/.local/vmware/cache
 TARGET_IMAGE=bionic-kubernetes-$KUBERNETES_VERSION

@@ -25,7 +25,7 @@ group:
     - kubernetes
 runcmd:
     - KUBERNETES_VERSION="$(curl -sSL https://dl.k8s.io/release/stable.txt)"
-    - CNI_VERSION=v0.7.1
+    - CNI_VERSION=v0.7.5
     - mkdir -p /opt/cni/bin
     - mkdir -p /usr/local/bin
     - curl https://get.docker.com | bash
