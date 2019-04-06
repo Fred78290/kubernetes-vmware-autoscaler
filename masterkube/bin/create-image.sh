@@ -158,6 +158,8 @@ else
     echo "${SEEDIMAGE} already exists, nothing to do!"
 fi
 
+KUBERNETES_MINOR_RELEASE=$(echo -n $KUBERNETES_VERSION | tr '.' ' ' | awk '{ print $2 }')
+
 echo "Prepare ${TARGET_IMAGE} image"
 
 cat > "${ISODIR}/user-data" <<EOF
@@ -197,6 +199,7 @@ cat > "${ISODIR}/prepare-image.sh" <<EOF
 
 apt-get update
 apt-get upgrade -y
+apt-get dist-upgrade -y
 apt-get autoremove -y
 
 mkdir -p /opt/cni/bin
@@ -204,7 +207,41 @@ mkdir -p /usr/local/bin
 
 echo "Prepare to install Docker"
 
-curl https://get.docker.com | bash
+# Setup daemon.
+if [ $KUBERNETES_MINOR_RELEASE -ge 14 ]; then
+    mkdir -p /etc/docker
+
+    cat > /etc/docker/daemon.json <<SHELL
+{
+    "exec-opts": [
+        "native.cgroupdriver=systemd"
+    ],
+    "log-driver": "json-file",
+    "log-opts": {
+        "max-size": "100m"
+    },
+    "storage-driver": "overlay2"
+}
+SHELL
+
+    curl https://get.docker.com | bash
+
+    mkdir -p /etc/systemd/system/docker.service.d
+
+    # Restart docker.
+    systemctl daemon-reload
+    systemctl restart docker
+else
+    curl https://get.docker.com | bash
+fi
+
+# Setup Kube DNS resolver
+mkdir /etc/systemd/resolved.conf.d/
+cat > /etc/systemd/resolved.conf.d/kubernetes.conf <<SHELL
+[Resolve]
+DNS=10.96.0.10
+Domains=cluster.local
+SHELL
 
 echo "Prepare to install CNI plugins"
 
