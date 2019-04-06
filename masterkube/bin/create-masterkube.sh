@@ -292,7 +292,7 @@ if [ ! -f ./etc/ssl/privkey.pem ]; then
 fi
 
 # Extract the domain name from CERT
-export DOMAIN_NAME=$(openssl x509 -noout -fingerprint -text <./etc/ssl/cert.pem | grep 'Subject: CN' | tr '=' ' ' | awk '{print $3}' | sed 's/\*\.//g')
+export DOMAIN_NAME=$(openssl x509 -noout -subject -in ./etc/ssl/cert.pem | awk -F= '{print $NF}' | sed -e 's/^[ \t]*//' | sed 's/\*\.//g')
 
 # If the VM template doesn't exists, build it from scrash
 if [ -z "$(govc vm.info ${TARGET_IMAGE} 2>&1)" ]; then
