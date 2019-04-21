@@ -498,6 +498,38 @@ func (s *AutoScalerServerApp) GetResourceLimiter(ctx context.Context, request *a
 	}, nil
 }
 
+// GPULabel returns the label added to nodes with GPU resource.
+func (s *AutoScalerServerApp) GPULabel(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.GPULabelReply, error) {
+	glog.V(5).Infof("Call server GPULabel: %v", request)
+
+	if request.GetProviderID() != s.Configuration.ProviderID {
+		glog.Errorf(constantes.ErrMismatchingProvider)
+		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
+	}
+
+	return &apigrpc.GPULabelReply{
+		Response: &apigrpc.GPULabelReply_Gpulabel{
+			Gpulabel: "",
+		},
+	}, nil
+}
+
+// GetAvailableGPUTypes return all available GPU types cloud provider supports.
+func (s *AutoScalerServerApp) GetAvailableGPUTypes(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.GetAvailableGPUTypesReply, error) {
+	log.Printf("Call server GetAvailableGPUTypes: %v", request)
+
+	if request.GetProviderID() != s.Configuration.ProviderID {
+		glog.Errorf(constantes.ErrMismatchingProvider)
+		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
+	}
+
+	gpus := make(map[string]string)
+
+	return &apigrpc.GetAvailableGPUTypesReply{
+		AvailableGpuTypes: gpus,
+	}, nil
+}
+
 // Cleanup cleans up open resources before the cloud provider is destroyed, i.e. go routines etc.
 func (s *AutoScalerServerApp) Cleanup(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.CleanupReply, error) {
 	glog.V(5).Infof("Call server Cleanup: %v", request)
