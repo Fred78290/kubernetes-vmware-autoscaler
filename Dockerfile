@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASEIMAGE=k8s.gcr.io/debian-base-amd64:0.4.0
+ARG BASEIMAGE=k8s.gcr.io/debian-base-amd64:v1.0.0
 FROM $BASEIMAGE
 LABEL maintainer="Frederic Boltz <frederic.boltz@gmail.com>"
 
