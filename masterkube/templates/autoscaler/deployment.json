@@ -31,7 +31,7 @@
                 },
                 "containers": [
                     {
-                        "image": "fred78290/cluster-autoscaler:v1.18.2",
+                        "image": "fred78290/cluster-autoscaler:v1.17.5",
                         "name": "cluster-autoscaler",
                         "resources": {
                             "limits": {

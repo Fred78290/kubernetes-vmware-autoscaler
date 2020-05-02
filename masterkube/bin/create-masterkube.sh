@@ -15,7 +15,7 @@ export MASTERKUBE="${NODEGROUP_NAME}-masterkube"
 export PROVIDERID="${SCHEME}://${NODEGROUP_NAME}/object?type=node&name=${MASTERKUBE}"
 export SSH_PRIVATE_KEY=~/.ssh/id_rsa
 export SSH_KEY=$(cat "${SSH_PRIVATE_KEY}.pub")
-export KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
+export KUBERNETES_VERSION=v1.17.5
 export KUBERNETES_PASSWORD=$(uuidgen)
 export KUBECONFIG=$HOME/.kube/config
 export SEED_USER=ubuntu
