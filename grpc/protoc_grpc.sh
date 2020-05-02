@@ -13,9 +13,9 @@ mkdir -p $PROTOC_DIR
 
 pushd $PROTOC_DIR
 
-go get -v google.golang.org/grpc@v1.26.0
-go get -v github.com/golang/protobuf@v1.3.2
-go get -v github.com/golang/protobuf/protoc-gen-go@v1.3.2
+go get -v google.golang.org/grpc@v1.13.0
+go get -v github.com/golang/protobuf@v1.2.0
+go get -v github.com/golang/protobuf/protoc-gen-go@v1.2.0
 
 curl -LO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-linux-x86_64.zip
 unzip protoc-${PB_RELEASE}-linux-x86_64.zip

@@ -3,17 +3,16 @@
 
 package grpccloudprovider
 
+import proto "github.com/golang/protobuf/proto"
+import fmt "fmt"
+import math "math"
+import _ "github.com/golang/protobuf/ptypes/any"
+import _ "github.com/golang/protobuf/ptypes/struct"
+import v1 "k8s.io/api/core/v1"
+
 import (
-	context "context"
-	fmt "fmt"
-	proto "github.com/golang/protobuf/proto"
-	_ "github.com/golang/protobuf/ptypes/any"
-	_ "github.com/golang/protobuf/ptypes/struct"
+	context "golang.org/x/net/context"
 	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
-	v1 "k8s.io/api/core/v1"
-	math "math"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -25,7 +24,7 @@ var _ = math.Inf
 // is compatible with the proto package it is being compiled against.
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
-const _ = proto.ProtoPackageIsVersion3 // please upgrade the proto package
+const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
 type InstanceErrorClass int32
 
@@ -40,7 +39,6 @@ var InstanceErrorClass_name = map[int32]string{
 	1:  "ERROR_OUT_OF_RESOURCES",
 	99: "ERROR_OTHER",
 }
-
 var InstanceErrorClass_value = map[string]int32{
 	"ERROR_UNDEFINED":        0,
 	"ERROR_OUT_OF_RESOURCES": 1,
@@ -50,9 +48,8 @@ var InstanceErrorClass_value = map[string]int32{
 func (x InstanceErrorClass) String() string {
 	return proto.EnumName(InstanceErrorClass_name, int32(x))
 }
-
 func (InstanceErrorClass) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{0}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{0}
 }
 
 type InstanceState int32
@@ -70,7 +67,6 @@ var InstanceState_name = map[int32]string{
 	2: "STATE_BEING_CREATED",
 	3: "STATE_BEING_DELETED",
 }
-
 var InstanceState_value = map[string]int32{
 	"STATE_UNDEFINED":     0,
 	"STATE_RUNNING":       1,
@@ -81,9 +77,8 @@ var InstanceState_value = map[string]int32{
 func (x InstanceState) String() string {
 	return proto.EnumName(InstanceState_name, int32(x))
 }
-
 func (InstanceState) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{1}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{1}
 }
 
 type CloudProviderServiceRequest struct {
@@ -97,17 +92,16 @@ func (m *CloudProviderServiceRequest) Reset()         { *m = CloudProviderServic
 func (m *CloudProviderServiceRequest) String() string { return proto.CompactTextString(m) }
 func (*CloudProviderServiceRequest) ProtoMessage()    {}
 func (*CloudProviderServiceRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{0}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{0}
 }
-
 func (m *CloudProviderServiceRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CloudProviderServiceRequest.Unmarshal(m, b)
 }
 func (m *CloudProviderServiceRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CloudProviderServiceRequest.Marshal(b, m, deterministic)
 }
-func (m *CloudProviderServiceRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CloudProviderServiceRequest.Merge(m, src)
+func (dst *CloudProviderServiceRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CloudProviderServiceRequest.Merge(dst, src)
 }
 func (m *CloudProviderServiceRequest) XXX_Size() int {
 	return xxx_messageInfo_CloudProviderServiceRequest.Size(m)
@@ -139,17 +133,16 @@ func (m *KubeAdmConfig) Reset()         { *m = KubeAdmConfig{} }
 func (m *KubeAdmConfig) String() string { return proto.CompactTextString(m) }
 func (*KubeAdmConfig) ProtoMessage()    {}
 func (*KubeAdmConfig) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{1}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{1}
 }
-
 func (m *KubeAdmConfig) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_KubeAdmConfig.Unmarshal(m, b)
 }
 func (m *KubeAdmConfig) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_KubeAdmConfig.Marshal(b, m, deterministic)
 }
-func (m *KubeAdmConfig) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_KubeAdmConfig.Merge(m, src)
+func (dst *KubeAdmConfig) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_KubeAdmConfig.Merge(dst, src)
 }
 func (m *KubeAdmConfig) XXX_Size() int {
 	return xxx_messageInfo_KubeAdmConfig.Size(m)
@@ -204,17 +197,16 @@ func (m *NodeGroupDef) Reset()         { *m = NodeGroupDef{} }
 func (m *NodeGroupDef) String() string { return proto.CompactTextString(m) }
 func (*NodeGroupDef) ProtoMessage()    {}
 func (*NodeGroupDef) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{2}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{2}
 }
-
 func (m *NodeGroupDef) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NodeGroupDef.Unmarshal(m, b)
 }
 func (m *NodeGroupDef) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NodeGroupDef.Marshal(b, m, deterministic)
 }
-func (m *NodeGroupDef) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NodeGroupDef.Merge(m, src)
+func (dst *NodeGroupDef) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NodeGroupDef.Merge(dst, src)
 }
 func (m *NodeGroupDef) XXX_Size() int {
 	return xxx_messageInfo_NodeGroupDef.Size(m)
@@ -282,17 +274,16 @@ func (m *ConnectRequest) Reset()         { *m = ConnectRequest{} }
 func (m *ConnectRequest) String() string { return proto.CompactTextString(m) }
 func (*ConnectRequest) ProtoMessage()    {}
 func (*ConnectRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{3}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{3}
 }
-
 func (m *ConnectRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ConnectRequest.Unmarshal(m, b)
 }
 func (m *ConnectRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ConnectRequest.Marshal(b, m, deterministic)
 }
-func (m *ConnectRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ConnectRequest.Merge(m, src)
+func (dst *ConnectRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ConnectRequest.Merge(dst, src)
 }
 func (m *ConnectRequest) XXX_Size() int {
 	return xxx_messageInfo_ConnectRequest.Size(m)
@@ -352,17 +343,16 @@ func (m *ConnectReply) Reset()         { *m = ConnectReply{} }
 func (m *ConnectReply) String() string { return proto.CompactTextString(m) }
 func (*ConnectReply) ProtoMessage()    {}
 func (*ConnectReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{4}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{4}
 }
-
 func (m *ConnectReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ConnectReply.Unmarshal(m, b)
 }
 func (m *ConnectReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ConnectReply.Marshal(b, m, deterministic)
 }
-func (m *ConnectReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ConnectReply.Merge(m, src)
+func (dst *ConnectReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ConnectReply.Merge(dst, src)
 }
 func (m *ConnectReply) XXX_Size() int {
 	return xxx_messageInfo_ConnectReply.Size(m)
@@ -410,12 +400,77 @@ func (m *ConnectReply) GetConnected() bool {
 	return false
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*ConnectReply) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*ConnectReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _ConnectReply_OneofMarshaler, _ConnectReply_OneofUnmarshaler, _ConnectReply_OneofSizer, []interface{}{
 		(*ConnectReply_Error)(nil),
 		(*ConnectReply_Connected)(nil),
 	}
+}
+
+func _ConnectReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*ConnectReply)
+	// response
+	switch x := m.Response.(type) {
+	case *ConnectReply_Error:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case *ConnectReply_Connected:
+		t := uint64(0)
+		if x.Connected {
+			t = 1
+		}
+		b.EncodeVarint(2<<3 | proto.WireVarint)
+		b.EncodeVarint(t)
+	case nil:
+	default:
+		return fmt.Errorf("ConnectReply.Response has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _ConnectReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*ConnectReply)
+	switch tag {
+	case 1: // response.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Response = &ConnectReply_Error{msg}
+		return true, err
+	case 2: // response.connected
+		if wire != proto.WireVarint {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeVarint()
+		m.Response = &ConnectReply_Connected{x != 0}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _ConnectReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*ConnectReply)
+	// response
+	switch x := m.Response.(type) {
+	case *ConnectReply_Error:
+		s := proto.Size(x.Error)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *ConnectReply_Connected:
+		n += 1 // tag and wire
+		n += 1
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
 }
 
 type NameReply struct {
@@ -429,17 +484,16 @@ func (m *NameReply) Reset()         { *m = NameReply{} }
 func (m *NameReply) String() string { return proto.CompactTextString(m) }
 func (*NameReply) ProtoMessage()    {}
 func (*NameReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{5}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{5}
 }
-
 func (m *NameReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NameReply.Unmarshal(m, b)
 }
 func (m *NameReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NameReply.Marshal(b, m, deterministic)
 }
-func (m *NameReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NameReply.Merge(m, src)
+func (dst *NameReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NameReply.Merge(dst, src)
 }
 func (m *NameReply) XXX_Size() int {
 	return xxx_messageInfo_NameReply.Size(m)
@@ -468,17 +522,16 @@ func (m *NodeGroupsReply) Reset()         { *m = NodeGroupsReply{} }
 func (m *NodeGroupsReply) String() string { return proto.CompactTextString(m) }
 func (*NodeGroupsReply) ProtoMessage()    {}
 func (*NodeGroupsReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{6}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{6}
 }
-
 func (m *NodeGroupsReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NodeGroupsReply.Unmarshal(m, b)
 }
 func (m *NodeGroupsReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NodeGroupsReply.Marshal(b, m, deterministic)
 }
-func (m *NodeGroupsReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NodeGroupsReply.Merge(m, src)
+func (dst *NodeGroupsReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NodeGroupsReply.Merge(dst, src)
 }
 func (m *NodeGroupsReply) XXX_Size() int {
 	return xxx_messageInfo_NodeGroupsReply.Size(m)
@@ -508,17 +561,16 @@ func (m *NodeGroupForNodeRequest) Reset()         { *m = NodeGroupForNodeRequest
 func (m *NodeGroupForNodeRequest) String() string { return proto.CompactTextString(m) }
 func (*NodeGroupForNodeRequest) ProtoMessage()    {}
 func (*NodeGroupForNodeRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{7}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{7}
 }
-
 func (m *NodeGroupForNodeRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NodeGroupForNodeRequest.Unmarshal(m, b)
 }
 func (m *NodeGroupForNodeRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NodeGroupForNodeRequest.Marshal(b, m, deterministic)
 }
-func (m *NodeGroupForNodeRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NodeGroupForNodeRequest.Merge(m, src)
+func (dst *NodeGroupForNodeRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NodeGroupForNodeRequest.Merge(dst, src)
 }
 func (m *NodeGroupForNodeRequest) XXX_Size() int {
 	return xxx_messageInfo_NodeGroupForNodeRequest.Size(m)
@@ -554,17 +606,16 @@ func (m *NodeGroupes) Reset()         { *m = NodeGroupes{} }
 func (m *NodeGroupes) String() string { return proto.CompactTextString(m) }
 func (*NodeGroupes) ProtoMessage()    {}
 func (*NodeGroupes) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{8}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{8}
 }
-
 func (m *NodeGroupes) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NodeGroupes.Unmarshal(m, b)
 }
 func (m *NodeGroupes) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NodeGroupes.Marshal(b, m, deterministic)
 }
-func (m *NodeGroupes) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NodeGroupes.Merge(m, src)
+func (dst *NodeGroupes) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NodeGroupes.Merge(dst, src)
 }
 func (m *NodeGroupes) XXX_Size() int {
 	return xxx_messageInfo_NodeGroupes.Size(m)
@@ -596,17 +647,16 @@ func (m *NodeGroupForNodeReply) Reset()         { *m = NodeGroupForNodeReply{} }
 func (m *NodeGroupForNodeReply) String() string { return proto.CompactTextString(m) }
 func (*NodeGroupForNodeReply) ProtoMessage()    {}
 func (*NodeGroupForNodeReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{9}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{9}
 }
-
 func (m *NodeGroupForNodeReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NodeGroupForNodeReply.Unmarshal(m, b)
 }
 func (m *NodeGroupForNodeReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NodeGroupForNodeReply.Marshal(b, m, deterministic)
 }
-func (m *NodeGroupForNodeReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NodeGroupForNodeReply.Merge(m, src)
+func (dst *NodeGroupForNodeReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NodeGroupForNodeReply.Merge(dst, src)
 }
 func (m *NodeGroupForNodeReply) XXX_Size() int {
 	return xxx_messageInfo_NodeGroupForNodeReply.Size(m)
@@ -654,12 +704,78 @@ func (m *NodeGroupForNodeReply) GetNodeGroup() *NodeGroup {
 	return nil
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*NodeGroupForNodeReply) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*NodeGroupForNodeReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _NodeGroupForNodeReply_OneofMarshaler, _NodeGroupForNodeReply_OneofUnmarshaler, _NodeGroupForNodeReply_OneofSizer, []interface{}{
 		(*NodeGroupForNodeReply_Error)(nil),
 		(*NodeGroupForNodeReply_NodeGroup)(nil),
 	}
+}
+
+func _NodeGroupForNodeReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*NodeGroupForNodeReply)
+	// response
+	switch x := m.Response.(type) {
+	case *NodeGroupForNodeReply_Error:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case *NodeGroupForNodeReply_NodeGroup:
+		b.EncodeVarint(2<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.NodeGroup); err != nil {
+			return err
+		}
+	case nil:
+	default:
+		return fmt.Errorf("NodeGroupForNodeReply.Response has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _NodeGroupForNodeReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*NodeGroupForNodeReply)
+	switch tag {
+	case 1: // response.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Response = &NodeGroupForNodeReply_Error{msg}
+		return true, err
+	case 2: // response.nodeGroup
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(NodeGroup)
+		err := b.DecodeMessage(msg)
+		m.Response = &NodeGroupForNodeReply_NodeGroup{msg}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _NodeGroupForNodeReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*NodeGroupForNodeReply)
+	// response
+	switch x := m.Response.(type) {
+	case *NodeGroupForNodeReply_Error:
+		s := proto.Size(x.Error)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *NodeGroupForNodeReply_NodeGroup:
+		s := proto.Size(x.NodeGroup)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
 }
 
 type PricingModelReply struct {
@@ -676,17 +792,16 @@ func (m *PricingModelReply) Reset()         { *m = PricingModelReply{} }
 func (m *PricingModelReply) String() string { return proto.CompactTextString(m) }
 func (*PricingModelReply) ProtoMessage()    {}
 func (*PricingModelReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{10}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{10}
 }
-
 func (m *PricingModelReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PricingModelReply.Unmarshal(m, b)
 }
 func (m *PricingModelReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_PricingModelReply.Marshal(b, m, deterministic)
 }
-func (m *PricingModelReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PricingModelReply.Merge(m, src)
+func (dst *PricingModelReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PricingModelReply.Merge(dst, src)
 }
 func (m *PricingModelReply) XXX_Size() int {
 	return xxx_messageInfo_PricingModelReply.Size(m)
@@ -734,12 +849,78 @@ func (m *PricingModelReply) GetPriceModel() *PricingModel {
 	return nil
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*PricingModelReply) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*PricingModelReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _PricingModelReply_OneofMarshaler, _PricingModelReply_OneofUnmarshaler, _PricingModelReply_OneofSizer, []interface{}{
 		(*PricingModelReply_Error)(nil),
 		(*PricingModelReply_PriceModel)(nil),
 	}
+}
+
+func _PricingModelReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*PricingModelReply)
+	// response
+	switch x := m.Response.(type) {
+	case *PricingModelReply_Error:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case *PricingModelReply_PriceModel:
+		b.EncodeVarint(2<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.PriceModel); err != nil {
+			return err
+		}
+	case nil:
+	default:
+		return fmt.Errorf("PricingModelReply.Response has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _PricingModelReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*PricingModelReply)
+	switch tag {
+	case 1: // response.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Response = &PricingModelReply_Error{msg}
+		return true, err
+	case 2: // response.priceModel
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(PricingModel)
+		err := b.DecodeMessage(msg)
+		m.Response = &PricingModelReply_PriceModel{msg}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _PricingModelReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*PricingModelReply)
+	// response
+	switch x := m.Response.(type) {
+	case *PricingModelReply_Error:
+		s := proto.Size(x.Error)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *PricingModelReply_PriceModel:
+		s := proto.Size(x.PriceModel)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
 }
 
 type AvailableMachineTypes struct {
@@ -753,17 +934,16 @@ func (m *AvailableMachineTypes) Reset()         { *m = AvailableMachineTypes{} }
 func (m *AvailableMachineTypes) String() string { return proto.CompactTextString(m) }
 func (*AvailableMachineTypes) ProtoMessage()    {}
 func (*AvailableMachineTypes) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{11}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{11}
 }
-
 func (m *AvailableMachineTypes) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AvailableMachineTypes.Unmarshal(m, b)
 }
 func (m *AvailableMachineTypes) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_AvailableMachineTypes.Marshal(b, m, deterministic)
 }
-func (m *AvailableMachineTypes) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_AvailableMachineTypes.Merge(m, src)
+func (dst *AvailableMachineTypes) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AvailableMachineTypes.Merge(dst, src)
 }
 func (m *AvailableMachineTypes) XXX_Size() int {
 	return xxx_messageInfo_AvailableMachineTypes.Size(m)
@@ -795,17 +975,16 @@ func (m *AvailableMachineTypesReply) Reset()         { *m = AvailableMachineType
 func (m *AvailableMachineTypesReply) String() string { return proto.CompactTextString(m) }
 func (*AvailableMachineTypesReply) ProtoMessage()    {}
 func (*AvailableMachineTypesReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{12}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{12}
 }
-
 func (m *AvailableMachineTypesReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AvailableMachineTypesReply.Unmarshal(m, b)
 }
 func (m *AvailableMachineTypesReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_AvailableMachineTypesReply.Marshal(b, m, deterministic)
 }
-func (m *AvailableMachineTypesReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_AvailableMachineTypesReply.Merge(m, src)
+func (dst *AvailableMachineTypesReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AvailableMachineTypesReply.Merge(dst, src)
 }
 func (m *AvailableMachineTypesReply) XXX_Size() int {
 	return xxx_messageInfo_AvailableMachineTypesReply.Size(m)
@@ -853,12 +1032,78 @@ func (m *AvailableMachineTypesReply) GetAvailableMachineTypes() *AvailableMachin
 	return nil
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*AvailableMachineTypesReply) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*AvailableMachineTypesReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _AvailableMachineTypesReply_OneofMarshaler, _AvailableMachineTypesReply_OneofUnmarshaler, _AvailableMachineTypesReply_OneofSizer, []interface{}{
 		(*AvailableMachineTypesReply_Error)(nil),
 		(*AvailableMachineTypesReply_AvailableMachineTypes)(nil),
 	}
+}
+
+func _AvailableMachineTypesReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*AvailableMachineTypesReply)
+	// response
+	switch x := m.Response.(type) {
+	case *AvailableMachineTypesReply_Error:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case *AvailableMachineTypesReply_AvailableMachineTypes:
+		b.EncodeVarint(2<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.AvailableMachineTypes); err != nil {
+			return err
+		}
+	case nil:
+	default:
+		return fmt.Errorf("AvailableMachineTypesReply.Response has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _AvailableMachineTypesReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*AvailableMachineTypesReply)
+	switch tag {
+	case 1: // response.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Response = &AvailableMachineTypesReply_Error{msg}
+		return true, err
+	case 2: // response.availableMachineTypes
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(AvailableMachineTypes)
+		err := b.DecodeMessage(msg)
+		m.Response = &AvailableMachineTypesReply_AvailableMachineTypes{msg}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _AvailableMachineTypesReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*AvailableMachineTypesReply)
+	// response
+	switch x := m.Response.(type) {
+	case *AvailableMachineTypesReply_Error:
+		s := proto.Size(x.Error)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *AvailableMachineTypesReply_AvailableMachineTypes:
+		s := proto.Size(x.AvailableMachineTypes)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
 }
 
 type NewNodeGroupRequest struct {
@@ -880,17 +1125,16 @@ func (m *NewNodeGroupRequest) Reset()         { *m = NewNodeGroupRequest{} }
 func (m *NewNodeGroupRequest) String() string { return proto.CompactTextString(m) }
 func (*NewNodeGroupRequest) ProtoMessage()    {}
 func (*NewNodeGroupRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{13}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{13}
 }
-
 func (m *NewNodeGroupRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NewNodeGroupRequest.Unmarshal(m, b)
 }
 func (m *NewNodeGroupRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NewNodeGroupRequest.Marshal(b, m, deterministic)
 }
-func (m *NewNodeGroupRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NewNodeGroupRequest.Merge(m, src)
+func (dst *NewNodeGroupRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NewNodeGroupRequest.Merge(dst, src)
 }
 func (m *NewNodeGroupRequest) XXX_Size() int {
 	return xxx_messageInfo_NewNodeGroupRequest.Size(m)
@@ -978,17 +1222,16 @@ func (m *NewNodeGroupReply) Reset()         { *m = NewNodeGroupReply{} }
 func (m *NewNodeGroupReply) String() string { return proto.CompactTextString(m) }
 func (*NewNodeGroupReply) ProtoMessage()    {}
 func (*NewNodeGroupReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{14}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{14}
 }
-
 func (m *NewNodeGroupReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NewNodeGroupReply.Unmarshal(m, b)
 }
 func (m *NewNodeGroupReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NewNodeGroupReply.Marshal(b, m, deterministic)
 }
-func (m *NewNodeGroupReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NewNodeGroupReply.Merge(m, src)
+func (dst *NewNodeGroupReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NewNodeGroupReply.Merge(dst, src)
 }
 func (m *NewNodeGroupReply) XXX_Size() int {
 	return xxx_messageInfo_NewNodeGroupReply.Size(m)
@@ -1036,12 +1279,78 @@ func (m *NewNodeGroupReply) GetNodeGroup() *NodeGroup {
 	return nil
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*NewNodeGroupReply) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*NewNodeGroupReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _NewNodeGroupReply_OneofMarshaler, _NewNodeGroupReply_OneofUnmarshaler, _NewNodeGroupReply_OneofSizer, []interface{}{
 		(*NewNodeGroupReply_Error)(nil),
 		(*NewNodeGroupReply_NodeGroup)(nil),
 	}
+}
+
+func _NewNodeGroupReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*NewNodeGroupReply)
+	// response
+	switch x := m.Response.(type) {
+	case *NewNodeGroupReply_Error:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case *NewNodeGroupReply_NodeGroup:
+		b.EncodeVarint(2<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.NodeGroup); err != nil {
+			return err
+		}
+	case nil:
+	default:
+		return fmt.Errorf("NewNodeGroupReply.Response has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _NewNodeGroupReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*NewNodeGroupReply)
+	switch tag {
+	case 1: // response.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Response = &NewNodeGroupReply_Error{msg}
+		return true, err
+	case 2: // response.nodeGroup
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(NodeGroup)
+		err := b.DecodeMessage(msg)
+		m.Response = &NewNodeGroupReply_NodeGroup{msg}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _NewNodeGroupReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*NewNodeGroupReply)
+	// response
+	switch x := m.Response.(type) {
+	case *NewNodeGroupReply_Error:
+		s := proto.Size(x.Error)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *NewNodeGroupReply_NodeGroup:
+		s := proto.Size(x.NodeGroup)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
 }
 
 type ResourceLimiterReply struct {
@@ -1058,17 +1367,16 @@ func (m *ResourceLimiterReply) Reset()         { *m = ResourceLimiterReply{} }
 func (m *ResourceLimiterReply) String() string { return proto.CompactTextString(m) }
 func (*ResourceLimiterReply) ProtoMessage()    {}
 func (*ResourceLimiterReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{15}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{15}
 }
-
 func (m *ResourceLimiterReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ResourceLimiterReply.Unmarshal(m, b)
 }
 func (m *ResourceLimiterReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ResourceLimiterReply.Marshal(b, m, deterministic)
 }
-func (m *ResourceLimiterReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ResourceLimiterReply.Merge(m, src)
+func (dst *ResourceLimiterReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ResourceLimiterReply.Merge(dst, src)
 }
 func (m *ResourceLimiterReply) XXX_Size() int {
 	return xxx_messageInfo_ResourceLimiterReply.Size(m)
@@ -1116,12 +1424,78 @@ func (m *ResourceLimiterReply) GetResourceLimiter() *ResourceLimiter {
 	return nil
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*ResourceLimiterReply) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*ResourceLimiterReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _ResourceLimiterReply_OneofMarshaler, _ResourceLimiterReply_OneofUnmarshaler, _ResourceLimiterReply_OneofSizer, []interface{}{
 		(*ResourceLimiterReply_Error)(nil),
 		(*ResourceLimiterReply_ResourceLimiter)(nil),
 	}
+}
+
+func _ResourceLimiterReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*ResourceLimiterReply)
+	// response
+	switch x := m.Response.(type) {
+	case *ResourceLimiterReply_Error:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case *ResourceLimiterReply_ResourceLimiter:
+		b.EncodeVarint(2<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.ResourceLimiter); err != nil {
+			return err
+		}
+	case nil:
+	default:
+		return fmt.Errorf("ResourceLimiterReply.Response has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _ResourceLimiterReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*ResourceLimiterReply)
+	switch tag {
+	case 1: // response.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Response = &ResourceLimiterReply_Error{msg}
+		return true, err
+	case 2: // response.resourceLimiter
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(ResourceLimiter)
+		err := b.DecodeMessage(msg)
+		m.Response = &ResourceLimiterReply_ResourceLimiter{msg}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _ResourceLimiterReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*ResourceLimiterReply)
+	// response
+	switch x := m.Response.(type) {
+	case *ResourceLimiterReply_Error:
+		s := proto.Size(x.Error)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *ResourceLimiterReply_ResourceLimiter:
+		s := proto.Size(x.ResourceLimiter)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
 }
 
 type GPULabelReply struct {
@@ -1138,17 +1512,16 @@ func (m *GPULabelReply) Reset()         { *m = GPULabelReply{} }
 func (m *GPULabelReply) String() string { return proto.CompactTextString(m) }
 func (*GPULabelReply) ProtoMessage()    {}
 func (*GPULabelReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{16}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{16}
 }
-
 func (m *GPULabelReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_GPULabelReply.Unmarshal(m, b)
 }
 func (m *GPULabelReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_GPULabelReply.Marshal(b, m, deterministic)
 }
-func (m *GPULabelReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GPULabelReply.Merge(m, src)
+func (dst *GPULabelReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GPULabelReply.Merge(dst, src)
 }
 func (m *GPULabelReply) XXX_Size() int {
 	return xxx_messageInfo_GPULabelReply.Size(m)
@@ -1196,12 +1569,74 @@ func (m *GPULabelReply) GetGpulabel() string {
 	return ""
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*GPULabelReply) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*GPULabelReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _GPULabelReply_OneofMarshaler, _GPULabelReply_OneofUnmarshaler, _GPULabelReply_OneofSizer, []interface{}{
 		(*GPULabelReply_Error)(nil),
 		(*GPULabelReply_Gpulabel)(nil),
 	}
+}
+
+func _GPULabelReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*GPULabelReply)
+	// response
+	switch x := m.Response.(type) {
+	case *GPULabelReply_Error:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case *GPULabelReply_Gpulabel:
+		b.EncodeVarint(2<<3 | proto.WireBytes)
+		b.EncodeStringBytes(x.Gpulabel)
+	case nil:
+	default:
+		return fmt.Errorf("GPULabelReply.Response has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _GPULabelReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*GPULabelReply)
+	switch tag {
+	case 1: // response.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Response = &GPULabelReply_Error{msg}
+		return true, err
+	case 2: // response.gpulabel
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeStringBytes()
+		m.Response = &GPULabelReply_Gpulabel{x}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _GPULabelReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*GPULabelReply)
+	// response
+	switch x := m.Response.(type) {
+	case *GPULabelReply_Error:
+		s := proto.Size(x.Error)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *GPULabelReply_Gpulabel:
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(len(x.Gpulabel)))
+		n += len(x.Gpulabel)
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
 }
 
 type GetAvailableGPUTypesReply struct {
@@ -1215,17 +1650,16 @@ func (m *GetAvailableGPUTypesReply) Reset()         { *m = GetAvailableGPUTypesR
 func (m *GetAvailableGPUTypesReply) String() string { return proto.CompactTextString(m) }
 func (*GetAvailableGPUTypesReply) ProtoMessage()    {}
 func (*GetAvailableGPUTypesReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{17}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{17}
 }
-
 func (m *GetAvailableGPUTypesReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_GetAvailableGPUTypesReply.Unmarshal(m, b)
 }
 func (m *GetAvailableGPUTypesReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_GetAvailableGPUTypesReply.Marshal(b, m, deterministic)
 }
-func (m *GetAvailableGPUTypesReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetAvailableGPUTypesReply.Merge(m, src)
+func (dst *GetAvailableGPUTypesReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetAvailableGPUTypesReply.Merge(dst, src)
 }
 func (m *GetAvailableGPUTypesReply) XXX_Size() int {
 	return xxx_messageInfo_GetAvailableGPUTypesReply.Size(m)
@@ -1254,17 +1688,16 @@ func (m *CleanupReply) Reset()         { *m = CleanupReply{} }
 func (m *CleanupReply) String() string { return proto.CompactTextString(m) }
 func (*CleanupReply) ProtoMessage()    {}
 func (*CleanupReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{18}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{18}
 }
-
 func (m *CleanupReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CleanupReply.Unmarshal(m, b)
 }
 func (m *CleanupReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CleanupReply.Marshal(b, m, deterministic)
 }
-func (m *CleanupReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CleanupReply.Merge(m, src)
+func (dst *CleanupReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CleanupReply.Merge(dst, src)
 }
 func (m *CleanupReply) XXX_Size() int {
 	return xxx_messageInfo_CleanupReply.Size(m)
@@ -1293,17 +1726,16 @@ func (m *RefreshReply) Reset()         { *m = RefreshReply{} }
 func (m *RefreshReply) String() string { return proto.CompactTextString(m) }
 func (*RefreshReply) ProtoMessage()    {}
 func (*RefreshReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{19}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{19}
 }
-
 func (m *RefreshReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_RefreshReply.Unmarshal(m, b)
 }
 func (m *RefreshReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_RefreshReply.Marshal(b, m, deterministic)
 }
-func (m *RefreshReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_RefreshReply.Merge(m, src)
+func (dst *RefreshReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_RefreshReply.Merge(dst, src)
 }
 func (m *RefreshReply) XXX_Size() int {
 	return xxx_messageInfo_RefreshReply.Size(m)
@@ -1334,17 +1766,16 @@ func (m *BelongsRequest) Reset()         { *m = BelongsRequest{} }
 func (m *BelongsRequest) String() string { return proto.CompactTextString(m) }
 func (*BelongsRequest) ProtoMessage()    {}
 func (*BelongsRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{20}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{20}
 }
-
 func (m *BelongsRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_BelongsRequest.Unmarshal(m, b)
 }
 func (m *BelongsRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_BelongsRequest.Marshal(b, m, deterministic)
 }
-func (m *BelongsRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_BelongsRequest.Merge(m, src)
+func (dst *BelongsRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BelongsRequest.Merge(dst, src)
 }
 func (m *BelongsRequest) XXX_Size() int {
 	return xxx_messageInfo_BelongsRequest.Size(m)
@@ -1390,17 +1821,16 @@ func (m *BelongsReply) Reset()         { *m = BelongsReply{} }
 func (m *BelongsReply) String() string { return proto.CompactTextString(m) }
 func (*BelongsReply) ProtoMessage()    {}
 func (*BelongsReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{21}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{21}
 }
-
 func (m *BelongsReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_BelongsReply.Unmarshal(m, b)
 }
 func (m *BelongsReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_BelongsReply.Marshal(b, m, deterministic)
 }
-func (m *BelongsReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_BelongsReply.Merge(m, src)
+func (dst *BelongsReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_BelongsReply.Merge(dst, src)
 }
 func (m *BelongsReply) XXX_Size() int {
 	return xxx_messageInfo_BelongsReply.Size(m)
@@ -1448,12 +1878,77 @@ func (m *BelongsReply) GetBelongs() bool {
 	return false
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*BelongsReply) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*BelongsReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _BelongsReply_OneofMarshaler, _BelongsReply_OneofUnmarshaler, _BelongsReply_OneofSizer, []interface{}{
 		(*BelongsReply_Error)(nil),
 		(*BelongsReply_Belongs)(nil),
 	}
+}
+
+func _BelongsReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*BelongsReply)
+	// response
+	switch x := m.Response.(type) {
+	case *BelongsReply_Error:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case *BelongsReply_Belongs:
+		t := uint64(0)
+		if x.Belongs {
+			t = 1
+		}
+		b.EncodeVarint(2<<3 | proto.WireVarint)
+		b.EncodeVarint(t)
+	case nil:
+	default:
+		return fmt.Errorf("BelongsReply.Response has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _BelongsReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*BelongsReply)
+	switch tag {
+	case 1: // response.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Response = &BelongsReply_Error{msg}
+		return true, err
+	case 2: // response.belongs
+		if wire != proto.WireVarint {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeVarint()
+		m.Response = &BelongsReply_Belongs{x != 0}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _BelongsReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*BelongsReply)
+	// response
+	switch x := m.Response.(type) {
+	case *BelongsReply_Error:
+		s := proto.Size(x.Error)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *BelongsReply_Belongs:
+		n += 1 // tag and wire
+		n += 1
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
 }
 
 type NodeGroupServiceRequest struct {
@@ -1468,17 +1963,16 @@ func (m *NodeGroupServiceRequest) Reset()         { *m = NodeGroupServiceRequest
 func (m *NodeGroupServiceRequest) String() string { return proto.CompactTextString(m) }
 func (*NodeGroupServiceRequest) ProtoMessage()    {}
 func (*NodeGroupServiceRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{22}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{22}
 }
-
 func (m *NodeGroupServiceRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NodeGroupServiceRequest.Unmarshal(m, b)
 }
 func (m *NodeGroupServiceRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NodeGroupServiceRequest.Marshal(b, m, deterministic)
 }
-func (m *NodeGroupServiceRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NodeGroupServiceRequest.Merge(m, src)
+func (dst *NodeGroupServiceRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NodeGroupServiceRequest.Merge(dst, src)
 }
 func (m *NodeGroupServiceRequest) XXX_Size() int {
 	return xxx_messageInfo_NodeGroupServiceRequest.Size(m)
@@ -1514,17 +2008,16 @@ func (m *MaxSizeReply) Reset()         { *m = MaxSizeReply{} }
 func (m *MaxSizeReply) String() string { return proto.CompactTextString(m) }
 func (*MaxSizeReply) ProtoMessage()    {}
 func (*MaxSizeReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{23}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{23}
 }
-
 func (m *MaxSizeReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_MaxSizeReply.Unmarshal(m, b)
 }
 func (m *MaxSizeReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_MaxSizeReply.Marshal(b, m, deterministic)
 }
-func (m *MaxSizeReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MaxSizeReply.Merge(m, src)
+func (dst *MaxSizeReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MaxSizeReply.Merge(dst, src)
 }
 func (m *MaxSizeReply) XXX_Size() int {
 	return xxx_messageInfo_MaxSizeReply.Size(m)
@@ -1553,17 +2046,16 @@ func (m *MinSizeReply) Reset()         { *m = MinSizeReply{} }
 func (m *MinSizeReply) String() string { return proto.CompactTextString(m) }
 func (*MinSizeReply) ProtoMessage()    {}
 func (*MinSizeReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{24}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{24}
 }
-
 func (m *MinSizeReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_MinSizeReply.Unmarshal(m, b)
 }
 func (m *MinSizeReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_MinSizeReply.Marshal(b, m, deterministic)
 }
-func (m *MinSizeReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_MinSizeReply.Merge(m, src)
+func (dst *MinSizeReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_MinSizeReply.Merge(dst, src)
 }
 func (m *MinSizeReply) XXX_Size() int {
 	return xxx_messageInfo_MinSizeReply.Size(m)
@@ -1595,17 +2087,16 @@ func (m *TargetSizeReply) Reset()         { *m = TargetSizeReply{} }
 func (m *TargetSizeReply) String() string { return proto.CompactTextString(m) }
 func (*TargetSizeReply) ProtoMessage()    {}
 func (*TargetSizeReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{25}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{25}
 }
-
 func (m *TargetSizeReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_TargetSizeReply.Unmarshal(m, b)
 }
 func (m *TargetSizeReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_TargetSizeReply.Marshal(b, m, deterministic)
 }
-func (m *TargetSizeReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_TargetSizeReply.Merge(m, src)
+func (dst *TargetSizeReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TargetSizeReply.Merge(dst, src)
 }
 func (m *TargetSizeReply) XXX_Size() int {
 	return xxx_messageInfo_TargetSizeReply.Size(m)
@@ -1653,12 +2144,73 @@ func (m *TargetSizeReply) GetTargetSize() int32 {
 	return 0
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*TargetSizeReply) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*TargetSizeReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _TargetSizeReply_OneofMarshaler, _TargetSizeReply_OneofUnmarshaler, _TargetSizeReply_OneofSizer, []interface{}{
 		(*TargetSizeReply_Error)(nil),
 		(*TargetSizeReply_TargetSize)(nil),
 	}
+}
+
+func _TargetSizeReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*TargetSizeReply)
+	// response
+	switch x := m.Response.(type) {
+	case *TargetSizeReply_Error:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case *TargetSizeReply_TargetSize:
+		b.EncodeVarint(2<<3 | proto.WireVarint)
+		b.EncodeVarint(uint64(x.TargetSize))
+	case nil:
+	default:
+		return fmt.Errorf("TargetSizeReply.Response has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _TargetSizeReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*TargetSizeReply)
+	switch tag {
+	case 1: // response.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Response = &TargetSizeReply_Error{msg}
+		return true, err
+	case 2: // response.targetSize
+		if wire != proto.WireVarint {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeVarint()
+		m.Response = &TargetSizeReply_TargetSize{int32(x)}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _TargetSizeReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*TargetSizeReply)
+	// response
+	switch x := m.Response.(type) {
+	case *TargetSizeReply_Error:
+		s := proto.Size(x.Error)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *TargetSizeReply_TargetSize:
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(x.TargetSize))
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
 }
 
 type IncreaseSizeRequest struct {
@@ -1674,17 +2226,16 @@ func (m *IncreaseSizeRequest) Reset()         { *m = IncreaseSizeRequest{} }
 func (m *IncreaseSizeRequest) String() string { return proto.CompactTextString(m) }
 func (*IncreaseSizeRequest) ProtoMessage()    {}
 func (*IncreaseSizeRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{26}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{26}
 }
-
 func (m *IncreaseSizeRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IncreaseSizeRequest.Unmarshal(m, b)
 }
 func (m *IncreaseSizeRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IncreaseSizeRequest.Marshal(b, m, deterministic)
 }
-func (m *IncreaseSizeRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_IncreaseSizeRequest.Merge(m, src)
+func (dst *IncreaseSizeRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IncreaseSizeRequest.Merge(dst, src)
 }
 func (m *IncreaseSizeRequest) XXX_Size() int {
 	return xxx_messageInfo_IncreaseSizeRequest.Size(m)
@@ -1727,17 +2278,16 @@ func (m *IncreaseSizeReply) Reset()         { *m = IncreaseSizeReply{} }
 func (m *IncreaseSizeReply) String() string { return proto.CompactTextString(m) }
 func (*IncreaseSizeReply) ProtoMessage()    {}
 func (*IncreaseSizeReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{27}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{27}
 }
-
 func (m *IncreaseSizeReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IncreaseSizeReply.Unmarshal(m, b)
 }
 func (m *IncreaseSizeReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IncreaseSizeReply.Marshal(b, m, deterministic)
 }
-func (m *IncreaseSizeReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_IncreaseSizeReply.Merge(m, src)
+func (dst *IncreaseSizeReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IncreaseSizeReply.Merge(dst, src)
 }
 func (m *IncreaseSizeReply) XXX_Size() int {
 	return xxx_messageInfo_IncreaseSizeReply.Size(m)
@@ -1768,17 +2318,16 @@ func (m *DeleteNodesRequest) Reset()         { *m = DeleteNodesRequest{} }
 func (m *DeleteNodesRequest) String() string { return proto.CompactTextString(m) }
 func (*DeleteNodesRequest) ProtoMessage()    {}
 func (*DeleteNodesRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{28}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{28}
 }
-
 func (m *DeleteNodesRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_DeleteNodesRequest.Unmarshal(m, b)
 }
 func (m *DeleteNodesRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_DeleteNodesRequest.Marshal(b, m, deterministic)
 }
-func (m *DeleteNodesRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeleteNodesRequest.Merge(m, src)
+func (dst *DeleteNodesRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeleteNodesRequest.Merge(dst, src)
 }
 func (m *DeleteNodesRequest) XXX_Size() int {
 	return xxx_messageInfo_DeleteNodesRequest.Size(m)
@@ -1821,17 +2370,16 @@ func (m *DeleteNodesReply) Reset()         { *m = DeleteNodesReply{} }
 func (m *DeleteNodesReply) String() string { return proto.CompactTextString(m) }
 func (*DeleteNodesReply) ProtoMessage()    {}
 func (*DeleteNodesReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{29}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{29}
 }
-
 func (m *DeleteNodesReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_DeleteNodesReply.Unmarshal(m, b)
 }
 func (m *DeleteNodesReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_DeleteNodesReply.Marshal(b, m, deterministic)
 }
-func (m *DeleteNodesReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeleteNodesReply.Merge(m, src)
+func (dst *DeleteNodesReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeleteNodesReply.Merge(dst, src)
 }
 func (m *DeleteNodesReply) XXX_Size() int {
 	return xxx_messageInfo_DeleteNodesReply.Size(m)
@@ -1862,17 +2410,16 @@ func (m *DecreaseTargetSizeRequest) Reset()         { *m = DecreaseTargetSizeReq
 func (m *DecreaseTargetSizeRequest) String() string { return proto.CompactTextString(m) }
 func (*DecreaseTargetSizeRequest) ProtoMessage()    {}
 func (*DecreaseTargetSizeRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{30}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{30}
 }
-
 func (m *DecreaseTargetSizeRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_DecreaseTargetSizeRequest.Unmarshal(m, b)
 }
 func (m *DecreaseTargetSizeRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_DecreaseTargetSizeRequest.Marshal(b, m, deterministic)
 }
-func (m *DecreaseTargetSizeRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DecreaseTargetSizeRequest.Merge(m, src)
+func (dst *DecreaseTargetSizeRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DecreaseTargetSizeRequest.Merge(dst, src)
 }
 func (m *DecreaseTargetSizeRequest) XXX_Size() int {
 	return xxx_messageInfo_DecreaseTargetSizeRequest.Size(m)
@@ -1915,17 +2462,16 @@ func (m *DecreaseTargetSizeReply) Reset()         { *m = DecreaseTargetSizeReply
 func (m *DecreaseTargetSizeReply) String() string { return proto.CompactTextString(m) }
 func (*DecreaseTargetSizeReply) ProtoMessage()    {}
 func (*DecreaseTargetSizeReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{31}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{31}
 }
-
 func (m *DecreaseTargetSizeReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_DecreaseTargetSizeReply.Unmarshal(m, b)
 }
 func (m *DecreaseTargetSizeReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_DecreaseTargetSizeReply.Marshal(b, m, deterministic)
 }
-func (m *DecreaseTargetSizeReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DecreaseTargetSizeReply.Merge(m, src)
+func (dst *DecreaseTargetSizeReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DecreaseTargetSizeReply.Merge(dst, src)
 }
 func (m *DecreaseTargetSizeReply) XXX_Size() int {
 	return xxx_messageInfo_DecreaseTargetSizeReply.Size(m)
@@ -1954,17 +2500,16 @@ func (m *IdReply) Reset()         { *m = IdReply{} }
 func (m *IdReply) String() string { return proto.CompactTextString(m) }
 func (*IdReply) ProtoMessage()    {}
 func (*IdReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{32}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{32}
 }
-
 func (m *IdReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IdReply.Unmarshal(m, b)
 }
 func (m *IdReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IdReply.Marshal(b, m, deterministic)
 }
-func (m *IdReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_IdReply.Merge(m, src)
+func (dst *IdReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_IdReply.Merge(dst, src)
 }
 func (m *IdReply) XXX_Size() int {
 	return xxx_messageInfo_IdReply.Size(m)
@@ -1993,17 +2538,16 @@ func (m *DebugReply) Reset()         { *m = DebugReply{} }
 func (m *DebugReply) String() string { return proto.CompactTextString(m) }
 func (*DebugReply) ProtoMessage()    {}
 func (*DebugReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{33}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{33}
 }
-
 func (m *DebugReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_DebugReply.Unmarshal(m, b)
 }
 func (m *DebugReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_DebugReply.Marshal(b, m, deterministic)
 }
-func (m *DebugReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DebugReply.Merge(m, src)
+func (dst *DebugReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DebugReply.Merge(dst, src)
 }
 func (m *DebugReply) XXX_Size() int {
 	return xxx_messageInfo_DebugReply.Size(m)
@@ -2032,17 +2576,16 @@ func (m *Instances) Reset()         { *m = Instances{} }
 func (m *Instances) String() string { return proto.CompactTextString(m) }
 func (*Instances) ProtoMessage()    {}
 func (*Instances) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{34}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{34}
 }
-
 func (m *Instances) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Instances.Unmarshal(m, b)
 }
 func (m *Instances) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Instances.Marshal(b, m, deterministic)
 }
-func (m *Instances) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Instances.Merge(m, src)
+func (dst *Instances) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Instances.Merge(dst, src)
 }
 func (m *Instances) XXX_Size() int {
 	return xxx_messageInfo_Instances.Size(m)
@@ -2074,17 +2617,16 @@ func (m *NodesReply) Reset()         { *m = NodesReply{} }
 func (m *NodesReply) String() string { return proto.CompactTextString(m) }
 func (*NodesReply) ProtoMessage()    {}
 func (*NodesReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{35}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{35}
 }
-
 func (m *NodesReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NodesReply.Unmarshal(m, b)
 }
 func (m *NodesReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NodesReply.Marshal(b, m, deterministic)
 }
-func (m *NodesReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NodesReply.Merge(m, src)
+func (dst *NodesReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NodesReply.Merge(dst, src)
 }
 func (m *NodesReply) XXX_Size() int {
 	return xxx_messageInfo_NodesReply.Size(m)
@@ -2132,12 +2674,78 @@ func (m *NodesReply) GetInstances() *Instances {
 	return nil
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*NodesReply) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*NodesReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _NodesReply_OneofMarshaler, _NodesReply_OneofUnmarshaler, _NodesReply_OneofSizer, []interface{}{
 		(*NodesReply_Error)(nil),
 		(*NodesReply_Instances)(nil),
 	}
+}
+
+func _NodesReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*NodesReply)
+	// response
+	switch x := m.Response.(type) {
+	case *NodesReply_Error:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case *NodesReply_Instances:
+		b.EncodeVarint(2<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Instances); err != nil {
+			return err
+		}
+	case nil:
+	default:
+		return fmt.Errorf("NodesReply.Response has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _NodesReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*NodesReply)
+	switch tag {
+	case 1: // response.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Response = &NodesReply_Error{msg}
+		return true, err
+	case 2: // response.instances
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Instances)
+		err := b.DecodeMessage(msg)
+		m.Response = &NodesReply_Instances{msg}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _NodesReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*NodesReply)
+	// response
+	switch x := m.Response.(type) {
+	case *NodesReply_Error:
+		s := proto.Size(x.Error)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *NodesReply_Instances:
+		s := proto.Size(x.Instances)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
 }
 
 type ImageStateSummary struct {
@@ -2152,17 +2760,16 @@ func (m *ImageStateSummary) Reset()         { *m = ImageStateSummary{} }
 func (m *ImageStateSummary) String() string { return proto.CompactTextString(m) }
 func (*ImageStateSummary) ProtoMessage()    {}
 func (*ImageStateSummary) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{36}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{36}
 }
-
 func (m *ImageStateSummary) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ImageStateSummary.Unmarshal(m, b)
 }
 func (m *ImageStateSummary) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ImageStateSummary.Marshal(b, m, deterministic)
 }
-func (m *ImageStateSummary) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ImageStateSummary.Merge(m, src)
+func (dst *ImageStateSummary) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ImageStateSummary.Merge(dst, src)
 }
 func (m *ImageStateSummary) XXX_Size() int {
 	return xxx_messageInfo_ImageStateSummary.Size(m)
@@ -2205,17 +2812,16 @@ func (m *Resource) Reset()         { *m = Resource{} }
 func (m *Resource) String() string { return proto.CompactTextString(m) }
 func (*Resource) ProtoMessage()    {}
 func (*Resource) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{37}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{37}
 }
-
 func (m *Resource) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Resource.Unmarshal(m, b)
 }
 func (m *Resource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Resource.Marshal(b, m, deterministic)
 }
-func (m *Resource) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Resource.Merge(m, src)
+func (dst *Resource) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Resource.Merge(dst, src)
 }
 func (m *Resource) XXX_Size() int {
 	return xxx_messageInfo_Resource.Size(m)
@@ -2273,17 +2879,16 @@ func (m *TransientSchedulerInfo) Reset()         { *m = TransientSchedulerInfo{}
 func (m *TransientSchedulerInfo) String() string { return proto.CompactTextString(m) }
 func (*TransientSchedulerInfo) ProtoMessage()    {}
 func (*TransientSchedulerInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{38}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{38}
 }
-
 func (m *TransientSchedulerInfo) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_TransientSchedulerInfo.Unmarshal(m, b)
 }
 func (m *TransientSchedulerInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_TransientSchedulerInfo.Marshal(b, m, deterministic)
 }
-func (m *TransientSchedulerInfo) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_TransientSchedulerInfo.Merge(m, src)
+func (dst *TransientSchedulerInfo) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TransientSchedulerInfo.Merge(dst, src)
 }
 func (m *TransientSchedulerInfo) XXX_Size() int {
 	return xxx_messageInfo_TransientSchedulerInfo.Size(m)
@@ -2320,17 +2925,16 @@ func (m *ProtocolPort) Reset()         { *m = ProtocolPort{} }
 func (m *ProtocolPort) String() string { return proto.CompactTextString(m) }
 func (*ProtocolPort) ProtoMessage()    {}
 func (*ProtocolPort) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{39}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{39}
 }
-
 func (m *ProtocolPort) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ProtocolPort.Unmarshal(m, b)
 }
 func (m *ProtocolPort) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ProtocolPort.Marshal(b, m, deterministic)
 }
-func (m *ProtocolPort) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ProtocolPort.Merge(m, src)
+func (dst *ProtocolPort) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ProtocolPort.Merge(dst, src)
 }
 func (m *ProtocolPort) XXX_Size() int {
 	return xxx_messageInfo_ProtocolPort.Size(m)
@@ -2366,17 +2970,16 @@ func (m *HostPortInfo) Reset()         { *m = HostPortInfo{} }
 func (m *HostPortInfo) String() string { return proto.CompactTextString(m) }
 func (*HostPortInfo) ProtoMessage()    {}
 func (*HostPortInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{40}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{40}
 }
-
 func (m *HostPortInfo) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_HostPortInfo.Unmarshal(m, b)
 }
 func (m *HostPortInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_HostPortInfo.Marshal(b, m, deterministic)
 }
-func (m *HostPortInfo) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_HostPortInfo.Merge(m, src)
+func (dst *HostPortInfo) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_HostPortInfo.Merge(dst, src)
 }
 func (m *HostPortInfo) XXX_Size() int {
 	return xxx_messageInfo_HostPortInfo.Size(m)
@@ -2412,17 +3015,16 @@ func (m *NodeInfo) Reset()         { *m = NodeInfo{} }
 func (m *NodeInfo) String() string { return proto.CompactTextString(m) }
 func (*NodeInfo) ProtoMessage()    {}
 func (*NodeInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{41}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{41}
 }
-
 func (m *NodeInfo) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NodeInfo.Unmarshal(m, b)
 }
 func (m *NodeInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NodeInfo.Marshal(b, m, deterministic)
 }
-func (m *NodeInfo) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NodeInfo.Merge(m, src)
+func (dst *NodeInfo) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NodeInfo.Merge(dst, src)
 }
 func (m *NodeInfo) XXX_Size() int {
 	return xxx_messageInfo_NodeInfo.Size(m)
@@ -2503,17 +3105,16 @@ func (m *TemplateNodeInfoReply) Reset()         { *m = TemplateNodeInfoReply{} }
 func (m *TemplateNodeInfoReply) String() string { return proto.CompactTextString(m) }
 func (*TemplateNodeInfoReply) ProtoMessage()    {}
 func (*TemplateNodeInfoReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{42}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{42}
 }
-
 func (m *TemplateNodeInfoReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_TemplateNodeInfoReply.Unmarshal(m, b)
 }
 func (m *TemplateNodeInfoReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_TemplateNodeInfoReply.Marshal(b, m, deterministic)
 }
-func (m *TemplateNodeInfoReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_TemplateNodeInfoReply.Merge(m, src)
+func (dst *TemplateNodeInfoReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_TemplateNodeInfoReply.Merge(dst, src)
 }
 func (m *TemplateNodeInfoReply) XXX_Size() int {
 	return xxx_messageInfo_TemplateNodeInfoReply.Size(m)
@@ -2561,12 +3162,78 @@ func (m *TemplateNodeInfoReply) GetNodeInfo() *NodeInfo {
 	return nil
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*TemplateNodeInfoReply) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*TemplateNodeInfoReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _TemplateNodeInfoReply_OneofMarshaler, _TemplateNodeInfoReply_OneofUnmarshaler, _TemplateNodeInfoReply_OneofSizer, []interface{}{
 		(*TemplateNodeInfoReply_Error)(nil),
 		(*TemplateNodeInfoReply_NodeInfo)(nil),
 	}
+}
+
+func _TemplateNodeInfoReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*TemplateNodeInfoReply)
+	// response
+	switch x := m.Response.(type) {
+	case *TemplateNodeInfoReply_Error:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case *TemplateNodeInfoReply_NodeInfo:
+		b.EncodeVarint(2<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.NodeInfo); err != nil {
+			return err
+		}
+	case nil:
+	default:
+		return fmt.Errorf("TemplateNodeInfoReply.Response has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _TemplateNodeInfoReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*TemplateNodeInfoReply)
+	switch tag {
+	case 1: // response.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Response = &TemplateNodeInfoReply_Error{msg}
+		return true, err
+	case 2: // response.nodeInfo
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(NodeInfo)
+		err := b.DecodeMessage(msg)
+		m.Response = &TemplateNodeInfoReply_NodeInfo{msg}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _TemplateNodeInfoReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*TemplateNodeInfoReply)
+	// response
+	switch x := m.Response.(type) {
+	case *TemplateNodeInfoReply_Error:
+		s := proto.Size(x.Error)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *TemplateNodeInfoReply_NodeInfo:
+		s := proto.Size(x.NodeInfo)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
 }
 
 type ExistReply struct {
@@ -2580,17 +3247,16 @@ func (m *ExistReply) Reset()         { *m = ExistReply{} }
 func (m *ExistReply) String() string { return proto.CompactTextString(m) }
 func (*ExistReply) ProtoMessage()    {}
 func (*ExistReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{43}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{43}
 }
-
 func (m *ExistReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ExistReply.Unmarshal(m, b)
 }
 func (m *ExistReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ExistReply.Marshal(b, m, deterministic)
 }
-func (m *ExistReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ExistReply.Merge(m, src)
+func (dst *ExistReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ExistReply.Merge(dst, src)
 }
 func (m *ExistReply) XXX_Size() int {
 	return xxx_messageInfo_ExistReply.Size(m)
@@ -2622,17 +3288,16 @@ func (m *CreateReply) Reset()         { *m = CreateReply{} }
 func (m *CreateReply) String() string { return proto.CompactTextString(m) }
 func (*CreateReply) ProtoMessage()    {}
 func (*CreateReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{44}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{44}
 }
-
 func (m *CreateReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CreateReply.Unmarshal(m, b)
 }
 func (m *CreateReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CreateReply.Marshal(b, m, deterministic)
 }
-func (m *CreateReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_CreateReply.Merge(m, src)
+func (dst *CreateReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_CreateReply.Merge(dst, src)
 }
 func (m *CreateReply) XXX_Size() int {
 	return xxx_messageInfo_CreateReply.Size(m)
@@ -2680,12 +3345,78 @@ func (m *CreateReply) GetNodeGroup() *NodeGroup {
 	return nil
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*CreateReply) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*CreateReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _CreateReply_OneofMarshaler, _CreateReply_OneofUnmarshaler, _CreateReply_OneofSizer, []interface{}{
 		(*CreateReply_Error)(nil),
 		(*CreateReply_NodeGroup)(nil),
 	}
+}
+
+func _CreateReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*CreateReply)
+	// response
+	switch x := m.Response.(type) {
+	case *CreateReply_Error:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case *CreateReply_NodeGroup:
+		b.EncodeVarint(2<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.NodeGroup); err != nil {
+			return err
+		}
+	case nil:
+	default:
+		return fmt.Errorf("CreateReply.Response has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _CreateReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*CreateReply)
+	switch tag {
+	case 1: // response.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Response = &CreateReply_Error{msg}
+		return true, err
+	case 2: // response.nodeGroup
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(NodeGroup)
+		err := b.DecodeMessage(msg)
+		m.Response = &CreateReply_NodeGroup{msg}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _CreateReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*CreateReply)
+	// response
+	switch x := m.Response.(type) {
+	case *CreateReply_Error:
+		s := proto.Size(x.Error)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *CreateReply_NodeGroup:
+		s := proto.Size(x.NodeGroup)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
 }
 
 type DeleteReply struct {
@@ -2699,17 +3430,16 @@ func (m *DeleteReply) Reset()         { *m = DeleteReply{} }
 func (m *DeleteReply) String() string { return proto.CompactTextString(m) }
 func (*DeleteReply) ProtoMessage()    {}
 func (*DeleteReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{45}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{45}
 }
-
 func (m *DeleteReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_DeleteReply.Unmarshal(m, b)
 }
 func (m *DeleteReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_DeleteReply.Marshal(b, m, deterministic)
 }
-func (m *DeleteReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_DeleteReply.Merge(m, src)
+func (dst *DeleteReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_DeleteReply.Merge(dst, src)
 }
 func (m *DeleteReply) XXX_Size() int {
 	return xxx_messageInfo_DeleteReply.Size(m)
@@ -2738,17 +3468,16 @@ func (m *AutoprovisionedReply) Reset()         { *m = AutoprovisionedReply{} }
 func (m *AutoprovisionedReply) String() string { return proto.CompactTextString(m) }
 func (*AutoprovisionedReply) ProtoMessage()    {}
 func (*AutoprovisionedReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{46}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{46}
 }
-
 func (m *AutoprovisionedReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_AutoprovisionedReply.Unmarshal(m, b)
 }
 func (m *AutoprovisionedReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_AutoprovisionedReply.Marshal(b, m, deterministic)
 }
-func (m *AutoprovisionedReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_AutoprovisionedReply.Merge(m, src)
+func (dst *AutoprovisionedReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_AutoprovisionedReply.Merge(dst, src)
 }
 func (m *AutoprovisionedReply) XXX_Size() int {
 	return xxx_messageInfo_AutoprovisionedReply.Size(m)
@@ -2780,17 +3509,16 @@ func (m *NodePriceRequest) Reset()         { *m = NodePriceRequest{} }
 func (m *NodePriceRequest) String() string { return proto.CompactTextString(m) }
 func (*NodePriceRequest) ProtoMessage()    {}
 func (*NodePriceRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{47}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{47}
 }
-
 func (m *NodePriceRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NodePriceRequest.Unmarshal(m, b)
 }
 func (m *NodePriceRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NodePriceRequest.Marshal(b, m, deterministic)
 }
-func (m *NodePriceRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NodePriceRequest.Merge(m, src)
+func (dst *NodePriceRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NodePriceRequest.Merge(dst, src)
 }
 func (m *NodePriceRequest) XXX_Size() int {
 	return xxx_messageInfo_NodePriceRequest.Size(m)
@@ -2843,17 +3571,16 @@ func (m *NodePriceReply) Reset()         { *m = NodePriceReply{} }
 func (m *NodePriceReply) String() string { return proto.CompactTextString(m) }
 func (*NodePriceReply) ProtoMessage()    {}
 func (*NodePriceReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{48}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{48}
 }
-
 func (m *NodePriceReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NodePriceReply.Unmarshal(m, b)
 }
 func (m *NodePriceReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NodePriceReply.Marshal(b, m, deterministic)
 }
-func (m *NodePriceReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NodePriceReply.Merge(m, src)
+func (dst *NodePriceReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NodePriceReply.Merge(dst, src)
 }
 func (m *NodePriceReply) XXX_Size() int {
 	return xxx_messageInfo_NodePriceReply.Size(m)
@@ -2901,12 +3628,73 @@ func (m *NodePriceReply) GetPrice() float64 {
 	return 0
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*NodePriceReply) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*NodePriceReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _NodePriceReply_OneofMarshaler, _NodePriceReply_OneofUnmarshaler, _NodePriceReply_OneofSizer, []interface{}{
 		(*NodePriceReply_Error)(nil),
 		(*NodePriceReply_Price)(nil),
 	}
+}
+
+func _NodePriceReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*NodePriceReply)
+	// response
+	switch x := m.Response.(type) {
+	case *NodePriceReply_Error:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case *NodePriceReply_Price:
+		b.EncodeVarint(2<<3 | proto.WireFixed64)
+		b.EncodeFixed64(math.Float64bits(x.Price))
+	case nil:
+	default:
+		return fmt.Errorf("NodePriceReply.Response has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _NodePriceReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*NodePriceReply)
+	switch tag {
+	case 1: // response.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Response = &NodePriceReply_Error{msg}
+		return true, err
+	case 2: // response.price
+		if wire != proto.WireFixed64 {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeFixed64()
+		m.Response = &NodePriceReply_Price{math.Float64frombits(x)}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _NodePriceReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*NodePriceReply)
+	// response
+	switch x := m.Response.(type) {
+	case *NodePriceReply_Error:
+		s := proto.Size(x.Error)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *NodePriceReply_Price:
+		n += 1 // tag and wire
+		n += 8
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
 }
 
 type PodPriceRequest struct {
@@ -2923,17 +3711,16 @@ func (m *PodPriceRequest) Reset()         { *m = PodPriceRequest{} }
 func (m *PodPriceRequest) String() string { return proto.CompactTextString(m) }
 func (*PodPriceRequest) ProtoMessage()    {}
 func (*PodPriceRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{49}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{49}
 }
-
 func (m *PodPriceRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PodPriceRequest.Unmarshal(m, b)
 }
 func (m *PodPriceRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_PodPriceRequest.Marshal(b, m, deterministic)
 }
-func (m *PodPriceRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PodPriceRequest.Merge(m, src)
+func (dst *PodPriceRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PodPriceRequest.Merge(dst, src)
 }
 func (m *PodPriceRequest) XXX_Size() int {
 	return xxx_messageInfo_PodPriceRequest.Size(m)
@@ -2986,17 +3773,16 @@ func (m *PodPriceReply) Reset()         { *m = PodPriceReply{} }
 func (m *PodPriceReply) String() string { return proto.CompactTextString(m) }
 func (*PodPriceReply) ProtoMessage()    {}
 func (*PodPriceReply) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{50}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{50}
 }
-
 func (m *PodPriceReply) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PodPriceReply.Unmarshal(m, b)
 }
 func (m *PodPriceReply) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_PodPriceReply.Marshal(b, m, deterministic)
 }
-func (m *PodPriceReply) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PodPriceReply.Merge(m, src)
+func (dst *PodPriceReply) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PodPriceReply.Merge(dst, src)
 }
 func (m *PodPriceReply) XXX_Size() int {
 	return xxx_messageInfo_PodPriceReply.Size(m)
@@ -3044,17 +3830,78 @@ func (m *PodPriceReply) GetPrice() float64 {
 	return 0
 }
 
-// XXX_OneofWrappers is for the internal use of the proto package.
-func (*PodPriceReply) XXX_OneofWrappers() []interface{} {
-	return []interface{}{
+// XXX_OneofFuncs is for the internal use of the proto package.
+func (*PodPriceReply) XXX_OneofFuncs() (func(msg proto.Message, b *proto.Buffer) error, func(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error), func(msg proto.Message) (n int), []interface{}) {
+	return _PodPriceReply_OneofMarshaler, _PodPriceReply_OneofUnmarshaler, _PodPriceReply_OneofSizer, []interface{}{
 		(*PodPriceReply_Error)(nil),
 		(*PodPriceReply_Price)(nil),
 	}
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////
+func _PodPriceReply_OneofMarshaler(msg proto.Message, b *proto.Buffer) error {
+	m := msg.(*PodPriceReply)
+	// response
+	switch x := m.Response.(type) {
+	case *PodPriceReply_Error:
+		b.EncodeVarint(1<<3 | proto.WireBytes)
+		if err := b.EncodeMessage(x.Error); err != nil {
+			return err
+		}
+	case *PodPriceReply_Price:
+		b.EncodeVarint(2<<3 | proto.WireFixed64)
+		b.EncodeFixed64(math.Float64bits(x.Price))
+	case nil:
+	default:
+		return fmt.Errorf("PodPriceReply.Response has unexpected type %T", x)
+	}
+	return nil
+}
+
+func _PodPriceReply_OneofUnmarshaler(msg proto.Message, tag, wire int, b *proto.Buffer) (bool, error) {
+	m := msg.(*PodPriceReply)
+	switch tag {
+	case 1: // response.error
+		if wire != proto.WireBytes {
+			return true, proto.ErrInternalBadWireType
+		}
+		msg := new(Error)
+		err := b.DecodeMessage(msg)
+		m.Response = &PodPriceReply_Error{msg}
+		return true, err
+	case 2: // response.price
+		if wire != proto.WireFixed64 {
+			return true, proto.ErrInternalBadWireType
+		}
+		x, err := b.DecodeFixed64()
+		m.Response = &PodPriceReply_Price{math.Float64frombits(x)}
+		return true, err
+	default:
+		return false, nil
+	}
+}
+
+func _PodPriceReply_OneofSizer(msg proto.Message) (n int) {
+	m := msg.(*PodPriceReply)
+	// response
+	switch x := m.Response.(type) {
+	case *PodPriceReply_Error:
+		s := proto.Size(x.Error)
+		n += 1 // tag and wire
+		n += proto.SizeVarint(uint64(s))
+		n += s
+	case *PodPriceReply_Price:
+		n += 1 // tag and wire
+		n += 8
+	case nil:
+	default:
+		panic(fmt.Sprintf("proto: unexpected type %T in oneof", x))
+	}
+	return n
+}
+
+// ///////////////////////////////////////////////////////////////////////////////////////////////////////
 // General messages types
-/////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ///////////////////////////////////////////////////////////////////////////////////////////////////////
 type Error struct {
 	Code                 string   `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
 	Reason               string   `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
@@ -3067,17 +3914,16 @@ func (m *Error) Reset()         { *m = Error{} }
 func (m *Error) String() string { return proto.CompactTextString(m) }
 func (*Error) ProtoMessage()    {}
 func (*Error) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{51}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{51}
 }
-
 func (m *Error) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Error.Unmarshal(m, b)
 }
 func (m *Error) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Error.Marshal(b, m, deterministic)
 }
-func (m *Error) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Error.Merge(m, src)
+func (dst *Error) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Error.Merge(dst, src)
 }
 func (m *Error) XXX_Size() int {
 	return xxx_messageInfo_Error.Size(m)
@@ -3113,17 +3959,16 @@ func (m *NodeGroup) Reset()         { *m = NodeGroup{} }
 func (m *NodeGroup) String() string { return proto.CompactTextString(m) }
 func (*NodeGroup) ProtoMessage()    {}
 func (*NodeGroup) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{52}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{52}
 }
-
 func (m *NodeGroup) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NodeGroup.Unmarshal(m, b)
 }
 func (m *NodeGroup) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NodeGroup.Marshal(b, m, deterministic)
 }
-func (m *NodeGroup) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_NodeGroup.Merge(m, src)
+func (dst *NodeGroup) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_NodeGroup.Merge(dst, src)
 }
 func (m *NodeGroup) XXX_Size() int {
 	return xxx_messageInfo_NodeGroup.Size(m)
@@ -3152,17 +3997,16 @@ func (m *PricingModel) Reset()         { *m = PricingModel{} }
 func (m *PricingModel) String() string { return proto.CompactTextString(m) }
 func (*PricingModel) ProtoMessage()    {}
 func (*PricingModel) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{53}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{53}
 }
-
 func (m *PricingModel) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PricingModel.Unmarshal(m, b)
 }
 func (m *PricingModel) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_PricingModel.Marshal(b, m, deterministic)
 }
-func (m *PricingModel) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_PricingModel.Merge(m, src)
+func (dst *PricingModel) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PricingModel.Merge(dst, src)
 }
 func (m *PricingModel) XXX_Size() int {
 	return xxx_messageInfo_PricingModel.Size(m)
@@ -3192,17 +4036,16 @@ func (m *ResourceLimiter) Reset()         { *m = ResourceLimiter{} }
 func (m *ResourceLimiter) String() string { return proto.CompactTextString(m) }
 func (*ResourceLimiter) ProtoMessage()    {}
 func (*ResourceLimiter) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{54}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{54}
 }
-
 func (m *ResourceLimiter) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ResourceLimiter.Unmarshal(m, b)
 }
 func (m *ResourceLimiter) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ResourceLimiter.Marshal(b, m, deterministic)
 }
-func (m *ResourceLimiter) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ResourceLimiter.Merge(m, src)
+func (dst *ResourceLimiter) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ResourceLimiter.Merge(dst, src)
 }
 func (m *ResourceLimiter) XXX_Size() int {
 	return xxx_messageInfo_ResourceLimiter.Size(m)
@@ -3242,17 +4085,16 @@ func (m *InstanceErrorInfo) Reset()         { *m = InstanceErrorInfo{} }
 func (m *InstanceErrorInfo) String() string { return proto.CompactTextString(m) }
 func (*InstanceErrorInfo) ProtoMessage()    {}
 func (*InstanceErrorInfo) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{55}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{55}
 }
-
 func (m *InstanceErrorInfo) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_InstanceErrorInfo.Unmarshal(m, b)
 }
 func (m *InstanceErrorInfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_InstanceErrorInfo.Marshal(b, m, deterministic)
 }
-func (m *InstanceErrorInfo) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_InstanceErrorInfo.Merge(m, src)
+func (dst *InstanceErrorInfo) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_InstanceErrorInfo.Merge(dst, src)
 }
 func (m *InstanceErrorInfo) XXX_Size() int {
 	return xxx_messageInfo_InstanceErrorInfo.Size(m)
@@ -3296,17 +4138,16 @@ func (m *InstanceStatus) Reset()         { *m = InstanceStatus{} }
 func (m *InstanceStatus) String() string { return proto.CompactTextString(m) }
 func (*InstanceStatus) ProtoMessage()    {}
 func (*InstanceStatus) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{56}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{56}
 }
-
 func (m *InstanceStatus) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_InstanceStatus.Unmarshal(m, b)
 }
 func (m *InstanceStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_InstanceStatus.Marshal(b, m, deterministic)
 }
-func (m *InstanceStatus) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_InstanceStatus.Merge(m, src)
+func (dst *InstanceStatus) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_InstanceStatus.Merge(dst, src)
 }
 func (m *InstanceStatus) XXX_Size() int {
 	return xxx_messageInfo_InstanceStatus.Size(m)
@@ -3343,17 +4184,16 @@ func (m *Instance) Reset()         { *m = Instance{} }
 func (m *Instance) String() string { return proto.CompactTextString(m) }
 func (*Instance) ProtoMessage()    {}
 func (*Instance) Descriptor() ([]byte, []int) {
-	return fileDescriptor_81ea47a3f88c2082, []int{57}
+	return fileDescriptor_grpc_91b7c1ba39b96842, []int{57}
 }
-
 func (m *Instance) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Instance.Unmarshal(m, b)
 }
 func (m *Instance) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Instance.Marshal(b, m, deterministic)
 }
-func (m *Instance) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Instance.Merge(m, src)
+func (dst *Instance) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Instance.Merge(dst, src)
 }
 func (m *Instance) XXX_Size() int {
 	return xxx_messageInfo_Instance.Size(m)
@@ -3379,8 +4219,6 @@ func (m *Instance) GetStatus() *InstanceStatus {
 }
 
 func init() {
-	proto.RegisterEnum("grpccloudprovider.InstanceErrorClass", InstanceErrorClass_name, InstanceErrorClass_value)
-	proto.RegisterEnum("grpccloudprovider.InstanceState", InstanceState_name, InstanceState_value)
 	proto.RegisterType((*CloudProviderServiceRequest)(nil), "grpccloudprovider.CloudProviderServiceRequest")
 	proto.RegisterType((*KubeAdmConfig)(nil), "grpccloudprovider.KubeAdmConfig")
 	proto.RegisterType((*NodeGroupDef)(nil), "grpccloudprovider.NodeGroupDef")
@@ -3449,183 +4287,8 @@ func init() {
 	proto.RegisterType((*InstanceErrorInfo)(nil), "grpccloudprovider.InstanceErrorInfo")
 	proto.RegisterType((*InstanceStatus)(nil), "grpccloudprovider.InstanceStatus")
 	proto.RegisterType((*Instance)(nil), "grpccloudprovider.Instance")
-}
-
-func init() { proto.RegisterFile("grpc/grpc.proto", fileDescriptor_81ea47a3f88c2082) }
-
-var fileDescriptor_81ea47a3f88c2082 = []byte{
-	// 2733 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x3a, 0x5b, 0x6f, 0x1b, 0xd7,
-	0xd1, 0x5c, 0x52, 0x94, 0xc8, 0xa1, 0x2e, 0xd4, 0x91, 0x2c, 0xd3, 0xb4, 0x3f, 0x5b, 0xd9, 0x28,
-	0xf9, 0x54, 0xd7, 0xa5, 0x62, 0xa5, 0x29, 0xec, 0x20, 0x49, 0x2b, 0x51, 0x8c, 0xa4, 0xd6, 0xa2,
-	0x88, 0x15, 0x15, 0x14, 0x4d, 0x50, 0x67, 0xb5, 0x7b, 0x44, 0xad, 0xb5, 0x17, 0x7a, 0x2f, 0x8a,
-	0x95, 0x00, 0x79, 0x6e, 0x81, 0x02, 0x2d, 0xd0, 0x3e, 0xf6, 0xb1, 0x0f, 0x7d, 0xeb, 0x5b, 0x03,
-	0x14, 0x2d, 0xd0, 0xb7, 0xfe, 0x81, 0xfc, 0x9e, 0xa2, 0x38, 0x97, 0xbd, 0x91, 0x47, 0x14, 0x97,
-	0x8a, 0xd1, 0xbe, 0x08, 0x3c, 0x73, 0x66, 0xe6, 0xcc, 0xcc, 0x99, 0x9d, 0xdb, 0x11, 0x2c, 0xf4,
-	0xdc, 0xbe, 0xb6, 0x41, 0xfe, 0x34, 0xfa, 0xae, 0xe3, 0x3b, 0x68, 0x91, 0xfc, 0xd6, 0x4c, 0x27,
-	0xd0, 0xfb, 0xae, 0x73, 0x61, 0xe8, 0xd8, 0xad, 0xdf, 0xeb, 0x39, 0x4e, 0xcf, 0xc4, 0x1b, 0x14,
-	0xe1, 0x24, 0x38, 0xdd, 0xf0, 0x7c, 0x37, 0xd0, 0x7c, 0x46, 0x50, 0xbf, 0x33, 0xb8, 0xab, 0xda,
-	0x97, 0x7c, 0x4b, 0x3e, 0x7f, 0xe2, 0x35, 0x0c, 0x67, 0x43, 0xed, 0x1b, 0x1b, 0x9a, 0xe3, 0xe2,
-	0x8d, 0x8b, 0xc7, 0x1b, 0x3d, 0x6c, 0x63, 0x57, 0xf5, 0xb1, 0xce, 0x70, 0xe4, 0x0f, 0xe1, 0x6e,
-	0x93, 0x9c, 0xd6, 0xe1, 0xa7, 0x1d, 0x61, 0xf7, 0xc2, 0xd0, 0xb0, 0x82, 0x5f, 0x06, 0xd8, 0xf3,
-	0xd1, 0x7d, 0x80, 0x50, 0x8e, 0xfd, 0x9d, 0x9a, 0xb4, 0x2a, 0xad, 0x97, 0x95, 0x04, 0x44, 0xfe,
-	0x46, 0x82, 0xb9, 0x9f, 0x05, 0x27, 0x78, 0x4b, 0xb7, 0x9a, 0x8e, 0x7d, 0x6a, 0xf4, 0xd0, 0xdb,
-	0x30, 0x7f, 0xce, 0x00, 0x5b, 0xba, 0xee, 0x62, 0xcf, 0xe3, 0x54, 0x03, 0x50, 0x24, 0xc3, 0x2c,
-	0x87, 0x74, 0x9d, 0x73, 0x6c, 0xd7, 0xf2, 0x14, 0x2b, 0x05, 0x43, 0x6b, 0x30, 0xc7, 0xd7, 0xcd,
-	0xad, 0x26, 0x76, 0xfd, 0x5a, 0x81, 0x22, 0xa5, 0x81, 0xe8, 0x87, 0x70, 0x8b, 0x03, 0x5a, 0xaf,
-	0x7c, 0x57, 0xdd, 0x72, 0x7b, 0x81, 0x85, 0x6d, 0xdf, 0xab, 0x4d, 0xad, 0x16, 0xd6, 0xcb, 0x8a,
-	0x78, 0x53, 0xfe, 0x5b, 0x1e, 0x66, 0xdb, 0x8e, 0x8e, 0x77, 0x5d, 0x27, 0xe8, 0xef, 0xe0, 0x53,
-	0xb4, 0x0a, 0x15, 0x3b, 0x5c, 0x47, 0xba, 0x26, 0x41, 0xa8, 0x06, 0x33, 0x96, 0x61, 0x1f, 0x19,
-	0x5f, 0x62, 0x2a, 0x6d, 0x51, 0x09, 0x97, 0x74, 0x47, 0x7d, 0x45, 0x77, 0x0a, 0x7c, 0x87, 0x2d,
-	0x89, 0x9a, 0xd4, 0x5c, 0x9e, 0xe1, 0xd8, 0x36, 0xd6, 0x6b, 0x53, 0xab, 0xd2, 0x7a, 0x49, 0x49,
-	0xc1, 0xd0, 0x3b, 0xb0, 0x64, 0xd8, 0x9a, 0x19, 0xe8, 0xb8, 0xf5, 0xca, 0xf0, 0x7c, 0xc3, 0xee,
-	0x11, 0xc1, 0x6a, 0x45, 0x8a, 0x2a, 0xda, 0x42, 0x4d, 0x98, 0x36, 0xd5, 0x13, 0x6c, 0x7a, 0xb5,
-	0xe9, 0xd5, 0xc2, 0x7a, 0x65, 0xf3, 0xfb, 0x8d, 0x21, 0xb7, 0x69, 0x24, 0x95, 0x6b, 0x3c, 0xa3,
-	0xd8, 0x2d, 0xdb, 0x77, 0x2f, 0x15, 0x4e, 0x5a, 0x7f, 0x0a, 0x95, 0x04, 0x18, 0x55, 0xa1, 0x70,
-	0x8e, 0x2f, 0xb9, 0xde, 0xe4, 0x27, 0x5a, 0x86, 0xe2, 0x85, 0x6a, 0x06, 0x98, 0xdf, 0x0d, 0x5b,
-	0xbc, 0x9f, 0x7f, 0x22, 0xc9, 0xdf, 0xe4, 0x61, 0xbe, 0x49, 0x84, 0xd7, 0xfc, 0x31, 0x3d, 0x05,
-	0x3d, 0x83, 0x05, 0x17, 0x7b, 0x4e, 0xe0, 0x6a, 0xf8, 0x99, 0x61, 0x19, 0x3e, 0x76, 0x29, 0xdb,
-	0xca, 0xa6, 0x2c, 0x90, 0x5d, 0x49, 0x63, 0x2a, 0x83, 0xa4, 0xa8, 0x0b, 0xcb, 0xe7, 0x49, 0xb7,
-	0x0b, 0x5c, 0xd5, 0x37, 0x1c, 0x9b, 0x5a, 0xbf, 0xb2, 0xb9, 0x2a, 0x60, 0x99, 0xf2, 0x52, 0x45,
-	0x48, 0x8d, 0xde, 0x83, 0x22, 0xb9, 0x6f, 0xe6, 0x39, 0x95, 0xcd, 0x07, 0xd7, 0x58, 0x55, 0x61,
-	0xd8, 0xe8, 0x21, 0x54, 0xd5, 0xc0, 0x77, 0x3a, 0xc9, 0x7b, 0x66, 0x97, 0x37, 0x04, 0x97, 0x4d,
-	0x98, 0x8d, 0x0c, 0xd7, 0x37, 0x2f, 0xd1, 0x3b, 0x50, 0xc4, 0xae, 0xeb, 0xb8, 0xd4, 0x62, 0x95,
-	0xcd, 0x9a, 0xe0, 0xc8, 0x16, 0xd9, 0xdf, 0xcb, 0x29, 0x0c, 0x11, 0xdd, 0x87, 0xb2, 0xc6, 0x38,
-	0x60, 0x9d, 0x9a, 0xb0, 0xb4, 0x97, 0x53, 0x62, 0xd0, 0x36, 0x40, 0xc9, 0xc5, 0x5e, 0xdf, 0xb1,
-	0x3d, 0x2c, 0x3f, 0x80, 0x72, 0x5b, 0xb5, 0x30, 0x3b, 0x0a, 0xc1, 0x94, 0xad, 0x5a, 0x98, 0xdf,
-	0x0d, 0xfd, 0x2d, 0x1f, 0xc2, 0x42, 0xa4, 0x91, 0xc7, 0xd0, 0x3e, 0x00, 0x88, 0x9c, 0x9e, 0x7c,
-	0xbc, 0xc4, 0x12, 0xf7, 0x46, 0x59, 0x42, 0x49, 0xe0, 0xcb, 0x07, 0x70, 0x3b, 0xda, 0xf8, 0xd8,
-	0x71, 0xc9, 0xef, 0x71, 0x3d, 0x84, 0xc8, 0x47, 0xfc, 0x3e, 0xcf, 0xe5, 0x73, 0x74, 0x2c, 0x6f,
-	0x41, 0x25, 0x62, 0x87, 0x3d, 0xb4, 0x09, 0x45, 0xc3, 0xc7, 0xd6, 0x78, 0x62, 0x31, 0x54, 0xf9,
-	0xf7, 0x12, 0xdc, 0x1a, 0x16, 0x69, 0x32, 0xdb, 0x7f, 0x00, 0xe5, 0x48, 0x57, 0xee, 0xbe, 0x23,
-	0x65, 0x20, 0x37, 0x13, 0x11, 0xa4, 0x6e, 0xe6, 0x0f, 0x12, 0x2c, 0x76, 0x5c, 0x43, 0x33, 0xec,
-	0xde, 0x81, 0xa3, 0x63, 0x73, 0x52, 0x89, 0xb6, 0x88, 0x51, 0x0d, 0x0d, 0x53, 0x26, 0x5c, 0x24,
-	0x91, 0xdf, 0x26, 0xcf, 0xda, 0xcb, 0x29, 0x09, 0xa2, 0x94, 0x58, 0x4f, 0xe1, 0xd6, 0xd6, 0x85,
-	0x6a, 0x98, 0xea, 0x89, 0x89, 0x0f, 0x54, 0xed, 0xcc, 0xb0, 0x71, 0xf7, 0x92, 0x58, 0x7e, 0x15,
-	0x2a, 0x56, 0xbc, 0xa6, 0xf6, 0x2f, 0x2b, 0x49, 0x90, 0xfc, 0x77, 0x09, 0xea, 0x42, 0xda, 0x49,
-	0x55, 0xfb, 0x1c, 0x6e, 0xa9, 0x22, 0x7e, 0x5c, 0xcb, 0x75, 0x01, 0x07, 0xe1, 0xf9, 0x7b, 0x39,
-	0x45, 0xcc, 0x28, 0xa5, 0xf9, 0x3f, 0x8a, 0xb0, 0xd4, 0xc6, 0x5f, 0xc4, 0xee, 0x33, 0xa6, 0xd7,
-	0x0e, 0x18, 0x86, 0x39, 0x6f, 0x12, 0x34, 0x98, 0x58, 0x0a, 0xc3, 0x89, 0x85, 0xf0, 0x30, 0x6c,
-	0x72, 0x34, 0x4d, 0x21, 0x53, 0x34, 0x85, 0x24, 0x41, 0xec, 0x94, 0x57, 0x11, 0x46, 0x91, 0x63,
-	0xc4, 0x20, 0xf4, 0xd3, 0x81, 0x94, 0xb0, 0x29, 0xf2, 0xcb, 0x61, 0xfd, 0x44, 0x99, 0x01, 0x7d,
-	0x06, 0xb3, 0xde, 0xa5, 0xe7, 0x63, 0x8b, 0x6d, 0xd6, 0x66, 0x28, 0xc7, 0x27, 0x63, 0x72, 0x3c,
-	0x4a, 0x90, 0x32, 0xbe, 0x29, 0x6e, 0xe8, 0x31, 0x4c, 0xfb, 0xaa, 0x41, 0x12, 0x74, 0x89, 0xf2,
-	0xbd, 0xd3, 0x60, 0x75, 0x4a, 0x43, 0xed, 0x1b, 0x0d, 0x52, 0xa7, 0x34, 0x2e, 0x1e, 0x37, 0xba,
-	0x04, 0x43, 0xe1, 0x88, 0xe8, 0x04, 0xe6, 0x31, 0x49, 0xdf, 0x61, 0x5e, 0xf0, 0x6a, 0x65, 0x4a,
-	0xfa, 0xfe, 0x98, 0x22, 0xb5, 0x52, 0xc4, 0x4c, 0xa8, 0x01, 0x8e, 0x37, 0x48, 0x87, 0xf5, 0x1f,
-	0xc3, 0xe2, 0x90, 0xd2, 0x99, 0x18, 0x6c, 0xc1, 0x92, 0x40, 0xc4, 0x4c, 0x29, 0xf9, 0xb7, 0x12,
-	0x2c, 0xa6, 0x55, 0xff, 0x6f, 0x87, 0xb8, 0x3f, 0x49, 0xb0, 0x3c, 0x98, 0xc8, 0x27, 0x14, 0xaa,
-	0x7d, 0x83, 0xe2, 0x61, 0x2f, 0x37, 0x54, 0x3e, 0xa4, 0xc4, 0x3c, 0x87, 0xb9, 0xdd, 0xce, 0x31,
-	0xbd, 0xb9, 0x49, 0xc5, 0xbb, 0x07, 0xa5, 0x5e, 0x3f, 0xa0, 0x1f, 0x0f, 0xbb, 0x98, 0xbd, 0x9c,
-	0x12, 0x41, 0x52, 0x87, 0x7d, 0x2b, 0xc1, 0x9d, 0x5d, 0xec, 0x47, 0x71, 0x6a, 0xb7, 0x73, 0x9c,
-	0x88, 0x91, 0x2f, 0x61, 0x31, 0x0a, 0x54, 0xbb, 0xfd, 0x20, 0x8c, 0x76, 0xc4, 0xd3, 0x9b, 0x02,
-	0x29, 0xae, 0x64, 0x14, 0xc7, 0xc1, 0x90, 0x0b, 0x73, 0xf9, 0x61, 0xee, 0xf5, 0x1d, 0x58, 0x11,
-	0x23, 0x67, 0x72, 0xbe, 0x8f, 0x60, 0xb6, 0x69, 0x62, 0xd5, 0x0e, 0xdd, 0xae, 0x31, 0xa6, 0x09,
-	0xb9, 0x01, 0x09, 0xbd, 0x82, 0x4f, 0x5d, 0xec, 0x9d, 0x4d, 0x46, 0x7f, 0x0a, 0xf3, 0xdb, 0xd8,
-	0x74, 0xec, 0x9e, 0x97, 0x21, 0x6c, 0x27, 0x83, 0x72, 0x7e, 0x38, 0x28, 0x87, 0xe5, 0x48, 0x21,
-	0x51, 0x8e, 0x9c, 0xc1, 0x6c, 0x74, 0xce, 0x64, 0xae, 0x52, 0x87, 0x99, 0x13, 0xc6, 0x21, 0xaa,
-	0xdd, 0x42, 0x40, 0xca, 0x51, 0x3e, 0x4d, 0xd4, 0x51, 0xd9, 0x7a, 0xb2, 0xeb, 0x55, 0x93, 0xd7,
-	0x61, 0xf6, 0x80, 0xf5, 0x27, 0x4c, 0x8d, 0x44, 0xfb, 0x22, 0xa5, 0xda, 0x17, 0x8a, 0xc9, 0x7a,
-	0x9c, 0x18, 0x93, 0xb7, 0x40, 0x52, 0xaa, 0x05, 0x92, 0x5f, 0xc2, 0x42, 0x57, 0x75, 0x7b, 0xd8,
-	0x8f, 0x91, 0xb3, 0x5b, 0x67, 0x15, 0xc0, 0x8f, 0x98, 0xb0, 0x26, 0x8b, 0x14, 0x2b, 0x31, 0x2c,
-	0x65, 0x23, 0x0b, 0x96, 0xf6, 0x6d, 0xcd, 0xc5, 0xaa, 0x87, 0xd9, 0xa1, 0xdf, 0xd5, 0xd5, 0x2f,
-	0x43, 0x51, 0xc7, 0xa6, 0xaf, 0xf2, 0x66, 0x8e, 0x2d, 0xe4, 0x26, 0x2c, 0xa6, 0x8f, 0x9b, 0xc4,
-	0x53, 0x5f, 0x00, 0xda, 0xc1, 0x26, 0xf6, 0x31, 0xb9, 0xdd, 0xd7, 0xe2, 0xad, 0x85, 0xc8, 0x5b,
-	0xb7, 0xa1, 0x9a, 0x3a, 0x6b, 0x12, 0x79, 0x3d, 0xb8, 0xb3, 0x83, 0x99, 0xd2, 0xc9, 0xeb, 0x7d,
-	0xbd, 0x96, 0xde, 0x87, 0xdb, 0xa2, 0x43, 0x27, 0x91, 0xff, 0x2d, 0x98, 0xd9, 0xd7, 0x19, 0x69,
-	0x3d, 0x76, 0x1d, 0x2e, 0x6b, 0xec, 0x4a, 0xeb, 0x00, 0x3b, 0xf8, 0x24, 0xe8, 0x5d, 0x8f, 0xf9,
-	0x11, 0x94, 0xf7, 0x6d, 0xcf, 0x57, 0x6d, 0x0d, 0x93, 0x52, 0x26, 0xd5, 0x8f, 0xdc, 0x15, 0x48,
-	0x13, 0x22, 0x87, 0xed, 0xc8, 0xaf, 0x24, 0x80, 0xc4, 0x7d, 0x4c, 0x94, 0xa0, 0x8d, 0x50, 0x80,
-	0x11, 0x09, 0x3a, 0x12, 0x92, 0x24, 0xe8, 0x88, 0x20, 0xf5, 0xfd, 0x10, 0x87, 0xb6, 0xd4, 0x1e,
-	0x3e, 0xf2, 0x55, 0x1f, 0x1f, 0x05, 0x96, 0xa5, 0xba, 0xb4, 0x4b, 0xf4, 0xc2, 0xcf, 0xbb, 0xa0,
-	0xd0, 0xdf, 0xc4, 0x1e, 0x76, 0x60, 0x51, 0xa9, 0xf9, 0xe4, 0x23, 0x5a, 0xcb, 0x7f, 0xcd, 0x43,
-	0x29, 0xcc, 0xb8, 0x04, 0xd1, 0x32, 0x4c, 0xd3, 0x68, 0x76, 0x8e, 0x39, 0x83, 0x68, 0x8d, 0x56,
-	0x60, 0xda, 0xc2, 0x96, 0xe3, 0x5e, 0x52, 0x16, 0x05, 0x85, 0xaf, 0x48, 0xf7, 0x8c, 0xfb, 0x67,
-	0xd8, 0xc2, 0xae, 0x6a, 0x1e, 0xf9, 0x8e, 0xab, 0xf6, 0x58, 0xcc, 0x2d, 0x28, 0x43, 0x70, 0xda,
-	0x69, 0x9b, 0xa6, 0xf3, 0x05, 0xd6, 0x3b, 0x8e, 0xde, 0x0e, 0xac, 0x13, 0xec, 0xf2, 0x6a, 0x79,
-	0x08, 0x8e, 0x7e, 0x01, 0x0b, 0x9e, 0xa6, 0x9a, 0xaa, 0x1b, 0x17, 0x8d, 0x45, 0x7a, 0x4b, 0xef,
-	0x8c, 0xa8, 0x19, 0x1a, 0x47, 0x69, 0x12, 0x96, 0x37, 0x07, 0x19, 0xd5, 0xb7, 0x61, 0x59, 0x84,
-	0x78, 0x5d, 0xce, 0x2c, 0x24, 0x73, 0xe6, 0xd7, 0xb0, 0xd2, 0x75, 0x55, 0xdb, 0x33, 0xb0, 0xed,
-	0x1f, 0x69, 0x67, 0x58, 0x0f, 0x4c, 0xec, 0xee, 0xdb, 0xa7, 0x0e, 0x7a, 0x02, 0xb7, 0x89, 0x36,
-	0x9a, 0xea, 0x93, 0xac, 0xfc, 0x89, 0x63, 0x06, 0x16, 0xf6, 0x9a, 0x4e, 0x60, 0xfb, 0x3c, 0xe8,
-	0x5e, 0xb5, 0x4d, 0xec, 0xe3, 0xb2, 0x6f, 0x13, 0xeb, 0x7c, 0x83, 0x5f, 0xd8, 0x10, 0x9c, 0xe4,
-	0xdc, 0x8e, 0xeb, 0xf8, 0x8e, 0xe6, 0x98, 0x1d, 0xc7, 0xf5, 0xc9, 0xdd, 0xf5, 0xf9, 0x3a, 0x74,
-	0xfa, 0x70, 0x4d, 0x9c, 0xa2, 0xef, 0xb8, 0x3e, 0xe7, 0x45, 0x7f, 0xcb, 0xff, 0x92, 0x60, 0x76,
-	0xcf, 0xf1, 0x7c, 0x42, 0x4c, 0xc5, 0x3e, 0x86, 0xd9, 0xb3, 0xc4, 0x9a, 0x7f, 0x13, 0x8f, 0x05,
-	0xd6, 0x4e, 0x92, 0xa5, 0x16, 0xbc, 0x5d, 0x48, 0xb2, 0xa9, 0x7f, 0x0e, 0x8b, 0x43, 0x28, 0x02,
-	0x43, 0xbf, 0x97, 0x34, 0xf4, 0x55, 0x3d, 0x70, 0xac, 0x6e, 0xf2, 0x26, 0xfe, 0x3c, 0x05, 0x25,
-	0xe2, 0xcc, 0x54, 0x8b, 0x30, 0x90, 0x4a, 0x71, 0xda, 0x67, 0xea, 0xeb, 0xac, 0x14, 0x2b, 0x2b,
-	0xf4, 0x37, 0xfa, 0x10, 0xca, 0x81, 0x47, 0xfc, 0xcd, 0xf5, 0x3d, 0x3e, 0x76, 0x7a, 0x70, 0x8d,
-	0xaa, 0x4a, 0x4c, 0x81, 0xf6, 0x61, 0x31, 0xba, 0x91, 0xd0, 0x89, 0xa8, 0x2b, 0x8b, 0xa3, 0x48,
-	0x88, 0xa2, 0x0c, 0x53, 0xa1, 0x26, 0xcc, 0xdb, 0x8e, 0xfd, 0x25, 0x76, 0x1d, 0x1e, 0x97, 0x69,
-	0x7b, 0x78, 0x0d, 0x9f, 0x01, 0x12, 0xd4, 0x86, 0x8a, 0x11, 0xc5, 0x82, 0xb0, 0x87, 0x7c, 0x74,
-	0x45, 0xe1, 0x4f, 0xef, 0x2d, 0x0e, 0x1d, 0xfc, 0x2b, 0x49, 0x32, 0x40, 0x87, 0x30, 0x17, 0x79,
-	0x37, 0xf5, 0x86, 0x19, 0x2a, 0xd3, 0xf7, 0x04, 0x1c, 0xc5, 0x5f, 0x81, 0x92, 0xa6, 0x27, 0xb9,
-	0x86, 0xcf, 0xae, 0x0d, 0xc7, 0xae, 0x95, 0xe8, 0xd7, 0x94, 0x80, 0xd4, 0x75, 0xa8, 0x0e, 0x4a,
-	0x24, 0xf0, 0x92, 0xf7, 0xd3, 0x5e, 0xb2, 0x26, 0x0a, 0x9c, 0x83, 0x21, 0x31, 0xe9, 0x2a, 0xbf,
-	0x93, 0xe0, 0x56, 0x17, 0x5b, 0x7d, 0x53, 0x65, 0x59, 0x95, 0x4a, 0x3a, 0x61, 0x20, 0x7f, 0x0a,
-	0x25, 0x9b, 0xb3, 0xe0, 0xe2, 0xdc, 0x1d, 0x61, 0x6f, 0xd2, 0x52, 0x84, 0xe8, 0xa9, 0x28, 0xbe,
-	0x06, 0x40, 0x67, 0xc3, 0x4c, 0x8c, 0x15, 0x98, 0xc6, 0x64, 0xc5, 0xc6, 0xee, 0x25, 0x85, 0xaf,
-	0xe4, 0x5f, 0x4b, 0x50, 0x69, 0xba, 0x58, 0xf5, 0xff, 0x07, 0x66, 0x5f, 0x1f, 0x42, 0x85, 0xd5,
-	0x25, 0x93, 0xa5, 0xf4, 0x9f, 0xc0, 0xf2, 0x56, 0xe0, 0x3b, 0xd1, 0x08, 0x1d, 0xf3, 0xfc, 0xbe,
-	0x0e, 0x0b, 0x6a, 0x1a, 0xce, 0x6d, 0x30, 0x08, 0x96, 0xbf, 0x86, 0x2a, 0x11, 0xb3, 0xe3, 0x66,
-	0xa8, 0xaa, 0x05, 0xd3, 0x49, 0x74, 0x0f, 0xca, 0x9e, 0xaf, 0xba, 0x7e, 0xd7, 0xb0, 0xc2, 0x9c,
-	0x15, 0x03, 0x48, 0xad, 0x8c, 0x6d, 0x9d, 0xee, 0x4d, 0xd1, 0xbd, 0x70, 0x49, 0xda, 0x95, 0xc4,
-	0xf9, 0x93, 0x5d, 0xc7, 0x0a, 0x14, 0xe9, 0x0c, 0x8f, 0x0a, 0x24, 0x11, 0x38, 0x5d, 0xa6, 0x0c,
-	0xfd, 0x15, 0x2c, 0x74, 0x1c, 0x3d, 0x93, 0x9a, 0x55, 0x28, 0xf4, 0x1d, 0x9d, 0x6b, 0x49, 0x7e,
-	0x4e, 0xac, 0x24, 0x86, 0xb9, 0xf8, 0xf0, 0xd7, 0xa7, 0xe3, 0xbb, 0x50, 0xa4, 0x54, 0xe4, 0x82,
-	0xb4, 0x44, 0xe0, 0x26, 0xbf, 0xc9, 0xd7, 0x40, 0xaa, 0x48, 0x27, 0x7c, 0x5e, 0xe2, 0x2b, 0xf9,
-	0x2e, 0x94, 0x23, 0x3f, 0x45, 0xf3, 0x90, 0x37, 0x74, 0x4e, 0x96, 0x37, 0x74, 0xf9, 0x3e, 0x49,
-	0x8c, 0xf1, 0xb4, 0x74, 0x68, 0xff, 0x2f, 0x79, 0x58, 0x18, 0x98, 0x31, 0xa0, 0x43, 0x28, 0x5b,
-	0x86, 0x4d, 0x57, 0xde, 0x88, 0xc4, 0x37, 0x40, 0xd6, 0x38, 0x08, 0x69, 0x58, 0x04, 0x8d, 0x79,
-	0x50, 0x86, 0xea, 0x2b, 0xce, 0x30, 0x3f, 0x3e, 0xc3, 0x90, 0x26, 0x64, 0x18, 0xae, 0xeb, 0x1f,
-	0xc0, 0x7c, 0xfa, 0xb4, 0x2c, 0xc5, 0x0a, 0xa5, 0x4e, 0xb1, 0xce, 0x54, 0xea, 0xfc, 0x51, 0x22,
-	0xad, 0x13, 0x2b, 0x41, 0xe9, 0x65, 0xd1, 0x88, 0xde, 0x02, 0xa0, 0xd7, 0xdc, 0x34, 0x55, 0xfe,
-	0x4a, 0x38, 0xbf, 0xf9, 0xd6, 0x88, 0x4a, 0xb6, 0x15, 0x21, 0x2b, 0x09, 0x42, 0xe2, 0x9f, 0x6c,
-	0x15, 0x7f, 0x9d, 0x31, 0x00, 0xc9, 0x30, 0x4b, 0x17, 0x07, 0xd8, 0xf3, 0xc2, 0xca, 0xb2, 0xac,
-	0xa4, 0x60, 0xf2, 0x6f, 0x24, 0x98, 0x0f, 0x0f, 0x21, 0x81, 0x3f, 0xf0, 0xd0, 0x8f, 0xa0, 0xe8,
-	0x91, 0x14, 0xc0, 0xc5, 0x5a, 0x1d, 0x21, 0x16, 0x4d, 0x15, 0x0a, 0x43, 0x47, 0xdb, 0x5c, 0x98,
-	0x44, 0x50, 0x5f, 0xbb, 0x4e, 0x25, 0x56, 0x1a, 0x44, 0x64, 0xf2, 0x31, 0x94, 0xc2, 0xfd, 0x41,
-	0xdf, 0x43, 0x4f, 0x61, 0xda, 0xa3, 0x12, 0x72, 0xe6, 0x6f, 0x5c, 0x23, 0x58, 0xe0, 0x29, 0x9c,
-	0xe0, 0xe1, 0x27, 0x80, 0x86, 0x2d, 0x89, 0x96, 0x60, 0xa1, 0xa5, 0x28, 0x87, 0xca, 0xf3, 0xe3,
-	0xf6, 0x4e, 0xeb, 0xe3, 0xfd, 0x76, 0x6b, 0xa7, 0x9a, 0x43, 0x75, 0x58, 0x61, 0xc0, 0xc3, 0xe3,
-	0xee, 0xf3, 0xc3, 0x8f, 0x9f, 0x2b, 0xad, 0xa3, 0xc3, 0x63, 0xa5, 0xd9, 0x3a, 0xaa, 0x4a, 0x68,
-	0x01, 0x2a, 0x7c, 0xaf, 0xbb, 0xd7, 0x52, 0xaa, 0xda, 0x43, 0x03, 0xe6, 0x52, 0xa6, 0x20, 0x2c,
-	0x8f, 0xba, 0x5b, 0xdd, 0x56, 0x8a, 0xe5, 0x22, 0xcc, 0x31, 0xa0, 0x72, 0xdc, 0x6e, 0xef, 0xb7,
-	0x77, 0xab, 0x12, 0xba, 0x0d, 0x4b, 0x0c, 0xb4, 0xdd, 0xda, 0x6f, 0xef, 0x3e, 0x6f, 0x2a, 0xad,
-	0xad, 0x6e, 0x6b, 0xa7, 0x9a, 0x1f, 0xdc, 0xd8, 0x69, 0x3d, 0x6b, 0x91, 0x8d, 0xc2, 0xe6, 0xb7,
-	0x65, 0x58, 0x16, 0xbd, 0x56, 0xa3, 0x43, 0x98, 0xe1, 0xaf, 0x6a, 0x48, 0x64, 0x91, 0xf4, 0x53,
-	0x65, 0xfd, 0xc1, 0x28, 0x94, 0xbe, 0x79, 0x29, 0xe7, 0xd0, 0x27, 0x30, 0xd5, 0x56, 0x2d, 0x8c,
-	0x1a, 0x22, 0xd4, 0xab, 0xdf, 0xcb, 0xeb, 0xc2, 0x8c, 0x18, 0xbe, 0xc0, 0xc9, 0x39, 0x74, 0xc2,
-	0x9a, 0x3f, 0xf6, 0x58, 0x96, 0x99, 0xbb, 0x3c, 0x2a, 0xdf, 0x7a, 0xe1, 0x19, 0x2f, 0x58, 0x76,
-	0x4b, 0xbe, 0x77, 0xa1, 0x87, 0xa3, 0x28, 0xd3, 0xef, 0x74, 0xf5, 0xf5, 0xb1, 0x70, 0xd9, 0x59,
-	0x2a, 0xcc, 0xf0, 0x58, 0x99, 0x59, 0x99, 0xb5, 0x6b, 0x5e, 0xa9, 0xc2, 0x23, 0xbe, 0x82, 0x5a,
-	0x72, 0xd0, 0x99, 0x7a, 0x95, 0xca, 0x7a, 0xe6, 0x0f, 0xc6, 0x7d, 0x33, 0x0a, 0x0f, 0xff, 0x25,
-	0xcc, 0x26, 0x87, 0xea, 0xe8, 0xed, 0xf1, 0x1e, 0x1c, 0x84, 0xca, 0x0d, 0x4d, 0xe7, 0xe5, 0x1c,
-	0x72, 0x00, 0xed, 0x62, 0x7f, 0x30, 0x9b, 0x64, 0x55, 0xeb, 0xff, 0xc7, 0x78, 0x42, 0x8f, 0x14,
-	0x2a, 0x85, 0xd3, 0xee, 0xcc, 0xc7, 0x88, 0xa2, 0x60, 0x6a, 0x74, 0x2e, 0xe7, 0xd0, 0x05, 0x2c,
-	0x8b, 0xc6, 0xd2, 0x99, 0xcf, 0x7a, 0x94, 0x65, 0xde, 0x2d, 0xe7, 0xd0, 0x67, 0x30, 0xc3, 0x27,
-	0xd0, 0x99, 0x8f, 0x12, 0x86, 0x83, 0xc4, 0x34, 0x9b, 0x71, 0xe7, 0xf3, 0xe9, 0xef, 0x84, 0x7b,
-	0x72, 0xd6, 0x2d, 0xe7, 0x36, 0xff, 0x0d, 0x89, 0x2f, 0x36, 0x0c, 0x69, 0x3f, 0x87, 0x19, 0x3e,
-	0xa3, 0x1d, 0xfd, 0xf1, 0x8e, 0x71, 0x5c, 0x72, 0xd6, 0x2b, 0xe7, 0x28, 0x67, 0xfe, 0x7f, 0x2b,
-	0x37, 0xe6, 0x9c, 0x98, 0x0d, 0x53, 0xe7, 0x82, 0x78, 0x5e, 0x97, 0x89, 0xb9, 0x28, 0xb2, 0x0d,
-	0x8c, 0xfe, 0xd8, 0xd7, 0x98, 0x9c, 0xc0, 0x0a, 0xbf, 0x46, 0xc1, 0x44, 0xb8, 0xbe, 0x76, 0x2d,
-	0x1e, 0xe3, 0xff, 0x69, 0xd8, 0x98, 0xd0, 0xd1, 0x16, 0x12, 0x15, 0x23, 0xc3, 0xc3, 0xdb, 0xfa,
-	0x9b, 0xd7, 0xa1, 0x31, 0xe6, 0x7d, 0x40, 0xc3, 0x43, 0x4d, 0xf4, 0x48, 0x48, 0x7c, 0xc5, 0xc0,
-	0xb5, 0xfe, 0x70, 0x4c, 0x6c, 0x76, 0x62, 0x1b, 0xf2, 0xfb, 0x7a, 0xa6, 0x6b, 0xa8, 0x8b, 0x0c,
-	0xa5, 0x87, 0xfc, 0xba, 0x50, 0xa4, 0x43, 0xd2, 0x4c, 0x2c, 0xff, 0x4f, 0x28, 0x72, 0x38, 0x6a,
-	0x65, 0x5c, 0x99, 0xb9, 0x6f, 0xca, 0x35, 0x65, 0xed, 0x17, 0x50, 0x1d, 0xec, 0xd3, 0x33, 0x1d,
-	0x20, 0x4a, 0x82, 0xc2, 0xc6, 0x9f, 0x69, 0x40, 0x3b, 0xf0, 0x1b, 0x6b, 0x10, 0xf7, 0xf1, 0xb4,
-	0x04, 0x99, 0x66, 0x0d, 0x7b, 0x26, 0xb6, 0xf7, 0x45, 0xe1, 0x29, 0xee, 0xfb, 0x19, 0x5f, 0xe6,
-	0x9d, 0x37, 0xe6, 0x9b, 0x68, 0xe2, 0xe5, 0x1c, 0x3a, 0x83, 0x85, 0x81, 0xb6, 0x3c, 0xd3, 0x01,
-	0xa2, 0x1c, 0x26, 0x6a, 0xf3, 0xe5, 0x1c, 0xa9, 0xf6, 0xf8, 0x2b, 0x9c, 0xb0, 0xda, 0x4b, 0xbf,
-	0x04, 0x0a, 0xe3, 0x56, 0xf2, 0x11, 0x4f, 0xce, 0x6d, 0xfe, 0x53, 0x82, 0xa5, 0x64, 0xe9, 0x11,
-	0xc6, 0xe0, 0x63, 0xd6, 0x26, 0xd2, 0x1e, 0x16, 0xbd, 0x79, 0x85, 0x32, 0xc9, 0xf6, 0xba, 0xfe,
-	0xc6, 0x68, 0x24, 0x26, 0xbf, 0x02, 0xa5, 0xb0, 0x33, 0x46, 0xa2, 0xc0, 0x37, 0xd0, 0xb3, 0x0b,
-	0xf3, 0x6e, 0xaa, 0xb5, 0x96, 0x73, 0xdb, 0x4d, 0x78, 0x64, 0x38, 0xf4, 0x1f, 0x29, 0x34, 0x33,
-	0xf0, 0x48, 0x2b, 0xa8, 0x06, 0xbe, 0xe3, 0x69, 0xaa, 0x89, 0xdd, 0x46, 0x9a, 0x94, 0x30, 0xdb,
-	0x5e, 0x4c, 0xe5, 0xac, 0x5d, 0xb7, 0xaf, 0x75, 0xa4, 0x93, 0x69, 0x3a, 0xf0, 0x7d, 0xf7, 0x3f,
-	0x01, 0x00, 0x00, 0xff, 0xff, 0xb7, 0xcb, 0x5a, 0x11, 0x96, 0x2a, 0x00, 0x00,
+	proto.RegisterEnum("grpccloudprovider.InstanceErrorClass", InstanceErrorClass_name, InstanceErrorClass_value)
+	proto.RegisterEnum("grpccloudprovider.InstanceState", InstanceState_name, InstanceState_value)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -3784,47 +4447,6 @@ type CloudProviderServiceServer interface {
 	GetAvailableGPUTypes(context.Context, *CloudProviderServiceRequest) (*GetAvailableGPUTypesReply, error)
 	Cleanup(context.Context, *CloudProviderServiceRequest) (*CleanupReply, error)
 	Refresh(context.Context, *CloudProviderServiceRequest) (*RefreshReply, error)
-}
-
-// UnimplementedCloudProviderServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedCloudProviderServiceServer struct {
-}
-
-func (*UnimplementedCloudProviderServiceServer) Connect(ctx context.Context, req *ConnectRequest) (*ConnectReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Connect not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) Name(ctx context.Context, req *CloudProviderServiceRequest) (*NameReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Name not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) NodeGroups(ctx context.Context, req *CloudProviderServiceRequest) (*NodeGroupsReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NodeGroups not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) NodeGroupForNode(ctx context.Context, req *NodeGroupForNodeRequest) (*NodeGroupForNodeReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NodeGroupForNode not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) Pricing(ctx context.Context, req *CloudProviderServiceRequest) (*PricingModelReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Pricing not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) GetAvailableMachineTypes(ctx context.Context, req *CloudProviderServiceRequest) (*AvailableMachineTypesReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetAvailableMachineTypes not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) NewNodeGroup(ctx context.Context, req *NewNodeGroupRequest) (*NewNodeGroupReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NewNodeGroup not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) GetResourceLimiter(ctx context.Context, req *CloudProviderServiceRequest) (*ResourceLimiterReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetResourceLimiter not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) GPULabel(ctx context.Context, req *CloudProviderServiceRequest) (*GPULabelReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GPULabel not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) GetAvailableGPUTypes(ctx context.Context, req *CloudProviderServiceRequest) (*GetAvailableGPUTypesReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetAvailableGPUTypes not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) Cleanup(ctx context.Context, req *CloudProviderServiceRequest) (*CleanupReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Cleanup not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) Refresh(ctx context.Context, req *CloudProviderServiceRequest) (*RefreshReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Refresh not implemented")
 }
 
 func RegisterCloudProviderServiceServer(s *grpc.Server, srv CloudProviderServiceServer) {
@@ -4287,56 +4909,6 @@ type NodeGroupServiceServer interface {
 	Belongs(context.Context, *BelongsRequest) (*BelongsReply, error)
 }
 
-// UnimplementedNodeGroupServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedNodeGroupServiceServer struct {
-}
-
-func (*UnimplementedNodeGroupServiceServer) MaxSize(ctx context.Context, req *NodeGroupServiceRequest) (*MaxSizeReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method MaxSize not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) MinSize(ctx context.Context, req *NodeGroupServiceRequest) (*MinSizeReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method MinSize not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) TargetSize(ctx context.Context, req *NodeGroupServiceRequest) (*TargetSizeReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method TargetSize not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) IncreaseSize(ctx context.Context, req *IncreaseSizeRequest) (*IncreaseSizeReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method IncreaseSize not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) DeleteNodes(ctx context.Context, req *DeleteNodesRequest) (*DeleteNodesReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteNodes not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) DecreaseTargetSize(ctx context.Context, req *DecreaseTargetSizeRequest) (*DecreaseTargetSizeReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DecreaseTargetSize not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Id(ctx context.Context, req *NodeGroupServiceRequest) (*IdReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Id not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Debug(ctx context.Context, req *NodeGroupServiceRequest) (*DebugReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Debug not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Nodes(ctx context.Context, req *NodeGroupServiceRequest) (*NodesReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Nodes not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) TemplateNodeInfo(ctx context.Context, req *NodeGroupServiceRequest) (*TemplateNodeInfoReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method TemplateNodeInfo not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Exist(ctx context.Context, req *NodeGroupServiceRequest) (*ExistReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Exist not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Create(ctx context.Context, req *NodeGroupServiceRequest) (*CreateReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Delete(ctx context.Context, req *NodeGroupServiceRequest) (*DeleteReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Autoprovisioned(ctx context.Context, req *NodeGroupServiceRequest) (*AutoprovisionedReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Autoprovisioned not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Belongs(ctx context.Context, req *BelongsRequest) (*BelongsReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Belongs not implemented")
-}
-
 func RegisterNodeGroupServiceServer(s *grpc.Server, srv NodeGroupServiceServer) {
 	s.RegisterService(&_NodeGroupService_serviceDesc, srv)
 }
@@ -4720,17 +5292,6 @@ type PricingModelServiceServer interface {
 	PodPrice(context.Context, *PodPriceRequest) (*PodPriceReply, error)
 }
 
-// UnimplementedPricingModelServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedPricingModelServiceServer struct {
-}
-
-func (*UnimplementedPricingModelServiceServer) NodePrice(ctx context.Context, req *NodePriceRequest) (*NodePriceReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NodePrice not implemented")
-}
-func (*UnimplementedPricingModelServiceServer) PodPrice(ctx context.Context, req *PodPriceRequest) (*PodPriceReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PodPrice not implemented")
-}
-
 func RegisterPricingModelServiceServer(s *grpc.Server, srv PricingModelServiceServer) {
 	s.RegisterService(&_PricingModelService_serviceDesc, srv)
 }
@@ -4786,4 +5347,181 @@ var _PricingModelService_serviceDesc = grpc.ServiceDesc{
 	},
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "grpc/grpc.proto",
+}
+
+func init() { proto.RegisterFile("grpc/grpc.proto", fileDescriptor_grpc_91b7c1ba39b96842) }
+
+var fileDescriptor_grpc_91b7c1ba39b96842 = []byte{
+	// 2733 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x3a, 0x5b, 0x6f, 0x1b, 0xd7,
+	0xd1, 0x5c, 0x52, 0x94, 0xc8, 0xa1, 0x2e, 0xd4, 0x91, 0x2c, 0xd3, 0xb4, 0x3f, 0x5b, 0xd9, 0x28,
+	0xf9, 0x54, 0xd7, 0xa5, 0x62, 0xa5, 0x29, 0xec, 0x20, 0x49, 0x2b, 0x51, 0x8c, 0xa4, 0xd6, 0xa2,
+	0x88, 0x15, 0x15, 0x14, 0x4d, 0x50, 0x67, 0xb5, 0x7b, 0x44, 0xad, 0xb5, 0x17, 0x7a, 0x2f, 0x8a,
+	0x95, 0x00, 0x79, 0x6e, 0x81, 0x02, 0x2d, 0xd0, 0x3e, 0xf6, 0xb1, 0x0f, 0x7d, 0xeb, 0x5b, 0x03,
+	0x14, 0x2d, 0xd0, 0xb7, 0xfe, 0x81, 0xfc, 0x9e, 0xa2, 0x38, 0x97, 0xbd, 0x91, 0x47, 0x14, 0x97,
+	0x8a, 0xd1, 0xbe, 0x08, 0x3c, 0x73, 0x66, 0xe6, 0xcc, 0xcc, 0x99, 0x9d, 0xdb, 0x11, 0x2c, 0xf4,
+	0xdc, 0xbe, 0xb6, 0x41, 0xfe, 0x34, 0xfa, 0xae, 0xe3, 0x3b, 0x68, 0x91, 0xfc, 0xd6, 0x4c, 0x27,
+	0xd0, 0xfb, 0xae, 0x73, 0x61, 0xe8, 0xd8, 0xad, 0xdf, 0xeb, 0x39, 0x4e, 0xcf, 0xc4, 0x1b, 0x14,
+	0xe1, 0x24, 0x38, 0xdd, 0xf0, 0x7c, 0x37, 0xd0, 0x7c, 0x46, 0x50, 0xbf, 0x33, 0xb8, 0xab, 0xda,
+	0x97, 0x7c, 0x4b, 0x3e, 0x7f, 0xe2, 0x35, 0x0c, 0x67, 0x43, 0xed, 0x1b, 0x1b, 0x9a, 0xe3, 0xe2,
+	0x8d, 0x8b, 0xc7, 0x1b, 0x3d, 0x6c, 0x63, 0x57, 0xf5, 0xb1, 0xce, 0x70, 0xe4, 0x0f, 0xe1, 0x6e,
+	0x93, 0x9c, 0xd6, 0xe1, 0xa7, 0x1d, 0x61, 0xf7, 0xc2, 0xd0, 0xb0, 0x82, 0x5f, 0x06, 0xd8, 0xf3,
+	0xd1, 0x7d, 0x80, 0x50, 0x8e, 0xfd, 0x9d, 0x9a, 0xb4, 0x2a, 0xad, 0x97, 0x95, 0x04, 0x44, 0xfe,
+	0x46, 0x82, 0xb9, 0x9f, 0x05, 0x27, 0x78, 0x4b, 0xb7, 0x9a, 0x8e, 0x7d, 0x6a, 0xf4, 0xd0, 0xdb,
+	0x30, 0x7f, 0xce, 0x00, 0x5b, 0xba, 0xee, 0x62, 0xcf, 0xe3, 0x54, 0x03, 0x50, 0x24, 0xc3, 0x2c,
+	0x87, 0x74, 0x9d, 0x73, 0x6c, 0xd7, 0xf2, 0x14, 0x2b, 0x05, 0x43, 0x6b, 0x30, 0xc7, 0xd7, 0xcd,
+	0xad, 0x26, 0x76, 0xfd, 0x5a, 0x81, 0x22, 0xa5, 0x81, 0xe8, 0x87, 0x70, 0x8b, 0x03, 0x5a, 0xaf,
+	0x7c, 0x57, 0xdd, 0x72, 0x7b, 0x81, 0x85, 0x6d, 0xdf, 0xab, 0x4d, 0xad, 0x16, 0xd6, 0xcb, 0x8a,
+	0x78, 0x53, 0xfe, 0x5b, 0x1e, 0x66, 0xdb, 0x8e, 0x8e, 0x77, 0x5d, 0x27, 0xe8, 0xef, 0xe0, 0x53,
+	0xb4, 0x0a, 0x15, 0x3b, 0x5c, 0x47, 0xba, 0x26, 0x41, 0xa8, 0x06, 0x33, 0x96, 0x61, 0x1f, 0x19,
+	0x5f, 0x62, 0x2a, 0x6d, 0x51, 0x09, 0x97, 0x74, 0x47, 0x7d, 0x45, 0x77, 0x0a, 0x7c, 0x87, 0x2d,
+	0x89, 0x9a, 0xd4, 0x5c, 0x9e, 0xe1, 0xd8, 0x36, 0xd6, 0x6b, 0x53, 0xab, 0xd2, 0x7a, 0x49, 0x49,
+	0xc1, 0xd0, 0x3b, 0xb0, 0x64, 0xd8, 0x9a, 0x19, 0xe8, 0xb8, 0xf5, 0xca, 0xf0, 0x7c, 0xc3, 0xee,
+	0x11, 0xc1, 0x6a, 0x45, 0x8a, 0x2a, 0xda, 0x42, 0x4d, 0x98, 0x36, 0xd5, 0x13, 0x6c, 0x7a, 0xb5,
+	0xe9, 0xd5, 0xc2, 0x7a, 0x65, 0xf3, 0xfb, 0x8d, 0x21, 0xb7, 0x69, 0x24, 0x95, 0x6b, 0x3c, 0xa3,
+	0xd8, 0x2d, 0xdb, 0x77, 0x2f, 0x15, 0x4e, 0x5a, 0x7f, 0x0a, 0x95, 0x04, 0x18, 0x55, 0xa1, 0x70,
+	0x8e, 0x2f, 0xb9, 0xde, 0xe4, 0x27, 0x5a, 0x86, 0xe2, 0x85, 0x6a, 0x06, 0x98, 0xdf, 0x0d, 0x5b,
+	0xbc, 0x9f, 0x7f, 0x22, 0xc9, 0xdf, 0xe4, 0x61, 0xbe, 0x49, 0x84, 0xd7, 0xfc, 0x31, 0x3d, 0x05,
+	0x3d, 0x83, 0x05, 0x17, 0x7b, 0x4e, 0xe0, 0x6a, 0xf8, 0x99, 0x61, 0x19, 0x3e, 0x76, 0x29, 0xdb,
+	0xca, 0xa6, 0x2c, 0x90, 0x5d, 0x49, 0x63, 0x2a, 0x83, 0xa4, 0xa8, 0x0b, 0xcb, 0xe7, 0x49, 0xb7,
+	0x0b, 0x5c, 0xd5, 0x37, 0x1c, 0x9b, 0x5a, 0xbf, 0xb2, 0xb9, 0x2a, 0x60, 0x99, 0xf2, 0x52, 0x45,
+	0x48, 0x8d, 0xde, 0x83, 0x22, 0xb9, 0x6f, 0xe6, 0x39, 0x95, 0xcd, 0x07, 0xd7, 0x58, 0x55, 0x61,
+	0xd8, 0xe8, 0x21, 0x54, 0xd5, 0xc0, 0x77, 0x3a, 0xc9, 0x7b, 0x66, 0x97, 0x37, 0x04, 0x97, 0x4d,
+	0x98, 0x8d, 0x0c, 0xd7, 0x37, 0x2f, 0xd1, 0x3b, 0x50, 0xc4, 0xae, 0xeb, 0xb8, 0xd4, 0x62, 0x95,
+	0xcd, 0x9a, 0xe0, 0xc8, 0x16, 0xd9, 0xdf, 0xcb, 0x29, 0x0c, 0x11, 0xdd, 0x87, 0xb2, 0xc6, 0x38,
+	0x60, 0x9d, 0x9a, 0xb0, 0xb4, 0x97, 0x53, 0x62, 0xd0, 0x36, 0x40, 0xc9, 0xc5, 0x5e, 0xdf, 0xb1,
+	0x3d, 0x2c, 0x3f, 0x80, 0x72, 0x5b, 0xb5, 0x30, 0x3b, 0x0a, 0xc1, 0x94, 0xad, 0x5a, 0x98, 0xdf,
+	0x0d, 0xfd, 0x2d, 0x1f, 0xc2, 0x42, 0xa4, 0x91, 0xc7, 0xd0, 0x3e, 0x00, 0x88, 0x9c, 0x9e, 0x7c,
+	0xbc, 0xc4, 0x12, 0xf7, 0x46, 0x59, 0x42, 0x49, 0xe0, 0xcb, 0x07, 0x70, 0x3b, 0xda, 0xf8, 0xd8,
+	0x71, 0xc9, 0xef, 0x71, 0x3d, 0x84, 0xc8, 0x47, 0xfc, 0x3e, 0xcf, 0xe5, 0x73, 0x74, 0x2c, 0x6f,
+	0x41, 0x25, 0x62, 0x87, 0x3d, 0xb4, 0x09, 0x45, 0xc3, 0xc7, 0xd6, 0x78, 0x62, 0x31, 0x54, 0xf9,
+	0xf7, 0x12, 0xdc, 0x1a, 0x16, 0x69, 0x32, 0xdb, 0x7f, 0x00, 0xe5, 0x48, 0x57, 0xee, 0xbe, 0x23,
+	0x65, 0x20, 0x37, 0x13, 0x11, 0xa4, 0x6e, 0xe6, 0x0f, 0x12, 0x2c, 0x76, 0x5c, 0x43, 0x33, 0xec,
+	0xde, 0x81, 0xa3, 0x63, 0x73, 0x52, 0x89, 0xb6, 0x88, 0x51, 0x0d, 0x0d, 0x53, 0x26, 0x5c, 0x24,
+	0x91, 0xdf, 0x26, 0xcf, 0xda, 0xcb, 0x29, 0x09, 0xa2, 0x94, 0x58, 0x4f, 0xe1, 0xd6, 0xd6, 0x85,
+	0x6a, 0x98, 0xea, 0x89, 0x89, 0x0f, 0x54, 0xed, 0xcc, 0xb0, 0x71, 0xf7, 0x92, 0x58, 0x7e, 0x15,
+	0x2a, 0x56, 0xbc, 0xa6, 0xf6, 0x2f, 0x2b, 0x49, 0x90, 0xfc, 0x77, 0x09, 0xea, 0x42, 0xda, 0x49,
+	0x55, 0xfb, 0x1c, 0x6e, 0xa9, 0x22, 0x7e, 0x5c, 0xcb, 0x75, 0x01, 0x07, 0xe1, 0xf9, 0x7b, 0x39,
+	0x45, 0xcc, 0x28, 0xa5, 0xf9, 0x3f, 0x8a, 0xb0, 0xd4, 0xc6, 0x5f, 0xc4, 0xee, 0x33, 0xa6, 0xd7,
+	0x0e, 0x18, 0x86, 0x39, 0x6f, 0x12, 0x34, 0x98, 0x58, 0x0a, 0xc3, 0x89, 0x85, 0xf0, 0x30, 0x6c,
+	0x72, 0x34, 0x4d, 0x21, 0x53, 0x34, 0x85, 0x24, 0x41, 0xec, 0x94, 0x57, 0x11, 0x46, 0x91, 0x63,
+	0xc4, 0x20, 0xf4, 0xd3, 0x81, 0x94, 0xb0, 0x29, 0xf2, 0xcb, 0x61, 0xfd, 0x44, 0x99, 0x01, 0x7d,
+	0x06, 0xb3, 0xde, 0xa5, 0xe7, 0x63, 0x8b, 0x6d, 0xd6, 0x66, 0x28, 0xc7, 0x27, 0x63, 0x72, 0x3c,
+	0x4a, 0x90, 0x32, 0xbe, 0x29, 0x6e, 0xe8, 0x31, 0x4c, 0xfb, 0xaa, 0x41, 0x12, 0x74, 0x89, 0xf2,
+	0xbd, 0xd3, 0x60, 0x75, 0x4a, 0x43, 0xed, 0x1b, 0x0d, 0x52, 0xa7, 0x34, 0x2e, 0x1e, 0x37, 0xba,
+	0x04, 0x43, 0xe1, 0x88, 0xe8, 0x04, 0xe6, 0x31, 0x49, 0xdf, 0x61, 0x5e, 0xf0, 0x6a, 0x65, 0x4a,
+	0xfa, 0xfe, 0x98, 0x22, 0xb5, 0x52, 0xc4, 0x4c, 0xa8, 0x01, 0x8e, 0x37, 0x48, 0x87, 0xf5, 0x1f,
+	0xc3, 0xe2, 0x90, 0xd2, 0x99, 0x18, 0x6c, 0xc1, 0x92, 0x40, 0xc4, 0x4c, 0x29, 0xf9, 0xb7, 0x12,
+	0x2c, 0xa6, 0x55, 0xff, 0x6f, 0x87, 0xb8, 0x3f, 0x49, 0xb0, 0x3c, 0x98, 0xc8, 0x27, 0x14, 0xaa,
+	0x7d, 0x83, 0xe2, 0x61, 0x2f, 0x37, 0x54, 0x3e, 0xa4, 0xc4, 0x3c, 0x87, 0xb9, 0xdd, 0xce, 0x31,
+	0xbd, 0xb9, 0x49, 0xc5, 0xbb, 0x07, 0xa5, 0x5e, 0x3f, 0xa0, 0x1f, 0x0f, 0xbb, 0x98, 0xbd, 0x9c,
+	0x12, 0x41, 0x52, 0x87, 0x7d, 0x2b, 0xc1, 0x9d, 0x5d, 0xec, 0x47, 0x71, 0x6a, 0xb7, 0x73, 0x9c,
+	0x88, 0x91, 0x2f, 0x61, 0x31, 0x0a, 0x54, 0xbb, 0xfd, 0x20, 0x8c, 0x76, 0xc4, 0xd3, 0x9b, 0x02,
+	0x29, 0xae, 0x64, 0x14, 0xc7, 0xc1, 0x90, 0x0b, 0x73, 0xf9, 0x61, 0xee, 0xf5, 0x1d, 0x58, 0x11,
+	0x23, 0x67, 0x72, 0xbe, 0x8f, 0x60, 0xb6, 0x69, 0x62, 0xd5, 0x0e, 0xdd, 0xae, 0x31, 0xa6, 0x09,
+	0xb9, 0x01, 0x09, 0xbd, 0x82, 0x4f, 0x5d, 0xec, 0x9d, 0x4d, 0x46, 0x7f, 0x0a, 0xf3, 0xdb, 0xd8,
+	0x74, 0xec, 0x9e, 0x97, 0x21, 0x6c, 0x27, 0x83, 0x72, 0x7e, 0x38, 0x28, 0x87, 0xe5, 0x48, 0x21,
+	0x51, 0x8e, 0x9c, 0xc1, 0x6c, 0x74, 0xce, 0x64, 0xae, 0x52, 0x87, 0x99, 0x13, 0xc6, 0x21, 0xaa,
+	0xdd, 0x42, 0x40, 0xca, 0x51, 0x3e, 0x4d, 0xd4, 0x51, 0xd9, 0x7a, 0xb2, 0xeb, 0x55, 0x93, 0xd7,
+	0x61, 0xf6, 0x80, 0xf5, 0x27, 0x4c, 0x8d, 0x44, 0xfb, 0x22, 0xa5, 0xda, 0x17, 0x8a, 0xc9, 0x7a,
+	0x9c, 0x18, 0x93, 0xb7, 0x40, 0x52, 0xaa, 0x05, 0x92, 0x5f, 0xc2, 0x42, 0x57, 0x75, 0x7b, 0xd8,
+	0x8f, 0x91, 0xb3, 0x5b, 0x67, 0x15, 0xc0, 0x8f, 0x98, 0xb0, 0x26, 0x8b, 0x14, 0x2b, 0x31, 0x2c,
+	0x65, 0x23, 0x0b, 0x96, 0xf6, 0x6d, 0xcd, 0xc5, 0xaa, 0x87, 0xd9, 0xa1, 0xdf, 0xd5, 0xd5, 0x2f,
+	0x43, 0x51, 0xc7, 0xa6, 0xaf, 0xf2, 0x66, 0x8e, 0x2d, 0xe4, 0x26, 0x2c, 0xa6, 0x8f, 0x9b, 0xc4,
+	0x53, 0x5f, 0x00, 0xda, 0xc1, 0x26, 0xf6, 0x31, 0xb9, 0xdd, 0xd7, 0xe2, 0xad, 0x85, 0xc8, 0x5b,
+	0xb7, 0xa1, 0x9a, 0x3a, 0x6b, 0x12, 0x79, 0x3d, 0xb8, 0xb3, 0x83, 0x99, 0xd2, 0xc9, 0xeb, 0x7d,
+	0xbd, 0x96, 0xde, 0x87, 0xdb, 0xa2, 0x43, 0x27, 0x91, 0xff, 0x2d, 0x98, 0xd9, 0xd7, 0x19, 0x69,
+	0x3d, 0x76, 0x1d, 0x2e, 0x6b, 0xec, 0x4a, 0xeb, 0x00, 0x3b, 0xf8, 0x24, 0xe8, 0x5d, 0x8f, 0xf9,
+	0x11, 0x94, 0xf7, 0x6d, 0xcf, 0x57, 0x6d, 0x0d, 0x93, 0x52, 0x26, 0xd5, 0x8f, 0xdc, 0x15, 0x48,
+	0x13, 0x22, 0x87, 0xed, 0xc8, 0xaf, 0x24, 0x80, 0xc4, 0x7d, 0x4c, 0x94, 0xa0, 0x8d, 0x50, 0x80,
+	0x11, 0x09, 0x3a, 0x12, 0x92, 0x24, 0xe8, 0x88, 0x20, 0xf5, 0xfd, 0x10, 0x87, 0xb6, 0xd4, 0x1e,
+	0x3e, 0xf2, 0x55, 0x1f, 0x1f, 0x05, 0x96, 0xa5, 0xba, 0xb4, 0x4b, 0xf4, 0xc2, 0xcf, 0xbb, 0xa0,
+	0xd0, 0xdf, 0xc4, 0x1e, 0x76, 0x60, 0x51, 0xa9, 0xf9, 0xe4, 0x23, 0x5a, 0xcb, 0x7f, 0xcd, 0x43,
+	0x29, 0xcc, 0xb8, 0x04, 0xd1, 0x32, 0x4c, 0xd3, 0x68, 0x76, 0x8e, 0x39, 0x83, 0x68, 0x8d, 0x56,
+	0x60, 0xda, 0xc2, 0x96, 0xe3, 0x5e, 0x52, 0x16, 0x05, 0x85, 0xaf, 0x48, 0xf7, 0x8c, 0xfb, 0x67,
+	0xd8, 0xc2, 0xae, 0x6a, 0x1e, 0xf9, 0x8e, 0xab, 0xf6, 0x58, 0xcc, 0x2d, 0x28, 0x43, 0x70, 0xda,
+	0x69, 0x9b, 0xa6, 0xf3, 0x05, 0xd6, 0x3b, 0x8e, 0xde, 0x0e, 0xac, 0x13, 0xec, 0xf2, 0x6a, 0x79,
+	0x08, 0x8e, 0x7e, 0x01, 0x0b, 0x9e, 0xa6, 0x9a, 0xaa, 0x1b, 0x17, 0x8d, 0x45, 0x7a, 0x4b, 0xef,
+	0x8c, 0xa8, 0x19, 0x1a, 0x47, 0x69, 0x12, 0x96, 0x37, 0x07, 0x19, 0xd5, 0xb7, 0x61, 0x59, 0x84,
+	0x78, 0x5d, 0xce, 0x2c, 0x24, 0x73, 0xe6, 0xd7, 0xb0, 0xd2, 0x75, 0x55, 0xdb, 0x33, 0xb0, 0xed,
+	0x1f, 0x69, 0x67, 0x58, 0x0f, 0x4c, 0xec, 0xee, 0xdb, 0xa7, 0x0e, 0x7a, 0x02, 0xb7, 0x89, 0x36,
+	0x9a, 0xea, 0x93, 0xac, 0xfc, 0x89, 0x63, 0x06, 0x16, 0xf6, 0x9a, 0x4e, 0x60, 0xfb, 0x3c, 0xe8,
+	0x5e, 0xb5, 0x4d, 0xec, 0xe3, 0xb2, 0x6f, 0x13, 0xeb, 0x7c, 0x83, 0x5f, 0xd8, 0x10, 0x9c, 0xe4,
+	0xdc, 0x8e, 0xeb, 0xf8, 0x8e, 0xe6, 0x98, 0x1d, 0xc7, 0xf5, 0xc9, 0xdd, 0xf5, 0xf9, 0x3a, 0x74,
+	0xfa, 0x70, 0x4d, 0x9c, 0xa2, 0xef, 0xb8, 0x3e, 0xe7, 0x45, 0x7f, 0xcb, 0xff, 0x92, 0x60, 0x76,
+	0xcf, 0xf1, 0x7c, 0x42, 0x4c, 0xc5, 0x3e, 0x86, 0xd9, 0xb3, 0xc4, 0x9a, 0x7f, 0x13, 0x8f, 0x05,
+	0xd6, 0x4e, 0x92, 0xa5, 0x16, 0xbc, 0x5d, 0x48, 0xb2, 0xa9, 0x7f, 0x0e, 0x8b, 0x43, 0x28, 0x02,
+	0x43, 0xbf, 0x97, 0x34, 0xf4, 0x55, 0x3d, 0x70, 0xac, 0x6e, 0xf2, 0x26, 0xfe, 0x3c, 0x05, 0x25,
+	0xe2, 0xcc, 0x54, 0x8b, 0x30, 0x90, 0x4a, 0x71, 0xda, 0x67, 0xea, 0xeb, 0xac, 0x14, 0x2b, 0x2b,
+	0xf4, 0x37, 0xfa, 0x10, 0xca, 0x81, 0x47, 0xfc, 0xcd, 0xf5, 0x3d, 0x3e, 0x76, 0x7a, 0x70, 0x8d,
+	0xaa, 0x4a, 0x4c, 0x81, 0xf6, 0x61, 0x31, 0xba, 0x91, 0xd0, 0x89, 0xa8, 0x2b, 0x8b, 0xa3, 0x48,
+	0x88, 0xa2, 0x0c, 0x53, 0xa1, 0x26, 0xcc, 0xdb, 0x8e, 0xfd, 0x25, 0x76, 0x1d, 0x1e, 0x97, 0x69,
+	0x7b, 0x78, 0x0d, 0x9f, 0x01, 0x12, 0xd4, 0x86, 0x8a, 0x11, 0xc5, 0x82, 0xb0, 0x87, 0x7c, 0x74,
+	0x45, 0xe1, 0x4f, 0xef, 0x2d, 0x0e, 0x1d, 0xfc, 0x2b, 0x49, 0x32, 0x40, 0x87, 0x30, 0x17, 0x79,
+	0x37, 0xf5, 0x86, 0x19, 0x2a, 0xd3, 0xf7, 0x04, 0x1c, 0xc5, 0x5f, 0x81, 0x92, 0xa6, 0x27, 0xb9,
+	0x86, 0xcf, 0xae, 0x0d, 0xc7, 0xae, 0x95, 0xe8, 0xd7, 0x94, 0x80, 0xd4, 0x75, 0xa8, 0x0e, 0x4a,
+	0x24, 0xf0, 0x92, 0xf7, 0xd3, 0x5e, 0xb2, 0x26, 0x0a, 0x9c, 0x83, 0x21, 0x31, 0xe9, 0x2a, 0xbf,
+	0x93, 0xe0, 0x56, 0x17, 0x5b, 0x7d, 0x53, 0x65, 0x59, 0x95, 0x4a, 0x3a, 0x61, 0x20, 0x7f, 0x0a,
+	0x25, 0x9b, 0xb3, 0xe0, 0xe2, 0xdc, 0x1d, 0x61, 0x6f, 0xd2, 0x52, 0x84, 0xe8, 0xa9, 0x28, 0xbe,
+	0x06, 0x40, 0x67, 0xc3, 0x4c, 0x8c, 0x15, 0x98, 0xc6, 0x64, 0xc5, 0xc6, 0xee, 0x25, 0x85, 0xaf,
+	0xe4, 0x5f, 0x4b, 0x50, 0x69, 0xba, 0x58, 0xf5, 0xff, 0x07, 0x66, 0x5f, 0x1f, 0x42, 0x85, 0xd5,
+	0x25, 0x93, 0xa5, 0xf4, 0x9f, 0xc0, 0xf2, 0x56, 0xe0, 0x3b, 0xd1, 0x08, 0x1d, 0xf3, 0xfc, 0xbe,
+	0x0e, 0x0b, 0x6a, 0x1a, 0xce, 0x6d, 0x30, 0x08, 0x96, 0xbf, 0x86, 0x2a, 0x11, 0xb3, 0xe3, 0x66,
+	0xa8, 0xaa, 0x05, 0xd3, 0x49, 0x74, 0x0f, 0xca, 0x9e, 0xaf, 0xba, 0x7e, 0xd7, 0xb0, 0xc2, 0x9c,
+	0x15, 0x03, 0x48, 0xad, 0x8c, 0x6d, 0x9d, 0xee, 0x4d, 0xd1, 0xbd, 0x70, 0x49, 0xda, 0x95, 0xc4,
+	0xf9, 0x93, 0x5d, 0xc7, 0x0a, 0x14, 0xe9, 0x0c, 0x8f, 0x0a, 0x24, 0x11, 0x38, 0x5d, 0xa6, 0x0c,
+	0xfd, 0x15, 0x2c, 0x74, 0x1c, 0x3d, 0x93, 0x9a, 0x55, 0x28, 0xf4, 0x1d, 0x9d, 0x6b, 0x49, 0x7e,
+	0x4e, 0xac, 0x24, 0x86, 0xb9, 0xf8, 0xf0, 0xd7, 0xa7, 0xe3, 0xbb, 0x50, 0xa4, 0x54, 0xe4, 0x82,
+	0xb4, 0x44, 0xe0, 0x26, 0xbf, 0xc9, 0xd7, 0x40, 0xaa, 0x48, 0x27, 0x7c, 0x5e, 0xe2, 0x2b, 0xf9,
+	0x2e, 0x94, 0x23, 0x3f, 0x45, 0xf3, 0x90, 0x37, 0x74, 0x4e, 0x96, 0x37, 0x74, 0xf9, 0x3e, 0x49,
+	0x8c, 0xf1, 0xb4, 0x74, 0x68, 0xff, 0x2f, 0x79, 0x58, 0x18, 0x98, 0x31, 0xa0, 0x43, 0x28, 0x5b,
+	0x86, 0x4d, 0x57, 0xde, 0x88, 0xc4, 0x37, 0x40, 0xd6, 0x38, 0x08, 0x69, 0x58, 0x04, 0x8d, 0x79,
+	0x50, 0x86, 0xea, 0x2b, 0xce, 0x30, 0x3f, 0x3e, 0xc3, 0x90, 0x26, 0x64, 0x18, 0xae, 0xeb, 0x1f,
+	0xc0, 0x7c, 0xfa, 0xb4, 0x2c, 0xc5, 0x0a, 0xa5, 0x4e, 0xb1, 0xce, 0x54, 0xea, 0xfc, 0x51, 0x22,
+	0xad, 0x13, 0x2b, 0x41, 0xe9, 0x65, 0xd1, 0x88, 0xde, 0x02, 0xa0, 0xd7, 0xdc, 0x34, 0x55, 0xfe,
+	0x4a, 0x38, 0xbf, 0xf9, 0xd6, 0x88, 0x4a, 0xb6, 0x15, 0x21, 0x2b, 0x09, 0x42, 0xe2, 0x9f, 0x6c,
+	0x15, 0x7f, 0x9d, 0x31, 0x00, 0xc9, 0x30, 0x4b, 0x17, 0x07, 0xd8, 0xf3, 0xc2, 0xca, 0xb2, 0xac,
+	0xa4, 0x60, 0xf2, 0x6f, 0x24, 0x98, 0x0f, 0x0f, 0x21, 0x81, 0x3f, 0xf0, 0xd0, 0x8f, 0xa0, 0xe8,
+	0x91, 0x14, 0xc0, 0xc5, 0x5a, 0x1d, 0x21, 0x16, 0x4d, 0x15, 0x0a, 0x43, 0x47, 0xdb, 0x5c, 0x98,
+	0x44, 0x50, 0x5f, 0xbb, 0x4e, 0x25, 0x56, 0x1a, 0x44, 0x64, 0xf2, 0x31, 0x94, 0xc2, 0xfd, 0x41,
+	0xdf, 0x43, 0x4f, 0x61, 0xda, 0xa3, 0x12, 0x72, 0xe6, 0x6f, 0x5c, 0x23, 0x58, 0xe0, 0x29, 0x9c,
+	0xe0, 0xe1, 0x27, 0x80, 0x86, 0x2d, 0x89, 0x96, 0x60, 0xa1, 0xa5, 0x28, 0x87, 0xca, 0xf3, 0xe3,
+	0xf6, 0x4e, 0xeb, 0xe3, 0xfd, 0x76, 0x6b, 0xa7, 0x9a, 0x43, 0x75, 0x58, 0x61, 0xc0, 0xc3, 0xe3,
+	0xee, 0xf3, 0xc3, 0x8f, 0x9f, 0x2b, 0xad, 0xa3, 0xc3, 0x63, 0xa5, 0xd9, 0x3a, 0xaa, 0x4a, 0x68,
+	0x01, 0x2a, 0x7c, 0xaf, 0xbb, 0xd7, 0x52, 0xaa, 0xda, 0x43, 0x03, 0xe6, 0x52, 0xa6, 0x20, 0x2c,
+	0x8f, 0xba, 0x5b, 0xdd, 0x56, 0x8a, 0xe5, 0x22, 0xcc, 0x31, 0xa0, 0x72, 0xdc, 0x6e, 0xef, 0xb7,
+	0x77, 0xab, 0x12, 0xba, 0x0d, 0x4b, 0x0c, 0xb4, 0xdd, 0xda, 0x6f, 0xef, 0x3e, 0x6f, 0x2a, 0xad,
+	0xad, 0x6e, 0x6b, 0xa7, 0x9a, 0x1f, 0xdc, 0xd8, 0x69, 0x3d, 0x6b, 0x91, 0x8d, 0xc2, 0xe6, 0xb7,
+	0x65, 0x58, 0x16, 0xbd, 0x56, 0xa3, 0x43, 0x98, 0xe1, 0xaf, 0x6a, 0x48, 0x64, 0x91, 0xf4, 0x53,
+	0x65, 0xfd, 0xc1, 0x28, 0x94, 0xbe, 0x79, 0x29, 0xe7, 0xd0, 0x27, 0x30, 0xd5, 0x56, 0x2d, 0x8c,
+	0x1a, 0x22, 0xd4, 0xab, 0xdf, 0xcb, 0xeb, 0xc2, 0x8c, 0x18, 0xbe, 0xc0, 0xc9, 0x39, 0x74, 0xc2,
+	0x9a, 0x3f, 0xf6, 0x58, 0x96, 0x99, 0xbb, 0x3c, 0x2a, 0xdf, 0x7a, 0xe1, 0x19, 0x2f, 0x58, 0x76,
+	0x4b, 0xbe, 0x77, 0xa1, 0x87, 0xa3, 0x28, 0xd3, 0xef, 0x74, 0xf5, 0xf5, 0xb1, 0x70, 0xd9, 0x59,
+	0x2a, 0xcc, 0xf0, 0x58, 0x99, 0x59, 0x99, 0xb5, 0x6b, 0x5e, 0xa9, 0xc2, 0x23, 0xbe, 0x82, 0x5a,
+	0x72, 0xd0, 0x99, 0x7a, 0x95, 0xca, 0x7a, 0xe6, 0x0f, 0xc6, 0x7d, 0x33, 0x0a, 0x0f, 0xff, 0x25,
+	0xcc, 0x26, 0x87, 0xea, 0xe8, 0xed, 0xf1, 0x1e, 0x1c, 0x84, 0xca, 0x0d, 0x4d, 0xe7, 0xe5, 0x1c,
+	0x72, 0x00, 0xed, 0x62, 0x7f, 0x30, 0x9b, 0x64, 0x55, 0xeb, 0xff, 0xc7, 0x78, 0x42, 0x8f, 0x14,
+	0x2a, 0x85, 0xd3, 0xee, 0xcc, 0xc7, 0x88, 0xa2, 0x60, 0x6a, 0x74, 0x2e, 0xe7, 0xd0, 0x05, 0x2c,
+	0x8b, 0xc6, 0xd2, 0x99, 0xcf, 0x7a, 0x94, 0x65, 0xde, 0x2d, 0xe7, 0xd0, 0x67, 0x30, 0xc3, 0x27,
+	0xd0, 0x99, 0x8f, 0x12, 0x86, 0x83, 0xc4, 0x34, 0x9b, 0x71, 0xe7, 0xf3, 0xe9, 0xef, 0x84, 0x7b,
+	0x72, 0xd6, 0x2d, 0xe7, 0x36, 0xff, 0x0d, 0x89, 0x2f, 0x36, 0x0c, 0x69, 0x3f, 0x87, 0x19, 0x3e,
+	0xa3, 0x1d, 0xfd, 0xf1, 0x8e, 0x71, 0x5c, 0x72, 0xd6, 0x2b, 0xe7, 0x28, 0x67, 0xfe, 0x7f, 0x2b,
+	0x37, 0xe6, 0x9c, 0x98, 0x0d, 0x53, 0xe7, 0x82, 0x78, 0x5e, 0x97, 0x89, 0xb9, 0x28, 0xb2, 0x0d,
+	0x8c, 0xfe, 0xd8, 0xd7, 0x98, 0x9c, 0xc0, 0x0a, 0xbf, 0x46, 0xc1, 0x44, 0xb8, 0xbe, 0x76, 0x2d,
+	0x1e, 0xe3, 0xff, 0x69, 0xd8, 0x98, 0xd0, 0xd1, 0x16, 0x12, 0x15, 0x23, 0xc3, 0xc3, 0xdb, 0xfa,
+	0x9b, 0xd7, 0xa1, 0x31, 0xe6, 0x7d, 0x40, 0xc3, 0x43, 0x4d, 0xf4, 0x48, 0x48, 0x7c, 0xc5, 0xc0,
+	0xb5, 0xfe, 0x70, 0x4c, 0x6c, 0x76, 0x62, 0x1b, 0xf2, 0xfb, 0x7a, 0xa6, 0x6b, 0xa8, 0x8b, 0x0c,
+	0xa5, 0x87, 0xfc, 0xba, 0x50, 0xa4, 0x43, 0xd2, 0x4c, 0x2c, 0xff, 0x4f, 0x28, 0x72, 0x38, 0x6a,
+	0x65, 0x5c, 0x99, 0xb9, 0x6f, 0xca, 0x35, 0x65, 0xed, 0x17, 0x50, 0x1d, 0xec, 0xd3, 0x33, 0x1d,
+	0x20, 0x4a, 0x82, 0xc2, 0xc6, 0x9f, 0x69, 0x40, 0x3b, 0xf0, 0x1b, 0x6b, 0x10, 0xf7, 0xf1, 0xb4,
+	0x04, 0x99, 0x66, 0x0d, 0x7b, 0x26, 0xb6, 0xf7, 0x45, 0xe1, 0x29, 0xee, 0xfb, 0x19, 0x5f, 0xe6,
+	0x9d, 0x37, 0xe6, 0x9b, 0x68, 0xe2, 0xe5, 0x1c, 0x3a, 0x83, 0x85, 0x81, 0xb6, 0x3c, 0xd3, 0x01,
+	0xa2, 0x1c, 0x26, 0x6a, 0xf3, 0xe5, 0x1c, 0xa9, 0xf6, 0xf8, 0x2b, 0x9c, 0xb0, 0xda, 0x4b, 0xbf,
+	0x04, 0x0a, 0xe3, 0x56, 0xf2, 0x11, 0x4f, 0xce, 0x6d, 0xfe, 0x53, 0x82, 0xa5, 0x64, 0xe9, 0x11,
+	0xc6, 0xe0, 0x63, 0xd6, 0x26, 0xd2, 0x1e, 0x16, 0xbd, 0x79, 0x85, 0x32, 0xc9, 0xf6, 0xba, 0xfe,
+	0xc6, 0x68, 0x24, 0x26, 0xbf, 0x02, 0xa5, 0xb0, 0x33, 0x46, 0xa2, 0xc0, 0x37, 0xd0, 0xb3, 0x0b,
+	0xf3, 0x6e, 0xaa, 0xb5, 0x96, 0x73, 0xdb, 0x4d, 0x78, 0x64, 0x38, 0xf4, 0x1f, 0x29, 0x34, 0x33,
+	0xf0, 0x48, 0x2b, 0xa8, 0x06, 0xbe, 0xe3, 0x69, 0xaa, 0x89, 0xdd, 0x46, 0x9a, 0x94, 0x30, 0xdb,
+	0x5e, 0x4c, 0xe5, 0xac, 0x5d, 0xb7, 0xaf, 0x75, 0xa4, 0x93, 0x69, 0x3a, 0xf0, 0x7d, 0xf7, 0x3f,
+	0x01, 0x00, 0x00, 0xff, 0xff, 0xb7, 0xcb, 0x5a, 0x11, 0x96, 0x2a, 0x00, 0x00,
 }
