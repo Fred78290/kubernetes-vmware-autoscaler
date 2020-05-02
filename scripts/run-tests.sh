@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-govendor fetch +missing +external
+go mod vendor
 
 export Test_AuthMethodKey=NO
 export Test_Sudo=NO
