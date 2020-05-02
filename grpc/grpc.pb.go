@@ -10,8 +10,6 @@ import (
 	_ "github.com/golang/protobuf/ptypes/any"
 	_ "github.com/golang/protobuf/ptypes/struct"
 	grpc "google.golang.org/grpc"
-	codes "google.golang.org/grpc/codes"
-	status "google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
 	math "math"
 )
@@ -3786,47 +3784,6 @@ type CloudProviderServiceServer interface {
 	Refresh(context.Context, *CloudProviderServiceRequest) (*RefreshReply, error)
 }
 
-// UnimplementedCloudProviderServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedCloudProviderServiceServer struct {
-}
-
-func (*UnimplementedCloudProviderServiceServer) Connect(ctx context.Context, req *ConnectRequest) (*ConnectReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Connect not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) Name(ctx context.Context, req *CloudProviderServiceRequest) (*NameReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Name not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) NodeGroups(ctx context.Context, req *CloudProviderServiceRequest) (*NodeGroupsReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NodeGroups not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) NodeGroupForNode(ctx context.Context, req *NodeGroupForNodeRequest) (*NodeGroupForNodeReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NodeGroupForNode not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) Pricing(ctx context.Context, req *CloudProviderServiceRequest) (*PricingModelReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Pricing not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) GetAvailableMachineTypes(ctx context.Context, req *CloudProviderServiceRequest) (*AvailableMachineTypesReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetAvailableMachineTypes not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) NewNodeGroup(ctx context.Context, req *NewNodeGroupRequest) (*NewNodeGroupReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NewNodeGroup not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) GetResourceLimiter(ctx context.Context, req *CloudProviderServiceRequest) (*ResourceLimiterReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetResourceLimiter not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) GPULabel(ctx context.Context, req *CloudProviderServiceRequest) (*GPULabelReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GPULabel not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) GetAvailableGPUTypes(ctx context.Context, req *CloudProviderServiceRequest) (*GetAvailableGPUTypesReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetAvailableGPUTypes not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) Cleanup(ctx context.Context, req *CloudProviderServiceRequest) (*CleanupReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Cleanup not implemented")
-}
-func (*UnimplementedCloudProviderServiceServer) Refresh(ctx context.Context, req *CloudProviderServiceRequest) (*RefreshReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Refresh not implemented")
-}
-
 func RegisterCloudProviderServiceServer(s *grpc.Server, srv CloudProviderServiceServer) {
 	s.RegisterService(&_CloudProviderService_serviceDesc, srv)
 }
@@ -4287,56 +4244,6 @@ type NodeGroupServiceServer interface {
 	Belongs(context.Context, *BelongsRequest) (*BelongsReply, error)
 }
 
-// UnimplementedNodeGroupServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedNodeGroupServiceServer struct {
-}
-
-func (*UnimplementedNodeGroupServiceServer) MaxSize(ctx context.Context, req *NodeGroupServiceRequest) (*MaxSizeReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method MaxSize not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) MinSize(ctx context.Context, req *NodeGroupServiceRequest) (*MinSizeReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method MinSize not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) TargetSize(ctx context.Context, req *NodeGroupServiceRequest) (*TargetSizeReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method TargetSize not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) IncreaseSize(ctx context.Context, req *IncreaseSizeRequest) (*IncreaseSizeReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method IncreaseSize not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) DeleteNodes(ctx context.Context, req *DeleteNodesRequest) (*DeleteNodesReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteNodes not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) DecreaseTargetSize(ctx context.Context, req *DecreaseTargetSizeRequest) (*DecreaseTargetSizeReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DecreaseTargetSize not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Id(ctx context.Context, req *NodeGroupServiceRequest) (*IdReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Id not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Debug(ctx context.Context, req *NodeGroupServiceRequest) (*DebugReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Debug not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Nodes(ctx context.Context, req *NodeGroupServiceRequest) (*NodesReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Nodes not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) TemplateNodeInfo(ctx context.Context, req *NodeGroupServiceRequest) (*TemplateNodeInfoReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method TemplateNodeInfo not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Exist(ctx context.Context, req *NodeGroupServiceRequest) (*ExistReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Exist not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Create(ctx context.Context, req *NodeGroupServiceRequest) (*CreateReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Create not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Delete(ctx context.Context, req *NodeGroupServiceRequest) (*DeleteReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Autoprovisioned(ctx context.Context, req *NodeGroupServiceRequest) (*AutoprovisionedReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Autoprovisioned not implemented")
-}
-func (*UnimplementedNodeGroupServiceServer) Belongs(ctx context.Context, req *BelongsRequest) (*BelongsReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Belongs not implemented")
-}
-
 func RegisterNodeGroupServiceServer(s *grpc.Server, srv NodeGroupServiceServer) {
 	s.RegisterService(&_NodeGroupService_serviceDesc, srv)
 }
@@ -4718,17 +4625,6 @@ func (c *pricingModelServiceClient) PodPrice(ctx context.Context, in *PodPriceRe
 type PricingModelServiceServer interface {
 	NodePrice(context.Context, *NodePriceRequest) (*NodePriceReply, error)
 	PodPrice(context.Context, *PodPriceRequest) (*PodPriceReply, error)
-}
-
-// UnimplementedPricingModelServiceServer can be embedded to have forward compatible implementations.
-type UnimplementedPricingModelServiceServer struct {
-}
-
-func (*UnimplementedPricingModelServiceServer) NodePrice(ctx context.Context, req *NodePriceRequest) (*NodePriceReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method NodePrice not implemented")
-}
-func (*UnimplementedPricingModelServiceServer) PodPrice(ctx context.Context, req *PodPriceRequest) (*PodPriceReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PodPrice not implemented")
 }
 
 func RegisterPricingModelServiceServer(s *grpc.Server, srv PricingModelServiceServer) {
