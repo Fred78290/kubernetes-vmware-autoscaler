@@ -86,10 +86,14 @@ func (vm *AutoScalerServerNode) prepareKubelet() (string, error) {
 	defer os.Remove(fName)
 
 	if err = utils.Scp(vm.serverConfig.SSH, vm.Addresses[0], fName, fName); err != nil {
+		glog.Errorf("Unable to scp node %s address:%s, reason:%s", vm.Addresses[0], vm.NodeName, err)
+
 		return out, err
 	}
 
 	if out, err = utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], fmt.Sprintf("bash %s", fName)); err != nil {
+		glog.Errorf("Unable to ssh node %s address:%s, reason:%s", vm.Addresses[0], vm.NodeName, err)
+
 		return out, err
 	}
 
