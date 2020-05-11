@@ -1,5 +1,5 @@
 #/bin/bash
-LOCAL=$1
+LAUNCH_CA=$1
 
 CURDIR=$(dirname $0)
 
@@ -26,7 +26,17 @@ EOF") | jq . > $ETC_DIR/$1.json
 kubectl apply -f $ETC_DIR/$1.json --kubeconfig=./cluster/config
 }
 
-if [ "$LOCAL" == "LOCAL" ]; then
+deploy service-account
+deploy cluster-role
+deploy role
+deploy cluster-role-binding
+deploy role-binding
+
+if [ "$LAUNCH_CA" == YES ]; then
+    deploy deployment
+elif [ "$LAUNCH_CA" == "DEBUG" ]; then
+    deploy autoscaler
+elif [ "$LAUNCH_CA" == "LOCAL" ]; then
     nohup ../out/vsphere-autoscaler-$GOOS-amd64 \
         --kubeconfig=$KUBECONFIG \
         --config=$PWD/config/kubernetes-vmware-autoscaler.json \
@@ -36,15 +46,10 @@ if [ "$LOCAL" == "LOCAL" ]; then
     pid="$!"
 
     echo -n "$pid" > config/vmware-autoscaler.pid
-else
-    deploy vsphere
-fi
 
-deploy service-account
-deploy cluster-role
-deploy role
-deploy cluster-role-binding
-deploy role-binding
-deploy deployment
+    deploy autoscaler
+else
+    deploy deployment
+fi
 
 popd

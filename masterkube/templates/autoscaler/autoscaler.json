@@ -1,0 +1,110 @@
+{
+    "apiVersion": "extensions/v1beta1",
+    "kind": "Deployment",
+    "metadata": {
+        "name": "cluster-autoscaler",
+        "namespace": "kube-system",
+        "labels": {
+            "k8s-app": "cluster-autoscaler"
+        }
+    },
+    "spec": {
+        "replicas": 1,
+        "selector": {
+            "matchLabels": {
+                "k8s-app": "cluster-autoscaler"
+            }
+        },
+        "template": {
+            "metadata": {
+                "labels": {
+                    "k8s-app": "cluster-autoscaler"
+                },
+                "annotations": {
+                    "scheduler.alpha.kubernetes.io/critical-pod": ""
+                }
+            },
+            "spec": {
+                "serviceAccountName": "cluster-autoscaler",
+                "nodeSelector": {
+                    "master": "true"
+                },
+                "containers": [
+                    {
+                        "image": "fred78290/cluster-autoscaler:v1.15.11",
+                        "name": "cluster-autoscaler",
+                        "resources": {
+                            "limits": {
+                                "cpu": "100m",
+                                "memory": "300Mi"
+                            },
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "300Mi"
+                            }
+                        },
+                        "command": [
+                            "./cluster-autoscaler",
+                            "--v=1",
+                            "--stderrthreshold=info",
+                            "--cloud-provider=grpc",
+                            "--cloud-config=/etc/cluster/grpc-config.json",
+                            "--kubeconfig=/etc/kubernetes/config",
+                            "--nodes=$MINNODES:$MAXNODES:true/$NODEGROUP_NAME",
+                            "--max-nodes-total=$MAXTOTALNODES",
+                            "--cores-total=$CORESTOTAL",
+                            "--memory-total=$MEMORYTOTAL",
+                            "--node-autoprovisioning-enabled",
+                            "--max-autoprovisioned-node-group-count=$MAXAUTOPROVISIONNEDNODEGROUPCOUNT",
+                            "--scale-down-enabled=$SCALEDOWNENABLED",
+                            "--scale-down-delay-after-add=$SCALEDOWNDELAYAFTERADD",
+                            "--scale-down-delay-after-delete=$SCALEDOWNDELAYAFTERDELETE",
+                            "--scale-down-delay-after-failure=$SCALEDOWNDELAYAFTERFAILURE",
+                            "--scale-down-unneeded-time=$SCALEDOWNUNEEDEDTIME",
+                            "--scale-down-unready-time=$SCALEDOWNUNREADYTIME",
+                            "--unremovable-node-recheck-timeout=$UNREMOVABLENODERECHECKTIMEOUT"
+                        ],
+                        "imagePullPolicy": "Always",
+                        "volumeMounts": [
+                            {
+                                "name": "ssl-certs",
+                                "mountPath": "/etc/ssl/certs/ca-certificates.crt",
+                                "readOnly": true
+                            },
+                            {
+                                "name": "cluster-autoscaler",
+                                "mountPath": "/etc/cluster",
+                                "readOnly": true
+                            },
+                            {
+                                "name": "kubernetes",
+                                "mountPath": "/etc/kubernetes/config",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "volumes": [
+                    {
+                        "name": "cluster-autoscaler",
+                        "hostPath": {
+                            "path": "/etc/cluster"
+                        }
+                    },
+                    {
+                        "name": "kubernetes",
+                        "hostPath": {
+                            "path": "/etc/kubernetes/admin.conf"
+                        }
+                    },
+                    {
+                        "name": "ssl-certs",
+                        "hostPath": {
+                            "path": "/etc/ssl/certs/ca-certificates.crt"
+                        }
+                    }
+                ]
+            }
+        }
+    }
+}
