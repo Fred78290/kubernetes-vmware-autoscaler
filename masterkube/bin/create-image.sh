@@ -1,6 +1,6 @@
 #/bin/bash
 
-set -e
+#set -e
 
 # This script will create 2 VM used as template
 # The first one is the seed VM customized to use vmware guestinfos cloud-init datasource instead ovf datasource.
@@ -14,7 +14,7 @@ set -e
 
 KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
 KUBERNETES_PASSWORD=$(uuidgen)
-CNI_VERSION=v0.7.5
+CNI_VERSION=v0.8.5
 SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
 CACHE=~/.local/vmware/cache
 TARGET_IMAGE=bionic-kubernetes-$KUBERNETES_VERSION
@@ -22,13 +22,10 @@ PASSWORD=$(uuidgen)
 OSDISTRO=$(uname -s)
 SEEDIMAGE=bionic-server-cloudimg-seed
 IMPORTMODE="govc"
-TEMP=`getopt -o i:k:n:op:s:u:v: --long user:,adapter:,vm-network:,ovftool,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
 CURDIR=$(dirname $0)
 USER=ubuntu
-NETWORK_ADAPTER=vmxnet3
-VM_NETWORK='VM Network'
-
-eval set -- "$TEMP"
+SECOND_NETWORK_ADAPTER=vmxnet3
+SECOND_NETWORK_NAME=
 
 if [ "$OSDISTRO" == "Linux" ]; then
     TZ=$(cat /etc/timezone)
@@ -42,7 +39,8 @@ fi
 
 mkdir -p $ISODIR
 
-pushd $CACHE
+TEMP=`getopt -o i:k:n:op:s:u:v: --long user:,adapter:,second-adapter:,second-network:,ovftool,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
+eval set -- "$TEMP"
 
 # extract options and their arguments into variables.
 while true ; do
@@ -56,8 +54,8 @@ while true ; do
         -s|--seed) SEEDIMAGE=$2 ; shift 2;;
         -u|--user) USER=$2 ; shift 2;;
         -v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
-        --adapter) NETWORK_ADAPTER=$2 ; shift 2;;
-        --vm-network) VM_NETWORK=$2 ; shift 2;;
+        --second-adapter) SECOND_NETWORK_ADAPTER=$2 ; shift 2;;
+        --second-network) SECOND_NETWORK_NAME=$2 ; shift 2;;
         --) shift ; break ;;
         *) echo "$1 - Internal error!" ; exit 1 ;;
     esac
@@ -68,38 +66,58 @@ if [ ! -z "$(govc vm.info $TARGET_IMAGE 2>&1)" ]; then
     exit 0
 fi
 
+echo "Kubernetes password:$KUBERNETES_PASSWORD"
+echo "Used password:$PASSWORD"
+
+USERDATA=$(base64 <<EOF
+#cloud-config
+password: $PASSWORD
+chpasswd: { expire: false }
+ssh_pwauth: true
+EOF
+)
+
 # If your seed image isn't present create one by import bionic cloud ova.
 # If you don't have the access right to import with govc (firewall rules blocking https traffic to esxi),
 # you can try with ovftool to import the ova.
 # If you have the bug "unsupported server", you must do it manually!
 if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
-    wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.ova -O bionic-server-cloudimg-amd64.ova
+    [ -f bionic-server-cloudimg-amd64.ova ] || wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.ova -O bionic-server-cloudimg-amd64.ova
         
     MAPPED_NETWORK=$(govc import.spec bionic-server-cloudimg-amd64.ova | jq .NetworkMapping[0].Name | tr -d '"')
 
-    if [ "${IMPORTMODE}" == "govc" ]; then        
+    if [ "${IMPORTMODE}" == "govc" ]; then
+
         govc import.spec bionic-server-cloudimg-amd64.ova \
             | jq --arg GOVC_NETWORK "${GOVC_NETWORK}" --arg MAPPED_NETWORK "${MAPPED_NETWORK}" '.NetworkMapping |= [ { Name: $MAPPED_NETWORK, Network: $GOVC_NETWORK } ]' \
-            > bionic-server-cloudimg-amd64.spec
+            > ${CACHE}/bionic-server-cloudimg-amd64.spec
         
-        cat bionic-server-cloudimg-amd64.spec \
+        cat ${CACHE}/bionic-server-cloudimg-amd64.spec \
             | jq --arg SSH_KEY "${SSH_KEY}" \
                 --arg SSH_KEY "${SSH_KEY}" \
-                --arg USERDATA "" \
+                --arg USERDATA "${USERDATA}" \
                 --arg PASSWORD "${PASSWORD}" \
                 --arg NAME "${SEEDIMAGE}" \
                 --arg INSTANCEID $(uuidgen) \
                 --arg TARGET_IMAGE "$TARGET_IMAGE" \
                 '.Name = $NAME | .PropertyMapping |= [ { Key: "instance-id", Value: $INSTANCEID }, { Key: "hostname", Value: $TARGET_IMAGE }, { Key: "public-keys", Value: $SSH_KEY }, { Key: "user-data", Value: $USERDATA }, { Key: "password", Value: $PASSWORD } ]' \
-                > bionic-server-cloudimg-amd64.txt
+                > ${CACHE}/bionic-server-cloudimg-amd64.txt
+
+        if [ -z "${GOVC_CLUSTER}" ]; then
+            DATASTORE="/${GOVC_DATACENTER}/datastore/${GOVC_DATASTORE}"
+            FOLDER="/${GOVC_DATACENTER}/vm/${GOVC_FOLDER}"
+        else
+            DATASTORE="/${GOVC_DATACENTER}/datastore/${GOVC_CLUSTER}/CUSTOMER/${GOVC_FOLDER}/${GOVC_DATASTORE}"
+            FOLDER="/${GOVC_DATACENTER}/vm/${GOVC_FOLDER}"
+        fi
 
         echo "Import bionic-server-cloudimg-amd64.ova to ${SEEDIMAGE} with govc"
         govc import.ova \
-            -options=bionic-server-cloudimg-amd64.txt \
-            -folder="/${GOVC_DATACENTER}/vm/${GOVC_FOLDER}" \
-            -ds="/${GOVC_DATACENTER}/datastore/${GOVC_CLUSTER}/CUSTOMER/${GOVC_FOLDER}/${GOVC_DATASTORE}" \
+            -options=${CACHE}/bionic-server-cloudimg-amd64.txt \
+            -folder="${FOLDER}" \
+            -ds="${DATASTORE}" \
             -name="${SEEDIMAGE}" \
-            bionic-server-cloudimg-amd64.ova
+            ${CACHE}/bionic-server-cloudimg-amd64.ova
     else
         echo "Import bionic-server-cloudimg-amd64.ova to ${SEEDIMAGE} with ovftool"
 
@@ -121,10 +139,10 @@ if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
 
     if [ $? -eq 0 ]; then
     
-        if [ ! -z "${VM_NETWORK}" ]; then
-            echo "Add second network card on ${SEEDIMAGE}"
+        if [ ! -z "${SECOND_NETWORK_NAME}" ]; then
+            echo "Add second network card ${SECOND_NETWORK_NAME} on ${SEEDIMAGE}"
 
-            govc vm.network.add -vm "${SEEDIMAGE}" -net="${VM_NETWORK}" -net.adapter="${NETWORK_ADAPTER}"
+            govc vm.network.add -vm "${SEEDIMAGE}" -net="${SECOND_NETWORK_NAME}" -net.adapter="${SECOND_NETWORK_ADAPTER}"
         fi
 
         echo "Power On ${SEEDIMAGE}"
@@ -236,26 +254,53 @@ else
 fi
 
 # Setup Kube DNS resolver
-mkdir /etc/systemd/resolved.conf.d/
-cat > /etc/systemd/resolved.conf.d/kubernetes.conf <<SHELL
-[Resolve]
-DNS=10.96.0.10
-Domains=cluster.local
-SHELL
+#mkdir /etc/systemd/resolved.conf.d/
+#cat > /etc/systemd/resolved.conf.d/kubernetes.conf <<SHELL
+#[Resolve]
+#DNS=10.96.0.10
+#Domains=cluster.local
+#SHELL
 
 echo "Prepare to install CNI plugins"
 
-curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-amd64-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
+curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-amd64-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
 
 cd /usr/local/bin
-curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/{kubeadm,kubelet,kubectl}
+curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/{kubeadm,kubelet,kubectl,kube-proxy}
 chmod +x /usr/local/bin/kube*
 
-echo 'KUBELET_EXTRA_ARGS="--fail-swap-on=false --read-only-port=10255 --feature-gates=VolumeSubpathEnvExpansion=true"' > /etc/default/kubelet
-curl -sSL "https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/kubelet.service" | sed 's:/usr/bin:/usr/local/bin:g' > /etc/systemd/system/kubelet.service
-
 mkdir -p /etc/systemd/system/kubelet.service.d
-curl -sSL "https://raw.githubusercontent.com/kubernetes/kubernetes/${KUBERNETES_VERSION}/build/debs/10-kubeadm.conf" | sed 's:/usr/bin:/usr/local/bin:g' > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+
+cat > /etc/systemd/system/kubelet.service <<SHELL
+[Unit]
+Description=kubelet: The Kubernetes Node Agent
+Documentation=http://kubernetes.io/docs/
+
+[Service]
+ExecStart=/usr/local/bin/kubelet
+Restart=always
+StartLimitInterval=0
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+SHELL
+
+cat > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf <<"SHELL"
+# Note: This dropin only works with kubeadm and kubelet v1.11+
+[Service]
+Environment="KUBELET_KUBECONFIG_ARGS=--bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf"
+Environment="KUBELET_CONFIG_ARGS=--config=/var/lib/kubelet/config.yaml"
+# This is a file that "kubeadm init" and "kubeadm join" generate at runtime, populating the KUBELET_KUBEADM_ARGS variable dynamically
+EnvironmentFile=-/var/lib/kubelet/kubeadm-flags.env
+# This is a file that the user can use for overrides of the kubelet args as a last resort. Preferably, the user should use
+# the .NodeRegistration.KubeletExtraArgs object in the configuration files instead. KUBELET_EXTRA_ARGS should be sourced from this file.
+EnvironmentFile=-/etc/default/kubelet
+ExecStart=
+ExecStart=/usr/local/bin/kubelet \$KUBELET_KUBECONFIG_ARGS \$KUBELET_CONFIG_ARGS \$KUBELET_KUBEADM_ARGS \$KUBELET_EXTRA_ARGS
+SHELL
+
+echo 'KUBELET_EXTRA_ARGS="--fail-swap-on=false --read-only-port=10255 --feature-gates=VolumeSubpathEnvExpansion=true"' > /etc/default/kubelet
 
 echo 'export PATH=/opt/cni/bin:\$PATH' >> /etc/profile.d/apps-bin-path.sh
 
@@ -282,9 +327,9 @@ EOF
 
 chmod +x "${ISODIR}/prepare-image.sh"
 
-gzip -c9 < "${ISODIR}/meta-data" | $BASE64 > metadata.base64
-gzip -c9 < "${ISODIR}/user-data" | $BASE64 > userdata.base64
-gzip -c9 < "${ISODIR}/vendor-data" | $BASE64 > vendordata.base64
+gzip -c9 < "${ISODIR}/meta-data" | $BASE64 > ${CACHE}/metadata.base64
+gzip -c9 < "${ISODIR}/user-data" | $BASE64 > ${CACHE}/userdata.base64
+gzip -c9 < "${ISODIR}/vendor-data" | $BASE64 > ${CACHE}/vendordata.base64
 
 # Due to my vsphere center the folder name refer more path, so I need to precise the path instead
 if [ "${GOVC_FOLDER}" ]; then
@@ -294,14 +339,14 @@ if [ "${GOVC_FOLDER}" ]; then
     fi
 fi
 
-govc vm.clone -link=false -on=false "${FOLDER_OPTIONS}" -c=2 -m=4096 -vm="${SEEDIMAGE}" "${TARGET_IMAGE}"
+govc vm.clone -on=false ${FOLDER_OPTIONS} -c=2 -m=4096 -vm=${SEEDIMAGE} ${TARGET_IMAGE}
 
 govc vm.change -vm "${TARGET_IMAGE}" \
-    -e guestinfo.metadata="$(cat metadata.base64)" \
+    -e guestinfo.metadata="$(cat ${CACHE}/metadata.base64)" \
     -e guestinfo.metadata.encoding="gzip+base64" \
-    -e guestinfo.userdata="$(cat userdata.base64)" \
+    -e guestinfo.userdata="$(cat ${CACHE}/userdata.base64)" \
     -e guestinfo.userdata.encoding="gzip+base64" \
-    -e guestinfo.vendordata="$(cat vendordata.base64)" \
+    -e guestinfo.vendordata="$(cat ${CACHE}/vendordata.base64)" \
     -e guestinfo.vendordata.encoding="gzip+base64"
 
 echo "Power On ${TARGET_IMAGE}"
@@ -314,10 +359,16 @@ scp "${ISODIR}/prepare-image.sh" "${USER}@${IPADDR}:~"
 
 ssh -t "${USER}@${IPADDR}" sudo ./prepare-image.sh
 
-govc vm.power -persist-session=false -s "${TARGET_IMAGE}"
+govc vm.power -persist-session=false -s=true "${TARGET_IMAGE}"
+
+echo "Wait ${TARGET_IMAGE} to shutdown"
+while [ $(govc vm.info -json "${TARGET_IMAGE}" | jq .VirtualMachines[0].Runtime.PowerState | tr -d '"') == "poweredOn" ]
+do
+    echo "."
+    sleep 1
+done
+echo
 
 echo "Created image ${TARGET_IMAGE} with kubernetes version ${KUBERNETES_VERSION}"
-
-popd
 
 exit 0
