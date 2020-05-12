@@ -127,6 +127,8 @@ func (net *Network) GetCloudInitNetwork() *NetworkConfig {
 				if len(n.NicName) > 0 {
 					ethernet.NicName = &n.NicName
 				}
+			} else {
+				ethernet.NicName = nil
 			}
 
 			if len(n.Gateway) > 0 {
