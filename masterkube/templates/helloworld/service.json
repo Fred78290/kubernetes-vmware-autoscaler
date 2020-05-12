@@ -9,12 +9,11 @@
         "namespace": "$K8NAMESPACE"
     },
     "spec": {
-        "type": "NodePort",
+        "type": "ClusterIP",
         "ports": [
             {
                 "port": 8080,
-                "targetPort": 8080,
-                "nodePort": 31880
+                "targetPort": 8080
             }
         ],
         "selector": {

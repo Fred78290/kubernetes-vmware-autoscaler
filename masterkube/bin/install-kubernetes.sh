@@ -5,7 +5,7 @@ CNI_VERSION="v0.8.5"
 curl -s https://get.docker.com | bash
 
 if [ "x$KUBERNETES_VERSION" == "x" ]; then
-	RELEASE="$(curl -sSL https://dl.k8s.io/release/stable.txt)"
+	RELEASE="v1.18.2"
 else
 	RELEASE=$KUBERNETES_VERSION
 fi

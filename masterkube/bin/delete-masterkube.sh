@@ -1,5 +1,6 @@
 #!/bin/bash
 CURDIR=$(dirname $0)
+NODEGROUP_NAME="vmware-ca-k8s"
 
 echo "Delete masterkube previous instance"
 
@@ -17,7 +18,7 @@ if [ -f ./cluster/config ]; then
     done
 fi
 
-./bin/kubeconfig-delete.sh masterkube &> /dev/null
+./bin/kubeconfig-delete.sh $NODEGROUP_NAME-masterkube &> /dev/null
 
 if [ -f config/vmware-autoscaler.pid ]; then
     kill $(cat config/vmware-autoscaler.pid)

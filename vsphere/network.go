@@ -127,6 +127,8 @@ func (net *Network) GetCloudInitNetwork() *NetworkConfig {
 				if len(n.NicName) > 0 {
 					ethernet.NicName = &n.NicName
 				}
+			} else {
+				ethernet.NicName = nil
 			}
 
 			if len(n.Gateway) > 0 {
@@ -187,7 +189,7 @@ func generateMacAddress() string {
 		return ""
 	}
 
-	return fmt.Sprintf("00:16:3E:%02X:%02X:%02X", buf[0], buf[1], buf[2])
+	return fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[0], buf[1], buf[2])
 }
 
 // See func (p DistributedVirtualPortgroup) EthernetCardBackingInfo(ctx context.Context) (types.BaseVirtualDeviceBackingInfo, error)
@@ -278,8 +280,11 @@ func (net *NetworkInterface) GetMacAddress() string {
 
 	if strings.ToLower(address) == "generate" {
 		address = generateMacAddress()
-		net.MacAddress = address
+	} else if strings.ToLower(address) == "ignore" {
+		address = ""
 	}
+
+	net.MacAddress = address
 
 	return address
 }

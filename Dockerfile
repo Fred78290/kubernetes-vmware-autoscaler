@@ -19,9 +19,9 @@ LABEL maintainer="Frederic Boltz <frederic.boltz@gmail.com>"
 ENV DEBIAN_FRONTEND noninteractive
 RUN clean-install ca-certificates tzdata; \
     apt-get update; \
-    apt-get install curl -y; \
+    apt-get install openssh-client curl -y; \
     cd /usr/local/bin; \
-    KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt); \
+    KUBERNETES_VERSION=v1.18.2; \
     curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kubectl; chmod +x kubectl
 
 ADD out/vsphere-autoscaler-linux-amd64 vsphere-autoscaler

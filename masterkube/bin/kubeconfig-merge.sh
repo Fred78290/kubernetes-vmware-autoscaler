@@ -1,12 +1,14 @@
 #!/bin/sh
-cat $2 | sed -e "s/kubernetes/k8s-$1/g" > /tmp/k8s-$1.config
+export KUBECONFIG=/tmp/k8s-$1.config
+
+cat $2 | sed -e "s/kubernetes/k8s-$1/g" > ${KUBECONFIG}
 
 mkdir -p ~/.kube
 
-cp ~/.kube/config ~/.kube/config.old
+if [ -f ~/.kube/config ]; then
+    cp ~/.kube/config ~/.kube/config.old
 
-export KUBECONFIG=/tmp/k8s-$1.config:~/.kube/config.old
+    KUBECONFIG="${KUBECONFIG}:${HOME}/.kube/config.old"
+fi
 
 kubectl config view --flatten > ~/.kube/config
-
-#rm /tmp/k8s-$1.config

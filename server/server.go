@@ -516,7 +516,7 @@ func (s *AutoScalerServerApp) GPULabel(ctx context.Context, request *apigrpc.Clo
 
 // GetAvailableGPUTypes return all available GPU types cloud provider supports.
 func (s *AutoScalerServerApp) GetAvailableGPUTypes(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.GetAvailableGPUTypesReply, error) {
-	log.Printf("Call server GetAvailableGPUTypes: %v", request)
+	glog.V(5).Infof("Call server GetAvailableGPUTypes: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)

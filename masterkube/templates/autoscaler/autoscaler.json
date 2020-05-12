@@ -31,44 +31,6 @@
                 },
                 "containers": [
                     {
-                        "image": "fred78290/vsphere-autoscaler:v1.18.2",
-                        "name": "vsphere-autoscaler",
-                        "resources": {
-                            "limits": {
-                                "cpu": "100m",
-                                "memory": "300Mi"
-                            },
-                            "requests": {
-                                "cpu": "100m",
-                                "memory": "300Mi"
-                            }
-                        },
-                        "command": [
-                            "./vsphere-autoscaler",
-                            "--kubeconfig=/etc/kubernetes/config",
-                            "--config=/etc/cluster/kubernetes-vmware-autoscaler.json",
-                            "--save=/etc/cluster/vmware-autoscaler-state.json",
-                            "-v=4",
-                            "-logtostderr=true"
-                        ],
-                        "imagePullPolicy": "Always",
-                        "volumeMounts": [
-                            {
-                                "name": "cluster-socket",
-                                "mountPath": "/var/run/cluster-autoscaler"
-                            },
-                            {
-                                "name": "kubernetes",
-                                "mountPath": "/etc/kubernetes/config",
-                                "readOnly": true
-                            },
-                            {
-                                "name": "cluster-autoscaler",
-                                "mountPath": "/etc/cluster"
-                            }
-                        ]
-                    },
-                    {
                         "image": "fred78290/cluster-autoscaler:v1.18.2",
                         "name": "cluster-autoscaler",
                         "resources": {
@@ -105,10 +67,6 @@
                         "imagePullPolicy": "Always",
                         "volumeMounts": [
                             {
-                                "name": "cluster-socket",
-                                "mountPath": "/var/run/cluster-autoscaler"
-                            },
-                            {
                                 "name": "ssl-certs",
                                 "mountPath": "/etc/ssl/certs/ca-certificates.crt",
                                 "readOnly": true
@@ -127,11 +85,6 @@
                     }
                 ],
                 "volumes": [
-                    {
-                        "name": "cluster-socket",
-                        "emptyDir": {
-                        }
-                    },
                     {
                         "name": "cluster-autoscaler",
                         "hostPath": {

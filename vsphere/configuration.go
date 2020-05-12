@@ -243,6 +243,25 @@ func (conf *Configuration) WaitForIP(name string) (string, error) {
 	return conf.WaitForIPWithContext(ctx, name)
 }
 
+// WaitForToolsRunningWithContext wait vmware tools is running a VM by name
+func (conf *Configuration) WaitForToolsRunningWithContext(ctx *Context, name string) (bool, error) {
+	vm, err := conf.VirtualMachineWithContext(ctx, name)
+
+	if err != nil {
+		return false, err
+	}
+
+	return vm.WaitForToolsRunning(ctx)
+}
+
+// WaitForToolsRunning wait vmware tools is running a VM by name
+func (conf *Configuration) WaitForToolsRunning(name string) (bool, error) {
+	ctx := NewContext(conf.Timeout)
+	defer ctx.Cancel()
+
+	return conf.WaitForToolsRunningWithContext(ctx, name)
+}
+
 // PowerOnWithContext power on a VM by name
 func (conf *Configuration) PowerOnWithContext(ctx *Context, name string) error {
 	vm, err := conf.VirtualMachineWithContext(ctx, name)

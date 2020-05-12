@@ -75,6 +75,19 @@
         },
         {
             "apiGroups": [
+                "batch"
+            ],
+            "resources": [
+                "jobs"
+            ],
+            "verbs": [
+                "watch",
+                "list",
+                "get"
+            ]
+        },
+        {
+            "apiGroups": [
                 ""
             ],
             "resources": [

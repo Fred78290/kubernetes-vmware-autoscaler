@@ -12,5 +12,5 @@ require (
 	google.golang.org/grpc v1.26.0
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api v0.18.2
-	k8s.io/client-go v11.0.0+incompatible
+	k8s.io/client-go v0.18.2
 )

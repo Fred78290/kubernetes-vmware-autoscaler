@@ -15,8 +15,8 @@ export MASTERKUBE="${NODEGROUP_NAME}-masterkube"
 export PROVIDERID="${SCHEME}://${NODEGROUP_NAME}/object?type=node&name=${MASTERKUBE}"
 export SSH_PRIVATE_KEY=~/.ssh/id_rsa
 export SSH_KEY=$(cat "${SSH_PRIVATE_KEY}.pub")
-export KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
-export KUBERNETES_PASSWORD=$(uuidgen)
+export KUBERNETES_VERSION=v1.18.2
+export KUBERNETES_PASSWORD=
 export KUBECONFIG=$HOME/.kube/config
 export SEED_USER=ubuntu
 export SEED_IMAGE="bionic-server-cloudimg-seed"
@@ -40,12 +40,15 @@ export UNREMOVABLENODERECHECKTIMEOUT="1m"
 export OSDISTRO=$(uname -s)
 export TRANSPORT="tcp"
 export USER=ubuntu
-export NET_DOMAIN=example.com
+export NET_DOMAIN=home
 export NET_IP=10.0.0.200
 export NET_GATEWAY=10.0.0.1
 export NET_DNS=10.0.0.1
-export VC_NETWORK_PRIVATE="VM Network"
-export VC_NETWORK_PUBLIC="VM Public"
+export NET_MASK=255.255.255.0
+export NET_MASK_CIDR=24
+export VC_NETWORK_PRIVATE="Private Network"
+export VC_NETWORK_PUBLIC="Public Network"
+export LAUNCH_CA=YES
 
 if [ "$OSDISTRO" == "Linux" ]; then
     TZ=$(cat /etc/timezone)
@@ -197,26 +200,45 @@ while true; do
     esac
 done
 
+if [ -z $KUBERNETES_PASSWORD ]; then
+    if [ -f ~/.kubernetes_pwd ]; then
+        KUBERNETES_PASSWORD=$(cat ~/.kubernetes_pwd)
+    else
+        KUBERNETES_PASSWORD=$(uuidgen)
+        echo $n "$KUBERNETES_PASSWORD" > ~/.kubernetes_pwd
+    fi
+fi
+
+export SSH_KEY_FNAME=$(basename $SSH_PRIVATE_KEY)
 export SSH_KEY=$(cat "${SSH_PRIVATE_KEY}.pub")
 
 # GRPC network endpoint
-if [ "${TRANSPORT}" == "unix" ]; then
-    LISTEN="/var/run/cluster-autoscaler/vmware.sock"
-    CONNECTTO="/var/run/cluster-autoscaler/vmware.sock"
-elif [ "${TRANSPORT}" == "tcp" ]; then
-    if [ "${OSDISTRO}" == "Linux" ]; then
-        NET_IF=$(ip route get 1 | awk '{print $5;exit}')
-        IPADDR=$(ip addr show ${NET_IF} | grep "inet\s" | tr '/' ' ' | awk '{print $2}')
-    else
-        NET_IF=$(route get 1 | grep interface | awk '{print $2}')
-        IPADDR=$(ifconfig ${NET_IF} | grep "inet\s" | sed -n 1p | awk '{print $2}')
-    fi
+if [ "$LAUNCH_CA" != "YES" ]; then
+    SSH_PRIVATE_KEY_LOCAL="$SSH_PRIVATE_KEY"
 
-    LISTEN="${IPADDR}:5200"
-    CONNECTTO="${IPADDR}:5200"
+    if [ "${TRANSPORT}" == "unix" ]; then
+        LISTEN="/var/run/cluster-autoscaler/vmware.sock"
+        CONNECTTO="unix:/var/run/cluster-autoscaler/vmware.sock"
+    elif [ "${TRANSPORT}" == "tcp" ]; then
+        if [ "${OSDISTRO}" == "Linux" ]; then
+            NET_IF=$(ip route get 1 | awk '{print $5;exit}')
+            IPADDR=$(ip addr show ${NET_IF} | grep -m 1 "inet\s" | tr '/' ' ' | awk '{print $2}')
+        else
+            NET_IF=$(route get 1 | grep -m 1 interface | awk '{print $2}')
+            IPADDR=$(ifconfig ${NET_IF} | grep -m 1 "inet\s" | sed -n 1p | awk '{print $2}')
+        fi
+
+        LISTEN="${IPADDR}:5200"
+        CONNECTTO="${IPADDR}:5200"
+    else
+        echo "Unknown transport: ${TRANSPORT}, should be unix or tcp"
+        exit -1
+    fi
 else
-    echo "Unknown transport: ${TRANSPORT}, should be unix or tcp"
-    exit -1
+    SSH_PRIVATE_KEY_LOCAL="/etc/cluster/${SSH_KEY_FNAME}"
+    TRANSPORT=unix
+    LISTEN="/var/run/cluster-autoscaler/vmware.sock"
+    CONNECTTO="unix:/var/run/cluster-autoscaler/vmware.sock"
 fi
 
 echo "Transport set to:${TRANSPORT}, listen endpoint at ${LISTEN}"
@@ -298,12 +320,15 @@ export DOMAIN_NAME=$(openssl x509 -noout -subject -in ./etc/ssl/cert.pem | awk -
 if [ -z "$(govc vm.info ${TARGET_IMAGE} 2>&1)" ]; then
     echo "Create vmware preconfigured image ${TARGET_IMAGE}"
 
-    create-image.sh --password=${KUBERNETES_PASSWORD} \
-        --cni-version=${CNI_VERSION} \
-        --custom-image=${TARGET_IMAGE} \
-        --kubernetes-version=${KUBERNETES_VERSION} \
-        --seed=${SEED_IMAGE} \
-        --user=${SEED_USER}
+    ./bin/create-image.sh \
+        --password="${KUBERNETES_PASSWORD}" \
+        --cni-version="${CNI_VERSION}" \
+        --custom-image="${TARGET_IMAGE}" \
+        --kubernetes-version="${KUBERNETES_VERSION}" \
+        --seed="${SEED_IMAGE}" \
+        --user="${SEED_USER}" \
+        --ssh-key="${SSH_KEY}" \
+        --second-network="${VC_NETWORK_PUBLIC}"
 fi
 
 # Delete previous exixting version
@@ -320,7 +345,7 @@ network:
     eth1:
       gateway4: $NET_GATEWAY
       addresses:
-      - $NET_IP/24
+      - $NET_IP/$NET_MASK_CIDR
 EOF
 
 echo "${KUBERNETES_PASSWORD}" >./config/kubernetes-password.txt
@@ -372,7 +397,7 @@ echo "MASTERKUBE=${MASTERKUBE}"
 # Due to my vsphere center the folder name refer more path, so I need to precise the path instead
 FOLDER_OPTIONS=
 if [ "${GOVC_FOLDER}" ]; then
-    if [ ! $(govc folder.info ${GOVC_FOLDER} | grep Path | wc -l) -eq 1 ]; then
+    if [ ! $(govc folder.info ${GOVC_FOLDER} | grep -m 1 Path | wc -l) -eq 1 ]; then
         FOLDER_OPTIONS="-folder=/${GOVC_DATACENTER}/vm/${GOVC_FOLDER}"
     fi
 fi
@@ -428,7 +453,7 @@ else
     INSECURE=false
 fi
 
-cat <<EOF | jq . >config/kubernetes-vmware-autoscaler.json
+AUTOSCALER_CONFIG=$(cat <<EOF
 {
     "network": "${TRANSPORT}",
     "listen": "${LISTEN}",
@@ -464,7 +489,7 @@ cat <<EOF | jq . >config/kubernetes-vmware-autoscaler.json
     },
     "ssh-infos" : {
         "user": "kubernetes",
-        "ssh-private-key": "${SSH_PRIVATE_KEY}"
+        "ssh-private-key": "${SSH_PRIVATE_KEY_LOCAL}"
     },
     "vmware": {
         "${NODEGROUP_NAME}": {
@@ -507,7 +532,8 @@ cat <<EOF | jq . >config/kubernetes-vmware-autoscaler.json
                         "nic": "eth1",
                         "dhcp": false,
                         "address": "${NET_IP}",
-                        "netmask": "255.255.255.0"
+                        "gateway4": "${NET_GATEWAY}",
+                        "netmask": "${NET_MASK}"
                     }
                 ]
             }
@@ -515,10 +541,13 @@ cat <<EOF | jq . >config/kubernetes-vmware-autoscaler.json
     }
 }
 EOF
+)
+
+echo "$AUTOSCALER_CONFIG" | jq . > config/kubernetes-vmware-autoscaler.json
 
 # Recopy config file on master node
-scp ./config/grpc-config.json $USER@${IPADDR}:/etc/cluster/
-scp ./config/kubernetes-vmware-autoscaler.json $USER@${IPADDR}:/etc/cluster/
+scp ${SSH_PRIVATE_KEY} ./config/grpc-config.json ./config/kubernetes-vmware-autoscaler.json $USER@${IPADDR}:/tmp
+ssh $USER@${IPADDR} sudo cp "/tmp/${SSH_KEY_FNAME}" /tmp/grpc-config.json /tmp/kubernetes-vmware-autoscaler.json /etc/cluster
 
 # Update /etc/hosts
 if [ "${OSDISTRO}" == "Linux" ]; then
@@ -534,8 +563,8 @@ create-ingress-controller.sh
 create-dashboard.sh
 create-helloworld.sh
 
-if [ "$LAUNCH_CA" == "YES" ]; then
-    create-autoscaler.sh
+if [ "$LAUNCH_CA" != "NO" ]; then
+    create-autoscaler.sh $LAUNCH_CA
 fi
 
 popd
