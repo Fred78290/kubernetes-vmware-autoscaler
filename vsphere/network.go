@@ -187,7 +187,7 @@ func generateMacAddress() string {
 		return ""
 	}
 
-	return fmt.Sprintf("00:16:3E:%02X:%02X:%02X", buf[0], buf[1], buf[2])
+	return fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[0], buf[1], buf[2])
 }
 
 // See func (p DistributedVirtualPortgroup) EthernetCardBackingInfo(ctx context.Context) (types.BaseVirtualDeviceBackingInfo, error)
