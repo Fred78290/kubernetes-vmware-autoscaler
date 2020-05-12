@@ -37,6 +37,7 @@ else
 fi
 
 mkdir -p $ISODIR
+mkdir -p $CACHE
 
 TEMP=`getopt -o i:k:n:op:s:u:v: --long user:,adapter:,second-adapter:,second-network:,ovftool,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
 eval set -- "$TEMP"
@@ -80,13 +81,13 @@ EOF
 # you can try with ovftool to import the ova.
 # If you have the bug "unsupported server", you must do it manually!
 if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
-    [ -f bionic-server-cloudimg-amd64.ova ] || wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.ova -O bionic-server-cloudimg-amd64.ova
+    [ -f ${CACHE}/bionic-server-cloudimg-amd64.ova ] || wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.ova -O ${CACHE}/bionic-server-cloudimg-amd64.ova
         
-    MAPPED_NETWORK=$(govc import.spec bionic-server-cloudimg-amd64.ova | jq .NetworkMapping[0].Name | tr -d '"')
+    MAPPED_NETWORK=$(govc import.spec ${CACHE}/bionic-server-cloudimg-amd64.ova | jq .NetworkMapping[0].Name | tr -d '"')
 
     if [ "${IMPORTMODE}" == "govc" ]; then
 
-        govc import.spec bionic-server-cloudimg-amd64.ova \
+        govc import.spec ${CACHE}/bionic-server-cloudimg-amd64.ova \
             | jq --arg GOVC_NETWORK "${GOVC_NETWORK}" --arg MAPPED_NETWORK "${MAPPED_NETWORK}" '.NetworkMapping |= [ { Name: $MAPPED_NETWORK, Network: $GOVC_NETWORK } ]' \
             > ${CACHE}/bionic-server-cloudimg-amd64.spec
         
