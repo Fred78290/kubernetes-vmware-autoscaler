@@ -11,6 +11,7 @@ import (
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	"github.com/golang/glog"
 	"github.com/vmware/govmomi/object"
+	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25"
 	"gopkg.in/yaml.v2"
 
@@ -283,6 +284,57 @@ func (vm VirtualMachine) IsToolsRunning(ctx *Context) (bool, error) {
 	v := vm.VirtualMachine(ctx)
 
 	return vm.isToolsRunning(ctx, v)
+}
+
+func (vm *VirtualMachine) waitForToolsRunning(ctx *Context, v *object.VirtualMachine) (bool, error) {
+	var running bool
+
+	p := property.DefaultCollector(vm.VimClient())
+
+	err := property.Wait(ctx, p, v.Reference(), []string{"guest.toolsRunningStatus"}, func(pc []types.PropertyChange) bool {
+		for _, c := range pc {
+			if c.Name != "guest.toolsRunningStatus" {
+				continue
+			}
+			if c.Op != types.PropertyChangeOpAssign {
+				continue
+			}
+			if c.Val == nil {
+				continue
+			}
+
+			running = c.Val.(string) == string(types.VirtualMachineToolsRunningStatusGuestToolsRunning)
+
+			return running
+		}
+
+		return false
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	return running, nil
+}
+
+// WaitForToolsRunning wait vmware tool starts
+func (vm *VirtualMachine) WaitForToolsRunning(ctx *Context) (bool, error) {
+	var powerState types.VirtualMachinePowerState
+	var err error
+	var running bool
+
+	v := vm.VirtualMachine(ctx)
+
+	if powerState, err = v.PowerState(ctx); err == nil {
+		if powerState == types.VirtualMachinePowerStatePoweredOn {
+			running, err = vm.waitForToolsRunning(ctx, v)
+		} else {
+			err = fmt.Errorf("The VM: %s is not powered", v.InventoryPath)
+		}
+	}
+
+	return running, err
 }
 
 func (vm *VirtualMachine) waitForIP(ctx *Context, v *object.VirtualMachine) (string, error) {
