@@ -318,13 +318,14 @@ export DOMAIN_NAME=$(openssl x509 -noout -subject -in ./etc/ssl/cert.pem | awk -
 if [ -z "$(govc vm.info ${TARGET_IMAGE} 2>&1)" ]; then
     echo "Create vmware preconfigured image ${TARGET_IMAGE}"
 
-    ./bin/create-image.sh --password="${KUBERNETES_PASSWORD}" \
+    ./bin/create-image.sh \
+        --password="${KUBERNETES_PASSWORD}" \
         --cni-version="${CNI_VERSION}" \
         --custom-image="${TARGET_IMAGE}" \
         --kubernetes-version="${KUBERNETES_VERSION}" \
         --seed="${SEED_IMAGE}" \
         --user="${SEED_USER}" \
-        --ssh-key="${SSH_PRIVATE_KEY}.pub" \
+        --ssh-key="${SSH_KEY}" \
         --second-network="${VC_NETWORK_PUBLIC}"
 fi
 
