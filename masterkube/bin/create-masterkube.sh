@@ -16,7 +16,7 @@ export PROVIDERID="${SCHEME}://${NODEGROUP_NAME}/object?type=node&name=${MASTERK
 export SSH_PRIVATE_KEY=~/.ssh/id_rsa
 export SSH_KEY=$(cat "${SSH_PRIVATE_KEY}.pub")
 export KUBERNETES_VERSION=v1.15.11
-export KUBERNETES_PASSWORD=$(uuidgen)
+export KUBERNETES_PASSWORD=
 export KUBECONFIG=$HOME/.kube/config
 export SEED_USER=ubuntu
 export SEED_IMAGE="bionic-server-cloudimg-seed"
@@ -197,6 +197,15 @@ while true; do
         ;;
     esac
 done
+
+if [ -z $KUBERNETES_PASSWORD ]; then
+    if [ -f ~/.kubernetes_pwd ]; then
+        KUBERNETES_PASSWORD=$(cat ~/.kubernetes_pwd)
+    else
+        KUBERNETES_PASSWORD=$(uuidgen)
+        echo $n "$KUBERNETES_PASSWORD" > ~/.kubernetes_pwd
+    fi
+fi
 
 export SSH_KEY_FNAME=$(basename $SSH_PRIVATE_KEY)
 export SSH_KEY=$(cat "${SSH_PRIVATE_KEY}.pub")
