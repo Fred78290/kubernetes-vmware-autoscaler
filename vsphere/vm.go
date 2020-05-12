@@ -261,7 +261,16 @@ func (vm *VirtualMachine) Configure(ctx *Context, userName, authKey string, clou
 func (vm VirtualMachine) isToolsRunning(ctx *Context, v *object.VirtualMachine) (bool, error) {
 	var o mo.VirtualMachine
 
-	err := v.Properties(ctx, v.Reference(), []string{"guest"}, &o)
+	running, err := v.IsToolsRunning(ctx)
+	if err != nil {
+		return false, err
+	}
+
+	if running {
+		return running, nil
+	}
+
+	err = v.Properties(ctx, v.Reference(), []string{"guest"}, &o)
 	if err != nil {
 		return false, err
 	}
