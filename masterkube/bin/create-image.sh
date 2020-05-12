@@ -13,7 +13,6 @@
 # The second VM will contains everything to run kubernetes
 
 KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
-KUBERNETES_PASSWORD=$(uuidgen)
 CNI_VERSION=v0.8.5
 SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
 CACHE=~/.local/vmware/cache
@@ -50,7 +49,7 @@ while true ; do
         -k|--ssh-key) SSH_KEY=$2 ; shift 2;;
         -n|--cni-version) CNI_VERSION=$2 ; shift 2;;
         -o|--ovftool) IMPORTMODE=ovftool ; shift 2;;
-        -p|--password) KUBERNETES_PASSWORD=$2 ; shift 2;;
+        -p|--password) PASSWORD=$2 ; shift 2;;
         -s|--seed) SEEDIMAGE=$2 ; shift 2;;
         -u|--user) USER=$2 ; shift 2;;
         -v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
@@ -66,8 +65,7 @@ if [ ! -z "$(govc vm.info $TARGET_IMAGE 2>&1)" ]; then
     exit 0
 fi
 
-echo "Kubernetes password:$KUBERNETES_PASSWORD"
-echo "Used password:$PASSWORD"
+echo "Ubuntu password:$PASSWORD"
 
 USERDATA=$(base64 <<EOF
 #cloud-config
