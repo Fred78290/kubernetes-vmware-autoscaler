@@ -308,6 +308,10 @@ func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabe
 
 		err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
 
+	} else if _, err = vsphere.WaitForToolsRunning(vm.NodeName); err != nil {
+
+		err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
+
 	} else if _, err = vsphere.WaitForIP(vm.NodeName); err != nil {
 
 		err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
