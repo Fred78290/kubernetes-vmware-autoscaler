@@ -2,7 +2,10 @@
     "kind": "Role",
     "apiVersion": "rbac.authorization.k8s.io/v1",
     "metadata": {
-        "name": "kubernetes-dashboard-minimal",
+        "labels": {
+            "k8s-app": "kubernetes-dashboard"
+        },
+        "name": "kubernetes-dashboard",
         "namespace": "$K8NAMESPACE"
     },
     "rules": [
@@ -13,31 +16,10 @@
             "resources": [
                 "secrets"
             ],
-            "verbs": [
-                "create"
-            ]
-        },
-        {
-            "apiGroups": [
-                ""
-            ],
-            "resources": [
-                "configmaps"
-            ],
-            "verbs": [
-                "create"
-            ]
-        },
-        {
-            "apiGroups": [
-                ""
-            ],
-            "resources": [
-                "secrets"
-            ],
             "resourceNames": [
                 "kubernetes-dashboard-key-holder",
-                "kubernetes-dashboard-certs"
+                "kubernetes-dashboard-certs",
+                "kubernetes-dashboard-csrf"
             ],
             "verbs": [
                 "get",
@@ -68,7 +50,8 @@
                 "services"
             ],
             "resourceNames": [
-                "heapster"
+                "heapster",
+                "dashboard-metrics-scraper"
             ],
             "verbs": [
                 "proxy"
@@ -84,7 +67,9 @@
             "resourceNames": [
                 "heapster",
                 "http:heapster:",
-                "https:heapster:"
+                "https:heapster:",
+                "dashboard-metrics-scraper",
+                "http:dashboard-metrics-scraper"
             ],
             "verbs": [
                 "get"

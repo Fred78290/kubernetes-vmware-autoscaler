@@ -19,7 +19,7 @@ LABEL maintainer="Frederic Boltz <frederic.boltz@gmail.com>"
 ENV DEBIAN_FRONTEND noninteractive
 RUN clean-install ca-certificates tzdata; \
     apt-get update; \
-    apt-get install curl -y; \
+    apt-get install openssh-client curl -y; \
     cd /usr/local/bin; \
     KUBERNETES_VERSION=v1.17.5; \
     curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kubectl; chmod +x kubectl

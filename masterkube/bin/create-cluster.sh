@@ -4,7 +4,7 @@ set -e
 
 CNI=flannel
 NET_IF=$(ip route get 1|awk '{print $5;exit}')
-KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
+KUBERNETES_VERSION=v1.17.5
 CLUSTER_DIR=/etc/cluster
 PROVIDERID="vmware://afp-slyo-ca-k8s/object?type=node&name=${HOSTNAME}"
 

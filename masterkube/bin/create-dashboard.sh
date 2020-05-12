@@ -1,16 +1,20 @@
 #!/bin/bash
 
+echo "Deploy kubernetes dashboard"
+
 # This file is intent to deploy dashboard inside the masterkube
 CURDIR=$(dirname $0)
 
 pushd $CURDIR/../
 
-export K8NAMESPACE=kube-system
+export K8NAMESPACE=kubernetes-dashboard
 export ETC_DIR=./config/deployment/dashboard
 export KUBERNETES_TEMPLATE=./templates/dashboard
+export SUBPATH_POD_NAME='$(POD_NAME)'
+export REWRITE_TARGET='/$1'
 
 if [ -z "$DOMAIN_NAME" ]; then
-    export DOMAIN_NAME=$(openssl x509 -noout -fingerprint -text < ./etc/ssl/cert.pem | grep 'Subject: CN' | tr '=' ' ' | awk '{print $3}' | sed 's/\*\.//g')
+    export DOMAIN_NAME=$(openssl x509 -noout -subject -in ./etc/ssl/cert.pem | awk -F= '{print $NF}' | sed -e 's/^[ \t]*//' | sed 's/\*\.//g')
 fi
 
 mkdir -p $ETC_DIR
@@ -24,18 +28,34 @@ EOF") | jq . > $ETC_DIR/$1.json
 kubectl apply -f $ETC_DIR/$1.json --kubeconfig=./cluster/config
 }
 
+deploy namespace
+deploy serviceaccount
+deploy service
+
+kubectl create secret tls $K8NAMESPACE \
+    -n $K8NAMESPACE \
+    --key ./etc/ssl/privkey.pem \
+    --cert ./etc/ssl/fullchain.pem \
+    --kubeconfig=./cluster/config
+
 kubectl create secret generic kubernetes-dashboard-certs \
     --from-file=dashboard.key=./etc/ssl/privkey.pem \
     --from-file=dashboard.crt=./etc/ssl/fullchain.pem \
     --kubeconfig=./cluster/config \
     -n $K8NAMESPACE
 
-deploy serviceaccount
+deploy csrf
+deploy keyholder
+deploy settings
+
 deploy role
+deploy clusterrole
 deploy rolebinding
+deploy clusterrolebinding
 deploy deployment
-deploy service
 deploy ingress
+deploy scrapersvc
+deploy scraper
 
 # Create the service account in the current namespace 
 # (we assume default)

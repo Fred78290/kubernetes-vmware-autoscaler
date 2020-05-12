@@ -24,8 +24,8 @@ cat > ${CURDIR}/userdata.yaml <<EOF
 group:
     - kubernetes
 runcmd:
-    - KUBERNETES_VERSION="$(curl -sSL https://dl.k8s.io/release/stable.txt)"
-    - CNI_VERSION=v0.7.5
+    - KUBERNETES_VERSION=v1.17.5
+    - CNI_VERSION=v0.8.5
     - mkdir -p /opt/cni/bin
     - mkdir -p /usr/local/bin
     - curl https://get.docker.com | bash
