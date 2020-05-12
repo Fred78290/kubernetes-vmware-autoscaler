@@ -31,7 +31,7 @@
                 "containers": [
                     {
                         "name": "helloworld",
-                        "image": "gcr.io/hello-minikube-zero-install/hello-node",
+                        "image": "fred78290/helloworld:v1.0.0",
                         "imagePullPolicy": "IfNotPresent",
                         "ports": [
                             {

@@ -31,13 +31,12 @@
                 "containers": [
                     {
                         "name": "masterkube-nginx-ingress-controller",
-                        "image": "quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.18.0",
+                        "image": "quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.26.2",
                         "args": [
                             "/nginx-ingress-controller",
                             "--default-backend-service=$K8NAMESPACE/masterkube-default-http-backend",
                             "--kubeconfig=/etc/kubernetes/config",
                             "--ingress-class=nginx",
-                            "--sort-backends=true",
                             "--healthz-port=10254",
                             "--http-port=80",
                             "--https-port=443",
