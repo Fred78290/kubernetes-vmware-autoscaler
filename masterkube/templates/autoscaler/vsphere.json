@@ -1,5 +1,5 @@
 {
-    "apiVersion": "extensions/v1beta1",
+    "apiVersion": "apps/v1",
     "kind": "Deployment",
     "metadata": {
         "name": "vsphere-autoscaler",
@@ -30,7 +30,7 @@
                 },
                 "containers": [
                     {
-                        "image": "fred78290/vsphere-autoscaler:v0.1.1",
+                        "image": "fred78290/vsphere-autoscaler:v1.18.2",
                         "name": "vsphere-autoscaler",
                         "resources": {
                             "limits": {
