@@ -1,5 +1,5 @@
 {
-    "apiVersion": "extensions/v1beta1",
+    "apiVersion": "apps/v1",
     "kind": "Deployment",
     "metadata": {
         "name": "cluster-autoscaler",
@@ -69,7 +69,7 @@
                         ]
                     },
                     {
-                        "image": "fred78290/cluster-autoscaler:v1.15.11",
+                        "image": "fred78290/cluster-autoscaler:v1.16.9",
                         "name": "cluster-autoscaler",
                         "resources": {
                             "limits": {
