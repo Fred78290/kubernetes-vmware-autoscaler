@@ -278,8 +278,11 @@ func (net *NetworkInterface) GetMacAddress() string {
 
 	if strings.ToLower(address) == "generate" {
 		address = generateMacAddress()
-		net.MacAddress = address
+	} else if strings.ToLower(address) == "ignore" {
+		address = ""
 	}
+
+	net.MacAddress = address
 
 	return address
 }
