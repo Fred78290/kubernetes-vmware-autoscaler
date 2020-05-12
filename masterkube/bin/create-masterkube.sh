@@ -44,9 +44,11 @@ export NET_DOMAIN=home
 export NET_IP=10.0.0.200
 export NET_GATEWAY=10.0.0.1
 export NET_DNS=10.0.0.1
+export NET_MASK=255.255.255.0
+export NET_MASK_CIDR=24
 export VC_NETWORK_PRIVATE="Private Network"
 export VC_NETWORK_PUBLIC="Public Network"
-export LAUNCH_CA=DEBUG
+export LAUNCH_CA=YES
 
 if [ "$OSDISTRO" == "Linux" ]; then
     TZ=$(cat /etc/timezone)
@@ -343,7 +345,7 @@ network:
     eth1:
       gateway4: $NET_GATEWAY
       addresses:
-      - $NET_IP/24
+      - $NET_IP/$NET_MASK_CIDR
 EOF
 
 echo "${KUBERNETES_PASSWORD}" >./config/kubernetes-password.txt
@@ -530,7 +532,8 @@ AUTOSCALER_CONFIG=$(cat <<EOF
                         "nic": "eth1",
                         "dhcp": false,
                         "address": "${NET_IP}",
-                        "netmask": "255.255.255.0"
+                        "gateway4": "${NET_GATEWAY}",
+                        "netmask": "${NET_MASK}"
                     }
                 ]
             }
