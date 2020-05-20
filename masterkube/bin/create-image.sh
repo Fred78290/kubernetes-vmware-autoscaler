@@ -218,6 +218,7 @@ apt-get update
 apt-get upgrade -y
 apt-get dist-upgrade -y
 apt-get autoremove -y
+apt-get install jq socat conntrack -y
 
 mkdir -p /opt/cni/bin
 mkdir -p /usr/local/bin

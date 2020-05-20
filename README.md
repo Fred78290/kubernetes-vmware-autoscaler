@@ -1,5 +1,4 @@
-[![Build Status](https://travis-ci.org/Fred78290/kubernetes-vmware-autoscaler.svg?branch=master)](https://travis-ci.org/Fred78290/kubernetes-vmware-autoscaler) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Fred78290_kubernetes-vmware-autoscaler&metric=alert_status)](https://sonarcloud.io/dashboard?id=Fred78290_kubernetes-vmware-autoscaler) [![Licence](https://img.shields.io/hexpm/l/plug.svg)](https://github.com/Fred78290/kubernetes-vmware-autoscaler/blob/master/LICENSE)
-
+[![Build Status](https://travis-ci.org/Fred78290/kubernetes-vmware-autoscaler.svg?branch=cluster-autoscaler-release-1.17)](https://travis-ci.org/Fred78290/kubernetes-vmware-autoscaler) [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Fred78290_kubernetes-vmware-autoscaler&metric=alert_status)](https://sonarcloud.io/dashboard?id=Fred78290_kubernetes-vmware-autoscaler) [![Licence](https://img.shields.io/hexpm/l/plug.svg)](https://github.com/Fred78290/kubernetes-vmware-autoscaler/blob/master/LICENSE)
 
 # kubernetes-vmware-autoscaler
 
