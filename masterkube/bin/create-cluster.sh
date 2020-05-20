@@ -6,7 +6,7 @@ CNI=flannel
 NET_IF=$(ip route get 1|awk '{print $5;exit}')
 KUBERNETES_VERSION=v1.18.2
 CLUSTER_DIR=/etc/cluster
-PROVIDERID="vmware://afp-slyo-ca-k8s/object?type=node&name=${HOSTNAME}"
+PROVIDERID="vmware://vmware-ca-k8s/object?type=node&name=${HOSTNAME}"
 
 [ -z "$1" ] || CNI="$1"
 [ -z "$2" ] || NET_IF="$2"
