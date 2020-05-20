@@ -587,3 +587,17 @@ func (vm *AutoScalerServerNode) xgetVSphere() *vsphere.Configuration {
 func (vm *AutoScalerServerNode) setServerConfiguration(config *types.AutoScalerServerConfig) {
 	vm.serverConfig = config
 }
+
+// cleanOnLaunchError called when error occurs during launch
+func (vm *AutoScalerServerNode) cleanOnLaunchError(err error) {
+	glog.Errorf(constantes.ErrUnableToLaunchVM, vm.NodeName, err)
+
+	if status, _ := vm.statusVM(); status != AutoScalerServerNodeStateNotCreated {
+		if e := vm.deleteVM(); e != nil {
+			glog.Errorf(constantes.ErrUnableToDeleteVM, vm.NodeName, e)
+		}
+	} else {
+		glog.Warningf(constantes.WarnFailedVMNotDeleted, vm.NodeName, status)
+	}
+
+}
