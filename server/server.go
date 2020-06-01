@@ -1367,6 +1367,8 @@ func StartServer(kubeConfig, saveState, configFileName string) {
 
 	server := grpc.NewServer()
 
+	defer server.Stop()
+
 	apigrc.RegisterCloudProviderServiceServer(server, autoScalerServer)
 	apigrc.RegisterNodeGroupServiceServer(server, autoScalerServer)
 	apigrc.RegisterPricingModelServiceServer(server, autoScalerServer)
