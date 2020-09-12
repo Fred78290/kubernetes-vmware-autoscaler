@@ -225,9 +225,11 @@ func (vm *VirtualMachine) Configure(ctx *Context, userName, authKey string, clou
 	virtualMachine := vm.VirtualMachine(ctx)
 
 	vmConfigSpec := types.VirtualMachineConfigSpec{
-		NumCPUs:    int32(cpus),
-		MemoryMB:   int64(memory),
-		Annotation: annotation,
+		NumCPUs:      int32(cpus),
+		MemoryMB:     int64(memory),
+		Annotation:   annotation,
+		InstanceUuid: virtualMachine.UUID(ctx),
+		Uuid:         virtualMachine.UUID(ctx),
 	}
 
 	if devices, err = vm.addHardDrive(ctx, virtualMachine, disk, devices); err != nil {
