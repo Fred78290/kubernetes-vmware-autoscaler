@@ -561,6 +561,7 @@ sudo bash -c "echo '${IPADDR} ${MASTERKUBE}.${DOMAIN_NAME} masterkube.${DOMAIN_N
 # Create Pods
 create-ingress-controller.sh
 create-dashboard.sh
+create-metrics.sh
 create-helloworld.sh
 
 if [ "$LAUNCH_CA" != "NO" ]; then
