@@ -13,7 +13,7 @@
 # The second VM will contains everything to run kubernetes
 
 KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
-CNI_VERSION=v0.8.5
+CNI_VERSION=v0.8.6
 SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
 CACHE=~/.local/vmware/cache
 TARGET_IMAGE=bionic-kubernetes-$KUBERNETES_VERSION
@@ -300,7 +300,7 @@ ExecStart=
 ExecStart=/usr/local/bin/kubelet \$KUBELET_KUBECONFIG_ARGS \$KUBELET_CONFIG_ARGS \$KUBELET_KUBEADM_ARGS \$KUBELET_EXTRA_ARGS
 SHELL
 
-echo 'KUBELET_EXTRA_ARGS="--fail-swap-on=false --read-only-port=10255 --feature-gates=VolumeSubpathEnvExpansion=true"' > /etc/default/kubelet
+echo 'KUBELET_EXTRA_ARGS="--fail-swap-on=false --read-only-port=10255"' > /etc/default/kubelet
 
 echo 'export PATH=/opt/cni/bin:\$PATH' >> /etc/profile.d/apps-bin-path.sh
 
@@ -321,8 +321,19 @@ SHELL
 [ -f /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg ] && rm /etc/cloud/cloud.cfg.d/50-curtin-networking.cfg
 rm /etc/netplan/*
 cloud-init clean
-rm /var/log/cloud-ini*
-rm /var/log/syslog
+
+rm -rf /etc/apparmor.d/cache/* /etc/apparmor.d/cache/.features
+/usr/bin/truncate --size 0 /etc/machine-id
+rm -f /snap/README
+find /usr/share/netplan -name __pycache__ -exec rm -r {} +
+rm -rf /var/cache/pollinate/seeded /var/cache/snapd/* /var/cache/motd-news
+rm -rf /var/lib/cloud /var/lib/dbus/machine-id /var/lib/private /var/lib/systemd/timers /var/lib/systemd/timesync /var/lib/systemd/random-seed
+rm -f /var/lib/ubuntu-release-upgrader/release-upgrade-available
+rm -f /var/lib/update-notifier/fsck-at-reboot /var/lib/update-notifier/hwe-eol
+find /var/log -type f -exec rm -f {} +
+rm -r /tmp/* /tmp/.*-unix /var/tmp/*"
+/bin/sync
+/sbin/fstrim -v /
 EOF
 
 chmod +x "${ISODIR}/prepare-image.sh"

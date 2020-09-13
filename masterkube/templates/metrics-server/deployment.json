@@ -1,0 +1,72 @@
+{
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+        "name": "metrics-server",
+        "namespace": "$K8NAMESPACE",
+        "labels": {
+            "k8s-app": "metrics-server"
+        }
+    },
+    "spec": {
+        "selector": {
+            "matchLabels": {
+                "k8s-app": "metrics-server"
+            }
+        },
+        "template": {
+            "metadata": {
+                "name": "metrics-server",
+                "labels": {
+                    "k8s-app": "metrics-server"
+                }
+            },
+            "spec": {
+                "serviceAccountName": "metrics-server",
+                "volumes": [
+                    {
+                        "name": "tmp-dir",
+                        "emptyDir": {}
+                    }
+                ],
+                "containers": [
+                    {
+                        "name": "metrics-server",
+                        "image": "k8s.gcr.io/metrics-server/metrics-server:v0.3.7",
+                        "imagePullPolicy": "IfNotPresent",
+                        "args": [
+                            "--cert-dir=/tmp",
+                            "--secure-port=4443",
+                            "--kubelet-insecure-tls",
+                            "--kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP",
+                            "--deprecated-kubelet-completely-insecure",
+                            "--kubelet-port=10255"
+                        ],
+                        "ports": [
+                            {
+                                "name": "main-port",
+                                "containerPort": 4443,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "securityContext": {
+                            "readOnlyRootFilesystem": true,
+                            "runAsNonRoot": true,
+                            "runAsUser": 1000
+                        },
+                        "volumeMounts": [
+                            {
+                                "name": "tmp-dir",
+                                "mountPath": "/tmp"
+                            }
+                        ]
+                    }
+                ],
+                "nodeSelector": {
+                    "kubernetes.io/os": "linux",
+                    "master": "true"
+                }
+            }
+        }
+    }
+}

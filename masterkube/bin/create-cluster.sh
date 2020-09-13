@@ -4,7 +4,7 @@ set -e
 
 CNI=flannel
 NET_IF=$(ip route get 1|awk '{print $5;exit}')
-KUBERNETES_VERSION=v1.18.2
+KUBERNETES_VERSION=v1.19.0
 CLUSTER_DIR=/etc/cluster
 PROVIDERID="vmware://afp-slyo-ca-k8s/object?type=node&name=${HOSTNAME}"
 
@@ -32,7 +32,7 @@ fi
 if [ ! -f /etc/kubernetes/kubelet.conf ]; then
 
     if [ -z "$(grep 'provider-id' /etc/default/kubelet)" ]; then
-        echo "KUBELET_EXTRA_ARGS='--fail-swap-on=false --read-only-port=10255 --feature-gates=VolumeSubpathEnvExpansion=true --provider-id=${PROVIDERID}'" > /etc/default/kubelet
+        echo "KUBELET_EXTRA_ARGS='--fail-swap-on=false --read-only-port=10255 --provider-id=${PROVIDERID}'" > /etc/default/kubelet
         systemctl restart kubelet
     fi
 

@@ -1,11 +1,11 @@
 #!/bin/bash
 KUBERNETES_VERSION=$1
-CNI_VERSION="v0.8.5"
+CNI_VERSION="v0.8.6"
 
 curl -s https://get.docker.com | bash
 
 if [ "x$KUBERNETES_VERSION" == "x" ]; then
-	RELEASE="v1.18.2"
+	RELEASE="v1.19.0"
 else
 	RELEASE=$KUBERNETES_VERSION
 fi
@@ -20,7 +20,7 @@ cd /usr/local/bin
 curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${RELEASE}/bin/linux/amd64/{kubeadm,kubelet,kubectl}
 chmod +x /usr/local/bin/kube*
 
-echo "KUBELET_EXTRA_ARGS='--fail-swap-on=false --read-only-port=10255 --feature-gates=VolumeSubpathEnvExpansion=true'" > /etc/default/kubelet
+echo "KUBELET_EXTRA_ARGS='--fail-swap-on=false --read-only-port=10255'" > /etc/default/kubelet
 
 curl -sSL "https://raw.githubusercontent.com/kubernetes/kubernetes/${RELEASE}/build/debs/kubelet.service" | sed "s:/usr/bin:/usr/local/bin:g" > /etc/systemd/system/kubelet.service
 mkdir -p /etc/systemd/system/kubelet.service.d

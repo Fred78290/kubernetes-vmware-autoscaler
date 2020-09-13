@@ -24,8 +24,8 @@ cat > ${CURDIR}/userdata.yaml <<EOF
 group:
     - kubernetes
 runcmd:
-    - KUBERNETES_VERSION=v1.18.2
-    - CNI_VERSION=v0.8.5
+    - KUBERNETES_VERSION=v1.19.0
+    - CNI_VERSION=v0.8.6
     - mkdir -p /opt/cni/bin
     - mkdir -p /usr/local/bin
     - curl https://get.docker.com | bash
@@ -33,7 +33,7 @@ runcmd:
     - cd /usr/local/bin
     - curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/\${KUBERNETES_VERSION}/bin/linux/amd64/{kubeadm,kubelet,kubectl}
     - chmod +x /usr/local/bin/kube*
-    - echo "KUBELET_EXTRA_ARGS=--fail-swap-on=false --read-only-port=10255 --feature-gates=VolumeSubpathEnvExpansion=true" > /etc/default/kubelet
+    - echo "KUBELET_EXTRA_ARGS=--fail-swap-on=false --read-only-port=10255" > /etc/default/kubelet
     - curl -sSL "https://raw.githubusercontent.com/kubernetes/kubernetes/\${KUBERNETES_VERSION}/build/debs/kubelet.service" | sed 's:/usr/bin:/usr/local/bin:g > /etc/systemd/system/kubelet.service
     - mkdir -p /etc/systemd/system/kubelet.service.d
     - curl -sSL "https://raw.githubusercontent.com/kubernetes/kubernetes/\${KUBERNETES_VERSION}/build/debs/10-kubeadm.conf" | sed 's:/usr/bin:/usr/local/bin:g > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf

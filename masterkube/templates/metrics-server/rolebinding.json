@@ -2,18 +2,18 @@
     "apiVersion": "rbac.authorization.k8s.io/v1",
     "kind": "RoleBinding",
     "metadata": {
-        "name": "masterkube-nginx-ingress-role-nisa-binding",
+        "name": "metrics-server-auth-reader",
         "namespace": "$K8NAMESPACE"
     },
     "roleRef": {
         "apiGroup": "rbac.authorization.k8s.io",
         "kind": "Role",
-        "name": "masterkube-nginx-ingress-role"
+        "name": "extension-apiserver-authentication-reader"
     },
     "subjects": [
         {
             "kind": "ServiceAccount",
-            "name": "masterkube-nginx-ingress-serviceaccount",
+            "name": "metrics-server",
             "namespace": "$K8NAMESPACE"
         }
     ]

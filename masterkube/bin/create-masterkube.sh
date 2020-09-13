@@ -15,14 +15,14 @@ export MASTERKUBE="${NODEGROUP_NAME}-masterkube"
 export PROVIDERID="${SCHEME}://${NODEGROUP_NAME}/object?type=node&name=${MASTERKUBE}"
 export SSH_PRIVATE_KEY=~/.ssh/id_rsa
 export SSH_KEY=$(cat "${SSH_PRIVATE_KEY}.pub")
-export KUBERNETES_VERSION=v1.18.2
+export KUBERNETES_VERSION=v1.19.0
 export KUBERNETES_PASSWORD=
 export KUBECONFIG=$HOME/.kube/config
 export SEED_USER=ubuntu
 export SEED_IMAGE="bionic-server-cloudimg-seed"
 export ROOT_IMG_NAME=bionic-kubernetes
 export TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_VERSION}"
-export CNI_VERSION="v0.8.5"
+export CNI_VERSION="v0.8.6"
 export MINNODES=0
 export MAXNODES=5
 export MAXTOTALNODES=$MAXNODES
@@ -561,6 +561,7 @@ sudo bash -c "echo '${IPADDR} ${MASTERKUBE}.${DOMAIN_NAME} masterkube.${DOMAIN_N
 # Create Pods
 create-ingress-controller.sh
 create-dashboard.sh
+create-metrics.sh
 create-helloworld.sh
 
 if [ "$LAUNCH_CA" != "NO" ]; then
