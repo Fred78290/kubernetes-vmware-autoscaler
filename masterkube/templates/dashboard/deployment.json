@@ -79,7 +79,8 @@
                 ],
                 "serviceAccountName": "kubernetes-dashboard",
                 "nodeSelector": {
-                    "kubernetes.io/os": "linux"
+                    "kubernetes.io/os": "linux",
+                    "master": "true"
                 },
                 "tolerations": [
                     {
