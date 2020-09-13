@@ -1,11 +1,10 @@
 {
-    "apiVersion": "networking.k8s.io/v1",
+    "apiVersion": "networking.k8s.io/v1beta1",
     "kind": "Ingress",
     "metadata": {
         "name": "masterkube-dashboard-server-ingress",
         "namespace": "$K8NAMESPACE",
         "annotations": {
-            "kubernetes.io/ingress.class": "nginx",
             "nginx.ingress.kubernetes.io/ssl-redirect": "true",
             "nginx.ingress.kubernetes.io/use-regex": "true",
             "nginx.ingress.kubernetes.io/rewrite-target": "$REWRITE_TARGET",
@@ -13,6 +12,7 @@
         }
     },
     "spec": {
+        "ingressClassName": "nginx",
         "tls": [
             {
                 "hosts": [
