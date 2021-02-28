@@ -578,7 +578,7 @@ func (vm *AutoScalerServerNode) xgetVSphere() *vsphere.Configuration {
 	}
 
 	if vsphere == nil {
-		glog.Fatalf("Unable to find vmware config for node:%s in group", vm.NodeName, vm.NodeGroupID)
+		glog.Fatalf("Unable to find vmware config for node:%s in group:%s", vm.NodeName, vm.NodeGroupID)
 	}
 
 	return vsphere
