@@ -30,7 +30,7 @@
                 },
                 "containers": [
                     {
-                        "image": "fred78290/vsphere-autoscaler:v1.19.0",
+                        "image": "fred78290/vsphere-autoscaler:v1.20.5",
                         "name": "vsphere-autoscaler",
                         "resources": {
                             "limits": {

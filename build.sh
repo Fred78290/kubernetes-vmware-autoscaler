@@ -1,4 +1,4 @@
 #!/bin/bash
 
-make -e REGISTRY=fred78290 -e TAG=v1.19.1 container
+make -e REGISTRY=fred78290 -e TAG=v1.20.5 container
 

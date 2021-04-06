@@ -1,5 +1,5 @@
 {
-    "apiVersion": "networking.k8s.io/v1beta1",
+    "apiVersion": "networking.k8s.io/v1",
     "kind": "Ingress",
     "metadata": {
         "name": "helloworld-ingress",
@@ -22,20 +22,25 @@
             }
         ],
         "rules": [
-            {
-                "host": "masterkube.$DOMAIN_NAME",
-                "http": {
-                    "paths": [
-                        {
-                            "path": "/(.*)",
-                            "backend": {
-                                "serviceName": "helloworld",
-                                "servicePort": 8080
-                            }
-                        }
-                    ]
-                }
-            }
+			{
+				"host": "masterkube.$DOMAIN_NAME",
+				"http": {
+					"paths": [
+						{
+							"path": "/(.*)",
+							"pathType": "ImplementationSpecific",
+							"backend": {
+								"service": {
+									"name": "helloworld",
+									"port": {
+										"number": 8080
+									}
+								}
+							}
+						}
+					]
+				}
+			}
         ]
     }
 }

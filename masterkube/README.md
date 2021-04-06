@@ -32,7 +32,7 @@ Some needed file are located in:
 | `etc/ssl`  | Your CERT for https. Autosigned will be generated if empty  |
 | `template`  | Templates files to deploy pod & service |
 
-The first thing done by this script is to create a VM Template Ubuntu-18.04.1 image with kubernetes and docker installed. The VM template will be named by default afp-slyo-bionic-kubernetes-(kuberneres version)
+The first thing done by this script is to create a VM Template Ubuntu-20.04.2 image with kubernetes and docker installed. The VM template will be named by default afp-slyo-bionic-kubernetes-(kuberneres version)
 
 Next step will be to launch a cloned VM and create a master node. It will also deploy a dashboard at the URL https://masterkube-dashboard.@your-domain@/
 
@@ -73,8 +73,8 @@ During the process the script will create many files located in
 | `--net-domain` | The public domain name | example.com |
 | `--vm-private-network` | The name of private vSphere network | 'VM Network' |
 | `--vm-public-network` | The name of private vSphere network | 'VM Public' |
-| `--target-image` | The VM name created for cloning with kubernetes | bionic-kubernetes |
-| `--seed-image` | The VM name used to created the targer image | bionic-server-cloudimg-seed |
+| `--target-image` | The VM name created for cloning with kubernetes | focal-kubernetes |
+| `--seed-image` | The VM name used to created the targer image | focal-server-cloudimg-seed |
 | `--seed-user` | The cloud-init user name | ubuntu |
 
 ```bash

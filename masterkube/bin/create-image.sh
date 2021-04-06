@@ -4,7 +4,7 @@
 
 # This script will create 2 VM used as template
 # The first one is the seed VM customized to use vmware guestinfos cloud-init datasource instead ovf datasource.
-# This step is done by importing https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.ova
+# This step is done by importing https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.ova
 # If don't have the right to import OVA with govc to your vpshere you can try with ovftool import method else you must build manually this seed
 # Jump to Prepare seed VM comment.
 # Very important, shutdown the seed VM by using shutdown guest or shutdown -P now. Never use PowerOff vsphere command
@@ -13,16 +13,18 @@
 # The second VM will contains everything to run kubernetes
 
 KUBERNETES_VERSION=$(curl -sSL https://dl.k8s.io/release/stable.txt)
-CNI_VERSION=v0.8.6
+CNI_VERSION=v0.9.1
 SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
 CACHE=~/.local/vmware/cache
-TARGET_IMAGE=bionic-kubernetes-$KUBERNETES_VERSION
+TARGET_IMAGE=focal-kubernetes-$KUBERNETES_VERSION
 PASSWORD=$(uuidgen)
 OSDISTRO=$(uname -s)
-SEEDIMAGE=bionic-server-cloudimg-seed
+SEEDIMAGE=focal-server-cloudimg-seed
 IMPORTMODE="govc"
 CURDIR=$(dirname $0)
 USER=ubuntu
+PRIMARY_NETWORK_ADAPTER=vmxnet3
+PRIMARY_NETWORK_NAME=$GOVC_NETWORK
 SECOND_NETWORK_ADAPTER=vmxnet3
 SECOND_NETWORK_NAME=
 
@@ -39,7 +41,7 @@ fi
 mkdir -p $ISODIR
 mkdir -p $CACHE
 
-TEMP=`getopt -o i:k:n:op:s:u:v: --long user:,adapter:,second-adapter:,second-network:,ovftool,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
+TEMP=`getopt -o i:k:n:op:s:u:v: --long user:,adapter:,primary-adapter:,primary-network:,second-adapter:,second-network:,ovftool,seed:,custom-image:,ssh-key:,cni-version:,password:,kubernetes-version: -n "$0" -- "$@"`
 eval set -- "$TEMP"
 
 # extract options and their arguments into variables.
@@ -54,12 +56,23 @@ while true ; do
         -s|--seed) SEEDIMAGE=$2 ; shift 2;;
         -u|--user) USER=$2 ; shift 2;;
         -v|--kubernetes-version) KUBERNETES_VERSION=$2 ; shift 2;;
+        --primary-adapter) PRIMARY_NETWORK_ADAPTER=$2 ; shift 2;;
+        --primary-network) PRIMARY_NETWORK_NAME=$2 ; shift 2;;
         --second-adapter) SECOND_NETWORK_ADAPTER=$2 ; shift 2;;
         --second-network) SECOND_NETWORK_NAME=$2 ; shift 2;;
         --) shift ; break ;;
         *) echo "$1 - Internal error!" ; exit 1 ;;
     esac
 done
+
+case $CNI_VERSION in
+    v0.7*)
+        URL_PLUGINS="https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-amd64-${CNI_VERSION}.tgz"
+    ;;
+    *)
+        URL_PLUGINS="https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-amd64-${CNI_VERSION}.tgz"
+    ;;
+esac
 
 if [ ! -z "$(govc vm.info $TARGET_IMAGE 2>&1)" ]; then
     echo "$TARGET_IMAGE already exists!"
@@ -76,22 +89,22 @@ ssh_pwauth: true
 EOF
 )
 
-# If your seed image isn't present create one by import bionic cloud ova.
+# If your seed image isn't present create one by import focal cloud ova.
 # If you don't have the access right to import with govc (firewall rules blocking https traffic to esxi),
 # you can try with ovftool to import the ova.
 # If you have the bug "unsupported server", you must do it manually!
 if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
-    [ -f ${CACHE}/bionic-server-cloudimg-amd64.ova ] || wget https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.ova -O ${CACHE}/bionic-server-cloudimg-amd64.ova
+    [ -f ${CACHE}/focal-server-cloudimg-amd64.ova ] || wget https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.ova -O ${CACHE}/focal-server-cloudimg-amd64.ova
         
-    MAPPED_NETWORK=$(govc import.spec ${CACHE}/bionic-server-cloudimg-amd64.ova | jq .NetworkMapping[0].Name | tr -d '"')
+    MAPPED_NETWORK=$(govc import.spec ${CACHE}/focal-server-cloudimg-amd64.ova | jq .NetworkMapping[0].Name | tr -d '"')
 
     if [ "${IMPORTMODE}" == "govc" ]; then
 
-        govc import.spec ${CACHE}/bionic-server-cloudimg-amd64.ova \
-            | jq --arg GOVC_NETWORK "${GOVC_NETWORK}" --arg MAPPED_NETWORK "${MAPPED_NETWORK}" '.NetworkMapping |= [ { Name: $MAPPED_NETWORK, Network: $GOVC_NETWORK } ]' \
-            > ${CACHE}/bionic-server-cloudimg-amd64.spec
+        govc import.spec ${CACHE}/focal-server-cloudimg-amd64.ova \
+            | jq --arg GOVC_NETWORK "${PRIMARY_NETWORK_NAME}" --arg MAPPED_NETWORK "${MAPPED_NETWORK}" '.NetworkMapping |= [ { Name: $MAPPED_NETWORK, Network: $GOVC_NETWORK } ]' \
+            > ${CACHE}/focal-server-cloudimg-amd64.spec
         
-        cat ${CACHE}/bionic-server-cloudimg-amd64.spec \
+        cat ${CACHE}/focal-server-cloudimg-amd64.spec \
             | jq --arg SSH_KEY "${SSH_KEY}" \
                 --arg SSH_KEY "${SSH_KEY}" \
                 --arg USERDATA "${USERDATA}" \
@@ -100,7 +113,7 @@ if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
                 --arg INSTANCEID $(uuidgen) \
                 --arg TARGET_IMAGE "$TARGET_IMAGE" \
                 '.Name = $NAME | .PropertyMapping |= [ { Key: "instance-id", Value: $INSTANCEID }, { Key: "hostname", Value: $TARGET_IMAGE }, { Key: "public-keys", Value: $SSH_KEY }, { Key: "user-data", Value: $USERDATA }, { Key: "password", Value: $PASSWORD } ]' \
-                > ${CACHE}/bionic-server-cloudimg-amd64.txt
+                > ${CACHE}/focal-server-cloudimg-amd64.txt
 
         if [ -z "${GOVC_CLUSTER}" ]; then
             DATASTORE="/${GOVC_DATACENTER}/datastore/${GOVC_DATASTORE}"
@@ -110,15 +123,15 @@ if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
             FOLDER="/${GOVC_DATACENTER}/vm/${GOVC_FOLDER}"
         fi
 
-        echo "Import bionic-server-cloudimg-amd64.ova to ${SEEDIMAGE} with govc"
+        echo "Import focal-server-cloudimg-amd64.ova to ${SEEDIMAGE} with govc"
         govc import.ova \
-            -options=${CACHE}/bionic-server-cloudimg-amd64.txt \
+            -options=${CACHE}/focal-server-cloudimg-amd64.txt \
             -folder="${FOLDER}" \
             -ds="${DATASTORE}" \
             -name="${SEEDIMAGE}" \
-            ${CACHE}/bionic-server-cloudimg-amd64.ova
+            ${CACHE}/focal-server-cloudimg-amd64.ova
     else
-        echo "Import bionic-server-cloudimg-amd64.ova to ${SEEDIMAGE} with ovftool"
+        echo "Import focal-server-cloudimg-amd64.ova to ${SEEDIMAGE} with ovftool"
 
         ovftool \
             --acceptAllEulas \
@@ -131,13 +144,19 @@ if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
             --prop:public-keys="${SSH_KEY}" \
             --prop:user-data="" \
             --prop:password="${PASSWORD}" \
-            --net:"${MAPPED_NETWORK}"="${GOVC_NETWORK}" \
-            https://cloud-images.ubuntu.com/bionic/current/bionic-server-cloudimg-amd64.ova \
+            --net:"${MAPPED_NETWORK}"="${PRIMARY_NETWORK_NAME}" \
+            https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.ova \
             "vi://${GOVC_USERNAME}:${GOVC_PASSWORD}@${GOVC_HOST}/${GOVC_RESOURCE_POOL}/"
     fi
 
     if [ $? -eq 0 ]; then
     
+        if [ ! -z "${PRIMARY_NETWORK_ADAPTER}" ];then
+            echo "Change primary network card ${PRIMARY_NETWORK_NAME} to ${PRIMARY_NETWORK_ADAPTER} on ${SEEDIMAGE}"
+
+            govc vm.network.change -vm "${SEEDIMAGE}" -net="${PRIMARY_NETWORK_NAME}" -net.adapter="${PRIMARY_NETWORK_ADAPTER}"
+        fi
+
         if [ ! -z "${SECOND_NETWORK_NAME}" ]; then
             echo "Add second network card ${SECOND_NETWORK_NAME} on ${SEEDIMAGE}"
 
@@ -192,6 +211,13 @@ network:
             dhcp4: true
 EOF
 
+if [ ! -z "${SECOND_NETWORK_NAME}" ]; then
+cat > "${ISODIR}/network.yaml" <<EOF
+        eth1:
+            dhcp4: true
+EOF
+fi
+
 cat > "${ISODIR}/vendor-data" <<EOF
 #cloud-config
 timezone: $TZ
@@ -218,7 +244,7 @@ apt-get update
 apt-get upgrade -y
 apt-get dist-upgrade -y
 apt-get autoremove -y
-apt-get install jq socat conntrack -y
+apt-get install jq socat conntrack net-tools traceroute -y
 
 mkdir -p /opt/cni/bin
 mkdir -p /usr/local/bin
@@ -263,13 +289,11 @@ fi
 
 echo "Prepare to install CNI plugins"
 
-curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-amd64-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
+curl -L "${URL_PLUGINS}" | tar -C /opt/cni/bin -xz
 
 cd /usr/local/bin
 curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/{kubeadm,kubelet,kubectl,kube-proxy}
 chmod +x /usr/local/bin/kube*
-
-mkdir -p /etc/systemd/system/kubelet.service.d
 
 cat > /etc/systemd/system/kubelet.service <<SHELL
 [Unit]
@@ -285,6 +309,8 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 SHELL
+
+mkdir -p /etc/systemd/system/kubelet.service.d
 
 cat > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf <<"SHELL"
 # Note: This dropin only works with kubeadm and kubelet v1.11+
@@ -331,7 +357,7 @@ rm -rf /var/lib/cloud /var/lib/dbus/machine-id /var/lib/private /var/lib/systemd
 rm -f /var/lib/ubuntu-release-upgrader/release-upgrade-available
 rm -f /var/lib/update-notifier/fsck-at-reboot /var/lib/update-notifier/hwe-eol
 find /var/log -type f -exec rm -f {} +
-rm -r /tmp/* /tmp/.*-unix /var/tmp/*"
+rm -r /tmp/* /tmp/.*-unix /var/tmp/*
 /bin/sync
 /sbin/fstrim -v /
 EOF
@@ -375,7 +401,7 @@ govc vm.power -persist-session=false -s=true "${TARGET_IMAGE}"
 echo "Wait ${TARGET_IMAGE} to shutdown"
 while [ $(govc vm.info -json "${TARGET_IMAGE}" | jq .VirtualMachines[0].Runtime.PowerState | tr -d '"') == "poweredOn" ]
 do
-    echo "."
+    echo -n "."
     sleep 1
 done
 echo

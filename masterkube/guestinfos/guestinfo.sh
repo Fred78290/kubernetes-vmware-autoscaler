@@ -24,19 +24,19 @@ cat > ${CURDIR}/userdata.yaml <<EOF
 group:
     - kubernetes
 runcmd:
-    - KUBERNETES_VERSION=v1.19.0
-    - CNI_VERSION=v0.8.6
+    - KUBERNETES_VERSION=v1.20.5
+    - CNI_VERSION=v0.9.1
     - mkdir -p /opt/cni/bin
     - mkdir -p /usr/local/bin
     - curl https://get.docker.com | bash
-    - curl -L "https://github.com/containernetworking/plugins/releases/download/\${CNI_VERSION}/cni-plugins-amd64-\${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
+    - curl -L "https://github.com/containernetworking/plugins/releases/download/\${CNI_VERSION}/cni-plugins-linux-amd64-\${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
     - cd /usr/local/bin
-    - curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/\${KUBERNETES_VERSION}/bin/linux/amd64/{kubeadm,kubelet,kubectl}
+    - curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/\${KUBERNETES_VERSION}/bin/linux/amd64/{kubeadm,kubelet,kubectl,kube-proxy}
     - chmod +x /usr/local/bin/kube*
     - echo "KUBELET_EXTRA_ARGS=--fail-swap-on=false --read-only-port=10255" > /etc/default/kubelet
-    - curl -sSL "https://raw.githubusercontent.com/kubernetes/kubernetes/\${KUBERNETES_VERSION}/build/debs/kubelet.service" | sed 's:/usr/bin:/usr/local/bin:g > /etc/systemd/system/kubelet.service
+    - curl -sSL "https://raw.githubusercontent.com/kubernetes/kubernetes/v1.17.0/build/debs/kubelet.service" | sed 's:/usr/bin:/usr/local/bin:g > /etc/systemd/system/kubelet.service
     - mkdir -p /etc/systemd/system/kubelet.service.d
-    - curl -sSL "https://raw.githubusercontent.com/kubernetes/kubernetes/\${KUBERNETES_VERSION}/build/debs/10-kubeadm.conf" | sed 's:/usr/bin:/usr/local/bin:g > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+    - curl -sSL "https://raw.githubusercontent.com/kubernetes/kubernetes/v1.17.0/build/debs/10-kubeadm.conf" | sed 's:/usr/bin:/usr/local/bin:g > /etc/systemd/system/kubelet.service.d/10-kubeadm.conf
     - systemctl enable kubelet
     - systemctl restart kubelet
     - echo 'export PATH=/usr/local/bin:/opt/cni/bin:\$PATH' >> /etc/profile.d/apps-bin-path.sh

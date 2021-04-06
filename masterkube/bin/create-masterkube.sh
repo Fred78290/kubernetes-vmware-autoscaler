@@ -15,14 +15,14 @@ export MASTERKUBE="${NODEGROUP_NAME}-masterkube"
 export PROVIDERID="${SCHEME}://${NODEGROUP_NAME}/object?type=node&name=${MASTERKUBE}"
 export SSH_PRIVATE_KEY=~/.ssh/id_rsa
 export SSH_KEY=$(cat "${SSH_PRIVATE_KEY}.pub")
-export KUBERNETES_VERSION=v1.19.1
+export KUBERNETES_VERSION=v1.20.5
 export KUBERNETES_PASSWORD=
 export KUBECONFIG=$HOME/.kube/config
 export SEED_USER=ubuntu
-export SEED_IMAGE="bionic-server-cloudimg-seed"
-export ROOT_IMG_NAME=bionic-kubernetes
+export SEED_IMAGE="focal-server-cloudimg-seed"
+export ROOT_IMG_NAME=focal-kubernetes
 export TARGET_IMAGE="${ROOT_IMG_NAME}-${KUBERNETES_VERSION}"
-export CNI_VERSION="v0.8.6"
+export CNI_VERSION="v0.9.1"
 export MINNODES=0
 export MAXNODES=5
 export MAXTOTALNODES=$MAXNODES
@@ -41,7 +41,7 @@ export OSDISTRO=$(uname -s)
 export TRANSPORT="tcp"
 export USER=ubuntu
 export NET_DOMAIN=home
-export NET_IP=10.0.0.200
+export NET_IP=10.0.0.20
 export NET_GATEWAY=10.0.0.1
 export NET_DNS=10.0.0.1
 export NET_MASK=255.255.255.0
@@ -274,23 +274,28 @@ MACHINE_DEFS=$(
     cat <<EOF
 {
     "tiny": {
-        "memsize": 4096,
+        "memsize": 1024,
+        "vcpus": 1,
+        "disksize": 10240
+    },
+    "small": {
+        "memsize": 2048,
         "vcpus": 2,
         "disksize": 10240
     },
     "medium": {
-        "memsize": 8192,
-        "vcpus": 4,
+        "memsize": 4096,
+        "vcpus": 2,
         "disksize": 20480
     },
     "large": {
-        "memsize": 16384,
-        "vcpus": 8,
+        "memsize": 8192,
+        "vcpus": 4,
         "disksize": 51200
     },
     "extra-large": {
-        "memsize": 32767,
-        "vcpus": 16,
+        "memsize": 16384,
+        "vcpus": 4,
         "disksize": 102400
     }
 }
@@ -328,6 +333,7 @@ if [ -z "$(govc vm.info ${TARGET_IMAGE} 2>&1)" ]; then
         --seed="${SEED_IMAGE}" \
         --user="${SEED_USER}" \
         --ssh-key="${SSH_KEY}" \
+        --primary-network="${VC_NETWORK_PRIVATE}" \
         --second-network="${VC_NETWORK_PUBLIC}"
 fi
 
@@ -376,14 +382,12 @@ cat >./config/metadata.json <<EOF
 EOF
 
 # Cloud init user-data
-echo "#cloud-config" >./config/userdata.yaml
-cat <<EOF | python2 -c "import json,sys,yaml; print yaml.safe_dump(json.load(sys.stdin), width=500, indent=4, default_flow_style=False)" >>./config/userdata.yaml
-{
-    "runcmd": [
-        "echo 'Create ${MASTERKUBE}' > /var/log/masterkube.log"
-    ]
-}
+cat > ./config/userdata.yaml <<EOF
+#cloud-config
+runcmd:
+- echo "Create ${MASTERKUBE}" > /var/log/masterkube.log
 EOF
+
 
 gzip -c9 <./config/metadata.json | $BASE64 | tee >config/metadata.base64
 gzip -c9 <./config/userdata.yaml | $BASE64 | tee >config/userdata.base64

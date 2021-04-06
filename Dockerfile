@@ -21,7 +21,7 @@ RUN clean-install ca-certificates tzdata; \
     apt-get update; \
     apt-get install openssh-client curl -y; \
     cd /usr/local/bin; \
-    KUBERNETES_VERSION=v1.19.0; \
+    KUBERNETES_VERSION=v1.20.5; \
     curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/kubectl; chmod +x kubectl
 
 ADD out/vsphere-autoscaler-linux-amd64 vsphere-autoscaler
