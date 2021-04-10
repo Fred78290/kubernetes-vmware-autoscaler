@@ -41,7 +41,7 @@ export OSDISTRO=$(uname -s)
 export TRANSPORT="tcp"
 export USER=ubuntu
 export NET_DOMAIN=home
-export NET_IP=10.0.0.20
+export NET_IP=192.168.1.20
 export NET_GATEWAY=10.0.0.1
 export NET_DNS=10.0.0.1
 export NET_MASK=255.255.255.0
@@ -333,8 +333,8 @@ if [ -z "$(govc vm.info ${TARGET_IMAGE} 2>&1)" ]; then
         --seed="${SEED_IMAGE}" \
         --user="${SEED_USER}" \
         --ssh-key="${SSH_KEY}" \
-        --primary-network="${VC_NETWORK_PRIVATE}" \
-        --second-network="${VC_NETWORK_PUBLIC}"
+        --primary-network="${VC_NETWORK_PUBLIC}" \
+        --second-network="${VC_NETWORK_PRIVATE}"
 fi
 
 # Delete previous exixting version
@@ -522,7 +522,7 @@ AUTOSCALER_CONFIG=$(cat <<EOF
                 "interfaces": [
                     {
                         "exists": true,
-                        "network": "${VC_NETWORK_PRIVATE}",
+                        "network": "${VC_NETWORK_PUBLIC}",
                         "adapter": "vmxnet3",
                         "mac-address": "generate",
                         "nic": "eth0",
@@ -530,7 +530,7 @@ AUTOSCALER_CONFIG=$(cat <<EOF
                     },
                     {
                         "exists": true,
-                        "network": "${VC_NETWORK_PUBLIC}",
+                        "network": "${VC_NETWORK_PRIVATE}",
                         "adapter": "vmxnet3",
                         "mac-address": "generate",
                         "nic": "eth1",
