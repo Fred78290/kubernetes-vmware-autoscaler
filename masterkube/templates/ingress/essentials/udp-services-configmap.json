@@ -1,8 +1,0 @@
-{
-    "kind": "ConfigMap",
-    "apiVersion": "v1",
-    "metadata": {
-        "name": "masterkube-udp-services",
-        "namespace": "$K8NAMESPACE"
-    }
-}

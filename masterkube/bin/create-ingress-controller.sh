@@ -10,43 +10,18 @@ export KUBERNETES_TEMPLATE=./templates/ingress
 
 mkdir -p $ETC_DIR
 
-function deploy {
-    echo "Create $ETC_DIR/$1.json"
-    mkdir -p $(dirname $ETC_DIR/$1)
-echo $(eval "cat <<EOF
-$(<$KUBERNETES_TEMPLATE/$1.json)
-EOF") | jq . > $ETC_DIR/$1.json
+sed "s/__K8NAMESPACE__/$K8NAMESPACE/g" $KUBERNETES_TEMPLATE/deploy.yaml > $ETC_DIR/deploy.yaml
 
-kubectl apply -f $ETC_DIR/$1.json --kubeconfig=./cluster/config
-}
+kubectl apply -f $ETC_DIR/deploy.yaml --kubeconfig=./cluster/config
 
-deploy essentials/namespace
-deploy essentials/clusterrole
-deploy essentials/clusterrolebinding
-deploy essentials/class
-deploy essentials/tcp-services-configmap
-deploy essentials/udp-services-configmap
+echo -n "Wait for ingress controller availability"
 
-deploy default-backend/deployement
-deploy default-backend/service
+while [ -z "$(kubectl --kubeconfig=./cluster/config get po -n $K8NAMESPACE 2>/dev/null | grep 'ingress-nginx-controller')" ];
+do
+    sleep 1
+    echo -n "."
+done
 
-deploy controller/serviceaccount
-deploy controller/configmap
-deploy controller/role
-deploy controller/rolebinding
-deploy controller/service-webhook
-deploy controller/service
-deploy controller/deployment
+echo
 
-deploy admission-webhooks/validating-webhook
-deploy admission-webhooks/job-patch/clusterrole
-deploy admission-webhooks/job-patch/clusterrolebinding
-deploy admission-webhooks/job-patch/job-createSecret
-deploy admission-webhooks/job-patch/job-patchWebhook
-deploy admission-webhooks/job-patch/role
-deploy admission-webhooks/job-patch/rolebinding
-deploy admission-webhooks/job-patch/serviceaccount
-
-sleep 20
-
-$CURDIR/wait-pod.sh ingress-nginx-controller $K8NAMESPACE
+kubectl wait --kubeconfig=./cluster/config --namespace $K8NAMESPACE --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=120s
