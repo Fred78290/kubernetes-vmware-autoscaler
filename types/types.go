@@ -1,12 +1,44 @@
 package types
 
 import (
+	"fmt"
 	"os/user"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/vsphere"
-	"github.com/golang/glog"
+	"github.com/alecthomas/kingpin"
+	glog "github.com/sirupsen/logrus"
+
+	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 )
+
+type Config struct {
+	APIServerURL   string
+	KubeConfig     string
+	RequestTimeout time.Duration
+	Config         string
+	SaveLocation   string
+	DisplayVersion bool
+	LogFormat      string
+	LogLevel       string
+}
+
+// ClientGenerator provides clients
+type ClientGenerator interface {
+	KubeClient() (kubernetes.Interface, error)
+
+	NodeList() (*apiv1.NodeList, error)
+	UncordonNode(nodeName string) error
+	CordonNode(nodeName string) error
+	DrainNode(nodeName string) error
+	DeleteNode(nodeName string) error
+	AnnoteNode(nodeName string, annotations map[string]string) error
+	LabelNode(nodeName string, labels map[string]string) error
+	WaitNodeToBeReady(nodeName string, timeToWaitInSeconds int) error
+}
 
 // ResourceLimiter define limit, not really used
 type ResourceLimiter struct {
@@ -100,7 +132,7 @@ type AutoScalerServerConfig struct {
 	MaxNode            int                               `json:"maxNode"`                       // Mandatory, Max AutoScaler VM
 	NodePrice          float64                           `json:"nodePrice"`                     // Optional, The VM price
 	PodPrice           float64                           `json:"podPrice"`                      // Optional, The pod price
-	KubeConfig         string                            `json:"-"`
+	Client             ClientGenerator                   `json:"-"`
 	KubeAdm            KubeJoinConfig                    `json:"kubeadm"`
 	DefaultMachineType string                            `default:"{\"standard\": {}}" json:"default-machine"`
 	Machines           map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
@@ -124,4 +156,58 @@ func (conf *AutoScalerServerConfig) GetVSphereConfiguration(name string) *vspher
 	}
 
 	return vsphere
+}
+
+// NewConfig returns new Config object
+func NewConfig() *Config {
+	return &Config{
+		APIServerURL:   "",
+		KubeConfig:     "",
+		RequestTimeout: 30,
+		DisplayVersion: false,
+		Config:         "/etc/cluster/vmware-cluster-autoscaler.json",
+		LogFormat:      "text",
+		LogLevel:       glog.InfoLevel.String(),
+	}
+}
+
+// allLogLevelsAsStrings returns all logrus levels as a list of strings
+func allLogLevelsAsStrings() []string {
+	var levels []string
+	for _, level := range glog.AllLevels {
+		levels = append(levels, level.String())
+	}
+	return levels
+}
+
+func (cfg *Config) ParseFlags(args []string, version string) error {
+	app := kingpin.New("vmware-autoscaler", "Kubernetes VMWare autoscaler create VM instances at demand for autoscaling.\n\nNote that all flags may be replaced with env vars - `--flag` -> `VMWARE_AUTOSCALER_FLAG=1` or `--flag value` -> `VMWARE_AUTOSCALER_FLAG=value`")
+
+	//	app.Version(version)
+	app.HelpFlag.Short('h')
+	app.DefaultEnvars()
+
+	app.Flag("log-format", "The format in which log messages are printed (default: text, options: text, json)").Default(cfg.LogFormat).EnumVar(&cfg.LogFormat, "text", "json")
+	app.Flag("log-level", "Set the level of logging. (default: info, options: panic, debug, info, warning, error, fatal").Default(cfg.LogLevel).EnumVar(&cfg.LogLevel, allLogLevelsAsStrings()...)
+
+	// Flags related to Kubernetes
+	app.Flag("server", "The Kubernetes API server to connect to (default: auto-detect)").Default(cfg.APIServerURL).StringVar(&cfg.APIServerURL)
+	app.Flag("kubeconfig", "Retrieve target cluster configuration from a Kubernetes configuration file (default: auto-detect)").Default(cfg.KubeConfig).StringVar(&cfg.KubeConfig)
+	app.Flag("request-timeout", "Request timeout when calling Kubernetes APIs. 0s means no timeout").Default(cfg.RequestTimeout.String()).DurationVar(&cfg.RequestTimeout)
+
+	app.Flag("version", "Display version and exit").BoolVar(&cfg.DisplayVersion)
+
+	app.Flag("config", "The config for the server").Default(cfg.Config).StringVar(&cfg.Config)
+	app.Flag("save", "The file to persists the server").Default(cfg.SaveLocation).StringVar(&cfg.SaveLocation)
+
+	_, err := app.Parse(args)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (cfg *Config) String() string {
+	return fmt.Sprintf("APIServerURL:%s\nKubeConfig:%s\nRequestTimeout:%s\nConfig:%s\nSaveLocation:%s\nDisplayVersion:%s", cfg.APIServerURL, cfg.KubeConfig, cfg.RequestTimeout, cfg.Config, cfg.SaveLocation, strconv.FormatBool(cfg.DisplayVersion))
 }

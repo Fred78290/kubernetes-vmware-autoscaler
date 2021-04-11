@@ -26,7 +26,8 @@ EOF") | jq . > $ETC_DIR/$1.json
 kubectl apply -f $ETC_DIR/$1.json --kubeconfig=./cluster/config
 }
 
-deploy service-account
+deploy service-account-autoscaler
+deploy service-account-vsphere
 deploy cluster-role
 deploy role
 deploy cluster-role-binding

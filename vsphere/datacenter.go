@@ -1,7 +1,7 @@
 package vsphere
 
 import (
-	"github.com/golang/glog"
+	glog "github.com/sirupsen/logrus"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25"

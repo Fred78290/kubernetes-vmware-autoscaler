@@ -6,7 +6,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/golang/glog"
+	glog "github.com/sirupsen/logrus"
 
 	"github.com/vmware/govmomi/govc/flags"
 	"github.com/vmware/govmomi/object"

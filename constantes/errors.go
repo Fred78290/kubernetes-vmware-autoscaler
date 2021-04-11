@@ -130,11 +130,23 @@ const (
 	// ErrNodeGroupCleanupFailOnVM error msg
 	ErrNodeGroupCleanupFailOnVM = "On node group: %s, failed to delete VM: %s, reason: %v"
 
-	// ErrKubeCtlIgnoredError error msg
-	ErrKubeCtlIgnoredError = "kubectl got error on VM: %s, reason: %s"
+	// ErrUncordonNodeReturnError error msg
+	ErrUncordonNodeReturnError = "Uncordon node: %s got error: %s"
 
-	// ErrKubeCtlReturnError error msg
-	ErrKubeCtlReturnError = "kubectl got error on VM: %s, %s, reason: %s"
+	// ErrCordonNodeReturnError error msg
+	ErrCordonNodeReturnError = "Cordon node: %s got error: %s"
+
+	// ErrDrainNodeReturnError error msg
+	ErrDrainNodeReturnError = "Drain node: %s got error: %s"
+
+	// ErrDeleteNodeReturnError error msg
+	ErrDeleteNodeReturnError = "Delete node: %s got error: %s"
+
+	// ErrLabelNodeReturnError error msg
+	ErrLabelNodeReturnError = "Set labels on node: %s got error: %s"
+
+	// ErrAnnoteNodeReturnError error msg
+	ErrAnnoteNodeReturnError = "Set annotations on node: %s got error: %s"
 
 	// ErrNotImplemented error msg
 	ErrNotImplemented = "Not implemented"

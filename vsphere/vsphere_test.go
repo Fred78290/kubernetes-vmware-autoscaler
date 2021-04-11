@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/golang/glog"
+	glog "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"

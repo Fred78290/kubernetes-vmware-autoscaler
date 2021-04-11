@@ -1,21 +1,17 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
-	"time"
-
-	apiv1 "k8s.io/api/core/v1"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/vsphere"
-	"github.com/golang/glog"
+	glog "github.com/sirupsen/logrus"
 )
 
 // AutoScalerServerNodeState VM state
@@ -101,52 +97,9 @@ func (vm *AutoScalerServerNode) prepareKubelet() (string, error) {
 }
 
 func (vm *AutoScalerServerNode) waitReady() error {
-	glog.V(5).Infof("AutoScalerNode::waitReady, node:%s", vm.NodeName)
+	glog.Debugf("AutoScalerNode::waitReady, node:%s", vm.NodeName)
 
-	kubeconfig := vm.serverConfig.KubeConfig
-
-	// Max 60s
-	for index := 0; index < 12; index++ {
-		var out string
-		var err error
-		var arg = []string{
-			"kubectl",
-			"get",
-			"nodes",
-			vm.NodeName,
-			"--output",
-			"json",
-			"--kubeconfig",
-			kubeconfig,
-		}
-
-		if out, err = utils.Pipe(arg...); err != nil {
-			return err
-		}
-
-		var nodeInfo apiv1.Node
-
-		if err = json.Unmarshal([]byte(out), &nodeInfo); err != nil {
-			return fmt.Errorf(constantes.ErrUnmarshallingError, vm.NodeName, err)
-		}
-
-		for _, status := range nodeInfo.Status.Conditions {
-			if status.Type == "Ready" {
-				if b, e := strconv.ParseBool(string(status.Status)); e == nil {
-					if b {
-						glog.Infof("The kubernetes node %s is Ready", vm.NodeName)
-						return nil
-					}
-				}
-			}
-		}
-
-		glog.Infof("The kubernetes node:%s is not ready", vm.NodeName)
-
-		time.Sleep(5 * time.Second)
-	}
-
-	return fmt.Errorf(constantes.ErrNodeIsNotReady, vm.NodeName)
+	return vm.serverConfig.Client.WaitNodeToBeReady(vm.NodeName, 60)
 }
 
 func (vm *AutoScalerServerNode) kubeAdmJoin() error {
@@ -177,45 +130,30 @@ func (vm *AutoScalerServerNode) kubeAdmJoin() error {
 func (vm *AutoScalerServerNode) setNodeLabels(nodeLabels, systemLabels KubernetesLabel) error {
 	if len(nodeLabels)+len(systemLabels) > 0 {
 
-		args := []string{
-			"kubectl",
-			"label",
-			"nodes",
-			vm.NodeName,
-		}
+		labels := map[string]string{}
 
 		// Append extras arguments
 		for k, v := range nodeLabels {
-			args = append(args, fmt.Sprintf("%s=%s", k, v))
+			labels[k] = v
 		}
 
 		for k, v := range systemLabels {
-			args = append(args, fmt.Sprintf("%s=%s", k, v))
+			labels[k] = v
 		}
 
-		args = append(args, "--kubeconfig")
-		args = append(args, vm.serverConfig.KubeConfig)
-
-		if out, err := utils.Pipe(args...); err != nil {
-			return fmt.Errorf(constantes.ErrKubeCtlReturnError, vm.NodeName, out, err)
+		if err := vm.serverConfig.Client.LabelNode(vm.NodeName, labels); err != nil {
+			return fmt.Errorf(constantes.ErrLabelNodeReturnError, vm.NodeName, err)
 		}
 	}
 
-	args := []string{
-		"kubectl",
-		"annotate",
-		"node",
-		vm.NodeName,
-		fmt.Sprintf("%s=%s", constantes.NodeLabelGroupName, vm.NodeGroupID),
-		fmt.Sprintf("%s=%s", constantes.AnnotationNodeAutoProvisionned, strconv.FormatBool(vm.AutoProvisionned)),
-		fmt.Sprintf("%s=%d", constantes.AnnotationNodeIndex, vm.NodeIndex),
-		"--overwrite",
-		"--kubeconfig",
-		vm.serverConfig.KubeConfig,
+	annotations := map[string]string{
+		constantes.NodeLabelGroupName:             vm.NodeGroupID,
+		constantes.AnnotationNodeAutoProvisionned: strconv.FormatBool(vm.AutoProvisionned),
+		constantes.AnnotationNodeIndex:            strconv.Itoa(vm.NodeIndex),
 	}
 
-	if out, err := utils.Pipe(args...); err != nil {
-		return fmt.Errorf(constantes.ErrKubeCtlReturnError, vm.NodeName, out, err)
+	if err := vm.serverConfig.Client.AnnoteNode(vm.NodeName, annotations); err != nil {
+		return fmt.Errorf(constantes.ErrAnnoteNodeReturnError, vm.NodeName, err)
 	}
 
 	return nil
@@ -280,7 +218,7 @@ func (vm *AutoScalerServerNode) syncFolders() (string, error) {
 }
 
 func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabel) error {
-	glog.V(5).Infof("AutoScalerNode::launchVM, node:%s", vm.NodeName)
+	glog.Debugf("AutoScalerNode::launchVM, node:%s", vm.NodeName)
 
 	var err error
 	var status AutoScalerServerNodeState
@@ -354,14 +292,13 @@ func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabe
 }
 
 func (vm *AutoScalerServerNode) startVM() error {
-	glog.V(5).Infof("AutoScalerNode::startVM, node:%s", vm.NodeName)
+	glog.Debugf("AutoScalerNode::startVM, node:%s", vm.NodeName)
 
 	var err error
 	var state AutoScalerServerNodeState
 
 	glog.Infof("Start VM:%s", vm.NodeName)
 
-	kubeconfig := vm.serverConfig.KubeConfig
 	vsphere := vm.VSphereConfig
 
 	if vm.AutoProvisionned == false {
@@ -391,16 +328,8 @@ func (vm *AutoScalerServerNode) startVM() error {
 			err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
 
 		} else {
-			args := []string{
-				"kubectl",
-				"uncordon",
-				vm.NodeName,
-				"--kubeconfig",
-				kubeconfig,
-			}
-
-			if err = utils.Shell(args...); err != nil {
-				glog.Errorf(constantes.ErrKubeCtlIgnoredError, vm.NodeName, err)
+			if err = vm.serverConfig.Client.UncordonNode(vm.NodeName); err != nil {
+				glog.Errorf(constantes.ErrUncordonNodeReturnError, vm.NodeName, err)
 
 				err = nil
 			}
@@ -421,14 +350,13 @@ func (vm *AutoScalerServerNode) startVM() error {
 }
 
 func (vm *AutoScalerServerNode) stopVM() error {
-	glog.V(5).Infof("AutoScalerNode::stopVM, node:%s", vm.NodeName)
+	glog.Debugf("AutoScalerNode::stopVM, node:%s", vm.NodeName)
 
 	var err error
 	var state AutoScalerServerNodeState
 
 	glog.Infof("Stop VM:%s", vm.NodeName)
 
-	kubeconfig := vm.serverConfig.KubeConfig
 	vsphere := vm.VSphereConfig
 
 	if vm.AutoProvisionned == false {
@@ -440,17 +368,8 @@ func (vm *AutoScalerServerNode) stopVM() error {
 		err = fmt.Errorf(constantes.ErrStopVMFailed, vm.NodeName, err)
 
 	} else if state == AutoScalerServerNodeStateRunning {
-
-		args := []string{
-			"kubectl",
-			"cordon",
-			vm.NodeName,
-			"--kubeconfig",
-			kubeconfig,
-		}
-
-		if err = utils.Shell(args...); err != nil {
-			glog.Errorf(constantes.ErrKubeCtlIgnoredError, vm.NodeName, err)
+		if err = vm.serverConfig.Client.CordonNode(vm.NodeName); err != nil {
+			glog.Errorf(constantes.ErrCordonNodeReturnError, vm.NodeName, err)
 		}
 
 		if err = vsphere.PowerOff(vm.NodeName); err == nil {
@@ -475,7 +394,7 @@ func (vm *AutoScalerServerNode) stopVM() error {
 }
 
 func (vm *AutoScalerServerNode) deleteVM() error {
-	glog.V(5).Infof("AutoScalerNode::deleteVM, node:%s", vm.NodeName)
+	glog.Debugf("AutoScalerNode::deleteVM, node:%s", vm.NodeName)
 
 	var err error
 	var status *vsphere.Status
@@ -483,37 +402,16 @@ func (vm *AutoScalerServerNode) deleteVM() error {
 	if vm.AutoProvisionned == false {
 		err = fmt.Errorf(constantes.ErrVMNotProvisionnedByMe, vm.NodeName)
 	} else {
-		kubeconfig := vm.serverConfig.KubeConfig
 		vsphere := vm.VSphereConfig
 
 		if status, err = vsphere.Status(vm.NodeName); err == nil {
 			if status.Powered {
-				args := []string{
-					"kubectl",
-					"drain",
-					vm.NodeName,
-					"--delete-local-data",
-					"--force",
-					"--ignore-daemonsets",
-					"--kubeconfig",
-					kubeconfig,
+				if err = vm.serverConfig.Client.DrainNode(vm.NodeName); err != nil {
+					glog.Errorf(constantes.ErrDrainNodeReturnError, vm.NodeName, err)
 				}
 
-				if err = utils.Shell(args...); err != nil {
-					glog.Errorf(constantes.ErrKubeCtlIgnoredError, vm.NodeName, err)
-				}
-
-				args = []string{
-					"kubectl",
-					"delete",
-					"node",
-					vm.NodeName,
-					"--kubeconfig",
-					kubeconfig,
-				}
-
-				if err = utils.Shell(args...); err != nil {
-					glog.Errorf(constantes.ErrKubeCtlIgnoredError, vm.NodeName, err)
+				if err = vm.serverConfig.Client.DeleteNode(vm.NodeName); err != nil {
+					glog.Errorf(constantes.ErrDeleteNodeReturnError, vm.NodeName, err)
 				}
 
 				if err = vsphere.PowerOff(vm.NodeName); err != nil {
@@ -542,7 +440,7 @@ func (vm *AutoScalerServerNode) deleteVM() error {
 }
 
 func (vm *AutoScalerServerNode) statusVM() (AutoScalerServerNodeState, error) {
-	glog.V(5).Infof("AutoScalerNode::statusVM, node:%s", vm.NodeName)
+	glog.Debugf("AutoScalerNode::statusVM, node:%s", vm.NodeName)
 
 	// Get VM infos
 	var status *vsphere.Status
