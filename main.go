@@ -58,6 +58,6 @@ func main() {
 			glog.Fatalf("Can't validate config, reason:%s", err)
 		}
 
-		server.StartServer(generator, cfg.SaveLocation, cfg.Config)
+		server.StartServer(generator, cfg)
 	}
 }

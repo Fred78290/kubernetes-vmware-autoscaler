@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/vsphere"
 	"github.com/alecthomas/kingpin"
 	glog "github.com/sirupsen/logrus"
@@ -24,6 +25,17 @@ type Config struct {
 	DisplayVersion bool
 	LogFormat      string
 	LogLevel       string
+	MinCpus        int64
+	MinMemory      int64
+	MaxCpus        int64
+	MaxMemory      int64
+}
+
+func (c *Config) GetResourceLimiter() *ResourceLimiter {
+	return &ResourceLimiter{
+		MinLimits: map[string]int64{constantes.ResourceNameCores: c.MinCpus, constantes.ResourceNameMemory: c.MinMemory * 1024 * 1024},
+		MaxLimits: map[string]int64{constantes.ResourceNameCores: c.MaxCpus, constantes.ResourceNameMemory: c.MaxMemory * 1024 * 1024},
+	}
 }
 
 // ClientGenerator provides clients
@@ -132,13 +144,13 @@ type AutoScalerServerConfig struct {
 	MaxNode            int                               `json:"maxNode"`                       // Mandatory, Max AutoScaler VM
 	NodePrice          float64                           `json:"nodePrice"`                     // Optional, The VM price
 	PodPrice           float64                           `json:"podPrice"`                      // Optional, The pod price
-	Client             ClientGenerator                   `json:"-"`
 	KubeAdm            KubeJoinConfig                    `json:"kubeadm"`
 	DefaultMachineType string                            `default:"{\"standard\": {}}" json:"default-machine"`
 	Machines           map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
 	CloudInit          interface{}                       `json:"cloud-init"`                            // Optional, The cloud init conf file
 	SyncFolders        *AutoScalerServerSyncFolders      `json:"sync-folder"`                           // Optional, do rsync between host and guest
 	Optionals          *AutoScalerServerOptionals        `json:"optionals"`
+	ResourceLimiter    *ResourceLimiter                  `json:"limits"`
 	SSH                *AutoScalerServerSSH              `json:"ssh-infos"`
 	VMwareInfos        map[string]*vsphere.Configuration `json:"vmware"`
 }
@@ -166,6 +178,10 @@ func NewConfig() *Config {
 		RequestTimeout: 30,
 		DisplayVersion: false,
 		Config:         "/etc/cluster/vmware-cluster-autoscaler.json",
+		MinCpus:        2,
+		MinMemory:      1024,
+		MaxCpus:        24,
+		MaxMemory:      1024 * 24,
 		LogFormat:      "text",
 		LogLevel:       glog.InfoLevel.String(),
 	}
@@ -194,6 +210,11 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.Flag("server", "The Kubernetes API server to connect to (default: auto-detect)").Default(cfg.APIServerURL).StringVar(&cfg.APIServerURL)
 	app.Flag("kubeconfig", "Retrieve target cluster configuration from a Kubernetes configuration file (default: auto-detect)").Default(cfg.KubeConfig).StringVar(&cfg.KubeConfig)
 	app.Flag("request-timeout", "Request timeout when calling Kubernetes APIs. 0s means no timeout").Default(cfg.RequestTimeout.String()).DurationVar(&cfg.RequestTimeout)
+
+	app.Flag("min-cpus", "Limits: minimum cpu (default: 1)").Default(strconv.FormatInt(cfg.MinCpus, 10)).Int64Var(&cfg.MinCpus)
+	app.Flag("min-memory", "Limits: minimum memory in MB (default: 1G)").Default(strconv.FormatInt(cfg.MinMemory, 10)).Int64Var(&cfg.MinMemory)
+	app.Flag("max-cpus", "Limits: max cpu (default: 24)").Default(strconv.FormatInt(cfg.MaxCpus, 10)).Int64Var(&cfg.MaxCpus)
+	app.Flag("max-memory", "Limits: max memory in MB (default: 24G)").Default(strconv.FormatInt(cfg.MaxMemory, 10)).Int64Var(&cfg.MaxMemory)
 
 	app.Flag("version", "Display version and exit").BoolVar(&cfg.DisplayVersion)
 

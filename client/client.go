@@ -134,7 +134,9 @@ func (p *SingletonClientGenerator) WaitNodeToBeReady(nodeName string, timeToWait
 	ctx := newContext(p.RequestTimeout)
 	defer ctx.Cancel()
 
-	for index := 0; index < timeToWaitInSeconds; index++ {
+	timeout := time.Duration(timeToWaitInSeconds) * time.Second
+
+	for t := time.Now(); time.Since(t) < timeout; time.Sleep(2 * time.Second) {
 		nodeInfo, err = kubeclient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 
 		if err != nil {
@@ -153,8 +155,6 @@ func (p *SingletonClientGenerator) WaitNodeToBeReady(nodeName string, timeToWait
 		}
 
 		glog.Infof("The kubernetes node:%s is not ready", nodeName)
-
-		time.Sleep(time.Second)
 	}
 
 	return fmt.Errorf(constantes.ErrNodeIsNotReady, nodeName)
@@ -215,7 +215,16 @@ func (p *SingletonClientGenerator) DrainNode(nodeName string) error {
 }
 
 func (p *SingletonClientGenerator) DeleteNode(nodeName string) error {
-	return nil
+	kubeclient, err := p.KubeClient()
+
+	if err != nil {
+		return err
+	}
+
+	ctx := newContext(p.RequestTimeout)
+	defer ctx.Cancel()
+
+	return kubeclient.CoreV1().Nodes().Delete(ctx, nodeName, metav1.DeleteOptions{})
 }
 
 // AnnoteNode set annotation on node
@@ -243,7 +252,7 @@ func (p *SingletonClientGenerator) AnnoteNode(nodeName string, annotations map[s
 		}
 	}
 
-	nodeInfo, err = kubeclient.CoreV1().Nodes().Update(ctx, nodeInfo, metav1.UpdateOptions{})
+	_, err = kubeclient.CoreV1().Nodes().Update(ctx, nodeInfo, metav1.UpdateOptions{})
 
 	return err
 }
@@ -273,7 +282,7 @@ func (p *SingletonClientGenerator) LabelNode(nodeName string, labels map[string]
 		}
 	}
 
-	nodeInfo, err = kubeclient.CoreV1().Nodes().Update(ctx, nodeInfo, metav1.UpdateOptions{})
+	_, err = kubeclient.CoreV1().Nodes().Update(ctx, nodeInfo, metav1.UpdateOptions{})
 
 	return err
 }

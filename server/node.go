@@ -96,10 +96,10 @@ func (vm *AutoScalerServerNode) prepareKubelet() (string, error) {
 	return "", nil
 }
 
-func (vm *AutoScalerServerNode) waitReady() error {
+func (vm *AutoScalerServerNode) waitReady(c types.ClientGenerator) error {
 	glog.Debugf("AutoScalerNode::waitReady, node:%s", vm.NodeName)
 
-	return vm.serverConfig.Client.WaitNodeToBeReady(vm.NodeName, 60)
+	return c.WaitNodeToBeReady(vm.NodeName, 60)
 }
 
 func (vm *AutoScalerServerNode) kubeAdmJoin() error {
@@ -127,7 +127,7 @@ func (vm *AutoScalerServerNode) kubeAdmJoin() error {
 	return nil
 }
 
-func (vm *AutoScalerServerNode) setNodeLabels(nodeLabels, systemLabels KubernetesLabel) error {
+func (vm *AutoScalerServerNode) setNodeLabels(c types.ClientGenerator, nodeLabels, systemLabels KubernetesLabel) error {
 	if len(nodeLabels)+len(systemLabels) > 0 {
 
 		labels := map[string]string{}
@@ -141,7 +141,7 @@ func (vm *AutoScalerServerNode) setNodeLabels(nodeLabels, systemLabels Kubernete
 			labels[k] = v
 		}
 
-		if err := vm.serverConfig.Client.LabelNode(vm.NodeName, labels); err != nil {
+		if err := c.LabelNode(vm.NodeName, labels); err != nil {
 			return fmt.Errorf(constantes.ErrLabelNodeReturnError, vm.NodeName, err)
 		}
 	}
@@ -152,7 +152,7 @@ func (vm *AutoScalerServerNode) setNodeLabels(nodeLabels, systemLabels Kubernete
 		constantes.AnnotationNodeIndex:            strconv.Itoa(vm.NodeIndex),
 	}
 
-	if err := vm.serverConfig.Client.AnnoteNode(vm.NodeName, annotations); err != nil {
+	if err := c.AnnoteNode(vm.NodeName, annotations); err != nil {
 		return fmt.Errorf(constantes.ErrAnnoteNodeReturnError, vm.NodeName, err)
 	}
 
@@ -217,7 +217,7 @@ func (vm *AutoScalerServerNode) syncFolders() (string, error) {
 	return "", nil
 }
 
-func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabel) error {
+func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, systemLabels KubernetesLabel) error {
 	glog.Debugf("AutoScalerNode::launchVM, node:%s", vm.NodeName)
 
 	var err error
@@ -274,12 +274,12 @@ func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabe
 
 		err = fmt.Errorf(constantes.ErrKubeAdmJoinFailed, vm.NodeName, err)
 
-	} else if err = vm.waitReady(); err != nil {
+	} else if err = vm.waitReady(c); err != nil {
 
 		err = fmt.Errorf(constantes.ErrNodeIsNotReady, vm.NodeName)
 
 	} else {
-		err = vm.setNodeLabels(nodeLabels, systemLabels)
+		err = vm.setNodeLabels(c, nodeLabels, systemLabels)
 	}
 
 	if err == nil {
@@ -291,7 +291,7 @@ func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabe
 	return err
 }
 
-func (vm *AutoScalerServerNode) startVM() error {
+func (vm *AutoScalerServerNode) startVM(c types.ClientGenerator) error {
 	glog.Debugf("AutoScalerNode::startVM, node:%s", vm.NodeName)
 
 	var err error
@@ -328,7 +328,7 @@ func (vm *AutoScalerServerNode) startVM() error {
 			err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
 
 		} else {
-			if err = vm.serverConfig.Client.UncordonNode(vm.NodeName); err != nil {
+			if err = c.UncordonNode(vm.NodeName); err != nil {
 				glog.Errorf(constantes.ErrUncordonNodeReturnError, vm.NodeName, err)
 
 				err = nil
@@ -349,7 +349,7 @@ func (vm *AutoScalerServerNode) startVM() error {
 	return err
 }
 
-func (vm *AutoScalerServerNode) stopVM() error {
+func (vm *AutoScalerServerNode) stopVM(c types.ClientGenerator) error {
 	glog.Debugf("AutoScalerNode::stopVM, node:%s", vm.NodeName)
 
 	var err error
@@ -368,7 +368,7 @@ func (vm *AutoScalerServerNode) stopVM() error {
 		err = fmt.Errorf(constantes.ErrStopVMFailed, vm.NodeName, err)
 
 	} else if state == AutoScalerServerNodeStateRunning {
-		if err = vm.serverConfig.Client.CordonNode(vm.NodeName); err != nil {
+		if err = c.CordonNode(vm.NodeName); err != nil {
 			glog.Errorf(constantes.ErrCordonNodeReturnError, vm.NodeName, err)
 		}
 
@@ -393,7 +393,7 @@ func (vm *AutoScalerServerNode) stopVM() error {
 	return err
 }
 
-func (vm *AutoScalerServerNode) deleteVM() error {
+func (vm *AutoScalerServerNode) deleteVM(c types.ClientGenerator) error {
 	glog.Debugf("AutoScalerNode::deleteVM, node:%s", vm.NodeName)
 
 	var err error
@@ -406,11 +406,11 @@ func (vm *AutoScalerServerNode) deleteVM() error {
 
 		if status, err = vsphere.Status(vm.NodeName); err == nil {
 			if status.Powered {
-				if err = vm.serverConfig.Client.DrainNode(vm.NodeName); err != nil {
+				if err = c.DrainNode(vm.NodeName); err != nil {
 					glog.Errorf(constantes.ErrDrainNodeReturnError, vm.NodeName, err)
 				}
 
-				if err = vm.serverConfig.Client.DeleteNode(vm.NodeName); err != nil {
+				if err = c.DeleteNode(vm.NodeName); err != nil {
 					glog.Errorf(constantes.ErrDeleteNodeReturnError, vm.NodeName, err)
 				}
 
@@ -468,7 +468,7 @@ func (vm *AutoScalerServerNode) statusVM() (AutoScalerServerNodeState, error) {
 	return AutoScalerServerNodeStateUndefined, fmt.Errorf(constantes.ErrAutoScalerInfoNotFound, vm.NodeName)
 }
 
-func (vm *AutoScalerServerNode) xgetVSphere() *vsphere.Configuration {
+func (vm *AutoScalerServerNode) getVSphere() *vsphere.Configuration {
 	var vsphere *vsphere.Configuration
 
 	if vsphere = vm.serverConfig.VMwareInfos[vm.NodeGroupID]; vsphere == nil {
