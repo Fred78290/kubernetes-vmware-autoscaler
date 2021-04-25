@@ -159,70 +159,11 @@ func (vm *AutoScalerServerNode) setNodeLabels(c types.ClientGenerator, nodeLabel
 	return nil
 }
 
-var phDefaultRsyncFlags = []string{
-	"--verbose",
-	"--archive",
-	"-z",
-	"--copy-links",
-	"--no-owner",
-	"--no-group",
-	"--delete",
-}
-
-func (vm *AutoScalerServerNode) syncFolders() (string, error) {
-
-	syncFolders := vm.serverConfig.SyncFolders
-
-	if syncFolders != nil && len(syncFolders.Folders) > 0 {
-		for _, folder := range syncFolders.Folders {
-			var rsync = []string{
-				"rsync",
-			}
-
-			tempFile, _ := ioutil.TempFile(os.TempDir(), "vmware-rsync")
-
-			defer tempFile.Close()
-
-			if len(syncFolders.RsyncOptions) == 0 {
-				rsync = append(rsync, phDefaultRsyncFlags...)
-			} else {
-				rsync = append(rsync, syncFolders.RsyncOptions...)
-			}
-
-			sshOptions := []string{
-				"--rsync-path",
-				"sudo rsync",
-				"-e",
-				fmt.Sprintf("ssh -p 22 -o LogLevel=FATAL -o ControlMaster=auto -o ControlPath=%s -o ControlPersist=10m  -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i '%s'", tempFile.Name(), syncFolders.RsyncSSHKey),
-			}
-
-			excludes := make([]string, 0, len(folder.Excludes)*2)
-
-			for _, exclude := range folder.Excludes {
-				excludes = append(excludes, "--exclude", exclude)
-			}
-
-			rsync = append(rsync, sshOptions...)
-			rsync = append(rsync, excludes...)
-			rsync = append(rsync, folder.Source, fmt.Sprintf("%s@%s:%s", syncFolders.RsyncUser, vm.Addresses[0], folder.Destination))
-
-			if out, err := utils.Pipe(rsync...); err != nil {
-				return out, err
-			}
-		}
-	}
-	//["/usr/bin/rsync", "--verbose", "--archive", "--delete", "-z", "--copy-links", "--no-owner", "--no-group", "--rsync-path", "sudo rsync", "-e",
-	// "ssh -p 22 -o LogLevel=FATAL  -o ControlMaster=auto -o ControlPath=/tmp/vagrant-rsync-20181227-31508-1sjw4bm -o ControlPersist=10m  -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i '/home/fboltz/.ssh/id_rsa'",
-	// "--exclude", ".vagrant/", "/home/fboltz/Projects/vagrant-multipass/", "vagrant@10.196.85.125:/vagrant"]
-	return "", nil
-}
-
 func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, systemLabels KubernetesLabel) error {
 	glog.Debugf("AutoScalerNode::launchVM, node:%s", vm.NodeName)
 
 	var err error
 	var status AutoScalerServerNodeState
-	var output string
 
 	vsphere := vm.VSphereConfig
 	network := vsphere.Network

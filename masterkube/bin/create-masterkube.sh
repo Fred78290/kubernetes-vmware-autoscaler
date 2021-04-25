@@ -509,8 +509,6 @@ AUTOSCALER_CONFIG=$(cat <<EOF
         "package_update": false,
         "package_upgrade": false
     },
-    "sync-folder": {
-    },
     "ssh-infos" : {
         "user": "${KUBERNETES_USER}",
         "ssh-private-key": "${SSH_PRIVATE_KEY_LOCAL}"

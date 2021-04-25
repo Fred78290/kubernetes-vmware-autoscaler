@@ -140,14 +140,6 @@ type AutoScalerServerRsync struct {
 	Excludes    []string `json:"excludes"`
 }
 
-// AutoScalerServerSyncFolders declare how to sync file between host and guest
-type AutoScalerServerSyncFolders struct {
-	RsyncOptions []string                `json:"options"`
-	RsyncUser    string                  `json:"user"`
-	RsyncSSHKey  string                  `json:"ssh-key"`
-	Folders      []AutoScalerServerRsync `json:"folders"`
-}
-
 // AutoScalerServerConfig is contains configuration
 type AutoScalerServerConfig struct {
 	Network            string                            `default:"tcp" json:"network"`         // Mandatory, Network to listen (see grpc doc) to listen
@@ -161,7 +153,6 @@ type AutoScalerServerConfig struct {
 	DefaultMachineType string                            `default:"{\"standard\": {}}" json:"default-machine"`
 	Machines           map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
 	CloudInit          interface{}                       `json:"cloud-init"`                            // Optional, The cloud init conf file
-	SyncFolders        *AutoScalerServerSyncFolders      `json:"sync-folder"`                           // Optional, do rsync between host and guest
 	Optionals          *AutoScalerServerOptionals        `json:"optionals"`
 	ResourceLimiter    *ResourceLimiter                  `json:"limits"`
 	SSH                *AutoScalerServerSSH              `json:"ssh-infos"`
