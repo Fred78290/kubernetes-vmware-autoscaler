@@ -4,6 +4,7 @@
 # It will generate:
 # Custom vmware image with every thing for kubernetes
 # Config file to deploy the cluster autoscaler.
+# kubectl run busybox --rm -ti --image=busybox -n kube-public /bin/sh
 
 set -e
 
@@ -450,7 +451,7 @@ echo "Prepare ${MASTERKUBE} instance"
 scp -r bin ${KUBERNETES_USER}@${IPADDR}:~
 
 echo "Start kubernetes ${MASTERKUBE} instance master node, kubernetes version=${KUBERNETES_VERSION}, providerID=${PROVIDERID}"
-ssh ${KUBERNETES_USER}@${IPADDR} sudo mv /home/ubuntu/bin/* /usr/local/bin
+ssh ${KUBERNETES_USER}@${IPADDR} sudo mv /home/${KUBERNETES_USER}/bin/* /usr/local/bin
 ssh ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh flannel eth1 "${KUBERNETES_VERSION}" "\"${PROVIDERID}\""
 
 scp ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ./cluster
