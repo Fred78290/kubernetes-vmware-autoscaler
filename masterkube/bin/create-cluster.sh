@@ -112,6 +112,13 @@ if [ ! -f /etc/kubernetes/kubelet.conf ]; then
     echo "Allow master to host pod"
     kubectl taint nodes --all node-role.kubernetes.io/master- 2>&1
 
+cat > patch.yaml <<EOF
+spec:
+    providerID: '${PROVIDERID}'
+EOF
+
+    kubectl patch node ${HOSTNAME} --patch-file patch.yaml
+
     if [ "$CNI" = "calico" ]; then
 
         echo "Install calico network"
