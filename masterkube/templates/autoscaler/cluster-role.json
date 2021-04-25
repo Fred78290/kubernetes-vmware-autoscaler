@@ -75,19 +75,6 @@
         },
         {
             "apiGroups": [
-                "batch"
-            ],
-            "resources": [
-                "jobs"
-            ],
-            "verbs": [
-                "watch",
-                "list",
-                "get"
-            ]
-        },
-        {
-            "apiGroups": [
                 ""
             ],
             "resources": [
@@ -134,9 +121,9 @@
                 "apps"
             ],
             "resources": [
+                "statefulsets",
                 "replicasets",
-                "daemonsets",
-                "statefulsets"
+                "daemonsets"
             ],
             "verbs": [
                 "watch",
@@ -149,12 +136,68 @@
                 "storage.k8s.io"
             ],
             "resources": [
-                "storageclasses"
+                "storageclasses",
+                "csinodes"
+            ],
+            "verbs": [
+                "get",
+                "list",
+                "watch"
+            ]
+        },
+        {
+            "apiGroups": [
+                "batch"
+            ],
+            "resources": [
+                "jobs",
+                "cronjobs"
             ],
             "verbs": [
                 "watch",
                 "list",
                 "get"
+            ]
+        },
+        {
+            "apiGroups": [
+                "coordination.k8s.io"
+            ],
+            "resources": [
+                "leases"
+            ],
+            "verbs": [
+                "create"
+            ]
+        },
+        {
+            "apiGroups": [
+                "coordination.k8s.io"
+            ],
+            "resourceNames": [
+                "cluster-autoscaler"
+            ],
+            "resources": [
+                "leases"
+            ],
+            "verbs": [
+                "get",
+                "update"
+            ]
+        },
+        {
+            "apiGroups": [
+                "storage.k8s.io"
+            ],
+            "resources": [
+                "csistoragecapacities",
+                "csidrivers"
+            ],
+            "verbs": [
+                "list",
+                "get",
+                "update",
+                "watch"
             ]
         }
     ]
