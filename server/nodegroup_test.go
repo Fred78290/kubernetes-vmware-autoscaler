@@ -7,30 +7,55 @@ import (
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/stretchr/testify/assert"
+	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
-type arguments struct {
-	kubeHost      string
-	kubeToken     string
-	kubeCACert    string
-	kubeExtraArgs []string
-	image         string
-	cloudInit     *map[string]interface{}
-	mountPoints   *map[string]string
+type mockupClientGenerator struct {
 }
 
-type vm struct {
-	name    string
-	memory  int
-	cpu     int
-	disk    int
-	address []string
+func (m mockupClientGenerator) KubeClient() (kubernetes.Interface, error) {
+	return nil, nil
 }
 
-type nodeTest struct {
-	name    string
-	wantErr bool
-	node    *AutoScalerServerNode
+func (m mockupClientGenerator) PodList(nodeName string, podFilter types.PodFilterFunc) ([]apiv1.Pod, error) {
+	return nil, nil
+}
+
+func (m mockupClientGenerator) NodeList() (*apiv1.NodeList, error) {
+	return &apiv1.NodeList{}, nil
+}
+
+func (m mockupClientGenerator) UncordonNode(nodeName string) error {
+	return nil
+}
+
+func (m mockupClientGenerator) CordonNode(nodeName string) error {
+	return nil
+}
+
+func (m mockupClientGenerator) MarkDrainNode(nodeName string) error {
+	return nil
+}
+
+func (m mockupClientGenerator) DrainNode(nodeName string, ignoreDaemonSet, deleteLocalData bool) error {
+	return nil
+}
+
+func (m mockupClientGenerator) DeleteNode(nodeName string) error {
+	return nil
+}
+
+func (m mockupClientGenerator) AnnoteNode(nodeName string, annotations map[string]string) error {
+	return nil
+}
+
+func (m mockupClientGenerator) LabelNode(nodeName string, labels map[string]string) error {
+	return nil
+}
+
+func (m mockupClientGenerator) WaitNodeToBeReady(nodeName string, timeToWaitInSeconds int) error {
+	return nil
 }
 
 func createTestNode(ng *AutoScalerServerNodeGroup) *AutoScalerServerNode {
@@ -99,8 +124,8 @@ func newTestNodeGroup() (*types.AutoScalerServerConfig, *AutoScalerServerNodeGro
 func newTestConfig() (*types.AutoScalerServerConfig, error) {
 	var config types.AutoScalerServerConfig
 
-	configStr, err := ioutil.ReadFile("./masterkube/config/config.json")
-	err = json.Unmarshal(configStr, &config)
+	configStr, _ := ioutil.ReadFile("./masterkube/config/config.json")
+	err := json.Unmarshal(configStr, &config)
 
 	if err != nil {
 		return nil, err
@@ -110,11 +135,12 @@ func newTestConfig() (*types.AutoScalerServerConfig, error) {
 }
 
 func Test_AutoScalerNode_launchVM(t *testing.T) {
+	kubeClient := &mockupClientGenerator{}
 	_, ng, testNode, err := newTestNode()
 
 	if assert.NoError(t, err) {
 		t.Run("Launch VM", func(t *testing.T) {
-			if err := testNode.launchVM(ng.NodeLabels, ng.SystemLabels); err != nil {
+			if err := testNode.launchVM(kubeClient, ng.NodeLabels, ng.SystemLabels); err != nil {
 				t.Errorf("AutoScalerNode.launchVM() error = %v", err)
 			}
 		})
@@ -122,11 +148,12 @@ func Test_AutoScalerNode_launchVM(t *testing.T) {
 }
 
 func Test_AutoScalerNode_startVM(t *testing.T) {
+	kubeClient := &mockupClientGenerator{}
 	_, _, testNode, err := newTestNode()
 
 	if assert.NoError(t, err) {
 		t.Run("Start VM", func(t *testing.T) {
-			if err := testNode.startVM(); err != nil {
+			if err := testNode.startVM(kubeClient); err != nil {
 				t.Errorf("AutoScalerNode.startVM() error = %v", err)
 			}
 		})
@@ -134,11 +161,12 @@ func Test_AutoScalerNode_startVM(t *testing.T) {
 }
 
 func Test_AutoScalerNode_stopVM(t *testing.T) {
+	kubeClient := &mockupClientGenerator{}
 	_, _, testNode, err := newTestNode()
 
 	if assert.NoError(t, err) {
 		t.Run("Stop VM", func(t *testing.T) {
-			if err := testNode.stopVM(); err != nil {
+			if err := testNode.stopVM(kubeClient); err != nil {
 				t.Errorf("AutoScalerNode.stopVM() error = %v", err)
 			}
 		})
@@ -146,11 +174,12 @@ func Test_AutoScalerNode_stopVM(t *testing.T) {
 }
 
 func Test_AutoScalerNode_deleteVM(t *testing.T) {
+	kubeClient := &mockupClientGenerator{}
 	_, _, testNode, err := newTestNode()
 
 	if assert.NoError(t, err) {
 		t.Run("Delete VM", func(t *testing.T) {
-			if err := testNode.deleteVM(); err != nil {
+			if err := testNode.deleteVM(kubeClient); err != nil {
 				t.Errorf("AutoScalerNode.deleteVM() error = %v", err)
 			}
 		})
@@ -172,11 +201,12 @@ func Test_AutoScalerNode_statusVM(t *testing.T) {
 }
 
 func Test_AutoScalerNodeGroup_addNode(t *testing.T) {
+	kubeClient := &mockupClientGenerator{}
 	_, ng, err := newTestNodeGroup()
 
 	if assert.NoError(t, err) {
 		t.Run("addNode", func(t *testing.T) {
-			if err := ng.addNodes(1); err != nil {
+			if err := ng.addNodes(kubeClient, 1); err != nil {
 				t.Errorf("AutoScalerServerNodeGroup.addNode() error = %v", err)
 			}
 		})
@@ -184,11 +214,12 @@ func Test_AutoScalerNodeGroup_addNode(t *testing.T) {
 }
 
 func Test_AutoScalerNodeGroup_deleteNode(t *testing.T) {
+	kubeClient := &mockupClientGenerator{}
 	_, ng, testNode, err := newTestNode()
 
 	if assert.NoError(t, err) {
 		t.Run("Delete VM", func(t *testing.T) {
-			if err := ng.deleteNodeByName(testNode.NodeName); err != nil {
+			if err := ng.deleteNodeByName(kubeClient, testNode.NodeName); err != nil {
 				t.Errorf("AutoScalerServerNodeGroup.deleteNode() error = %vv", err)
 			}
 		})
@@ -196,12 +227,13 @@ func Test_AutoScalerNodeGroup_deleteNode(t *testing.T) {
 }
 
 func Test_AutoScalerNodeGroup_deleteNodeGroup(t *testing.T) {
+	kubeClient := &mockupClientGenerator{}
 	_, ng, _, err := newTestNode()
 
 	if assert.NoError(t, err) {
 
 		t.Run("Delete node group", func(t *testing.T) {
-			if err := ng.deleteNodeGroup(); err != nil {
+			if err := ng.deleteNodeGroup(kubeClient); err != nil {
 				t.Errorf("AutoScalerServerNodeGroup.deleteNodeGroup() error = %v", err)
 			}
 		})

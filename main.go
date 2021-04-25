@@ -17,26 +17,47 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"log"
+	"os"
 
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/client"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/server"
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
+	glog "github.com/sirupsen/logrus"
 )
 
 var phVersion = "v0.0.0-unset"
 var phBuildDate = ""
 
 func main() {
-	versionPtr := flag.Bool("version", false, "Give the version")
-	savePtr := flag.String("save", "", "The file to persists the server")
-	configPtr := flag.String("config", "/etc/cluster/vmware-cluster-autoscaler.json", "The config for the server")
-	kubeConfigPtr := flag.String("kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
+	cfg := types.NewConfig()
 
-	flag.Parse()
+	if err := cfg.ParseFlags(os.Args[1:], phVersion); err != nil {
+		log.Fatalf("flag parsing error: %v", err)
+	}
 
-	if *versionPtr {
-		log.Printf("The current version is:%s, build at:%s", phVersion, phBuildDate)
+	ll, err := glog.ParseLevel(cfg.LogLevel)
+	if err != nil {
+		glog.Fatalf("failed to parse log level: %v", err)
+	}
+
+	glog.SetLevel(ll)
+
+	if cfg.LogFormat == "json" {
+		glog.SetFormatter(&glog.JSONFormatter{})
+	}
+
+	glog.Infof("config: %s", cfg)
+
+	if cfg.DisplayVersion {
+		glog.Infof("The current version is:%s, build at:%s", phVersion, phBuildDate)
 	} else {
-		server.StartServer(*kubeConfigPtr, *savePtr, *configPtr)
+		generator := client.NewClientGenerator(cfg)
+
+		if _, err := generator.NodeList(); err != nil {
+			glog.Fatalf("Can't validate config, reason:%s", err)
+		}
+
+		server.StartServer(generator, cfg)
 	}
 }

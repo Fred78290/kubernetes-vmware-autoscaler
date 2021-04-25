@@ -1,12 +1,69 @@
 package types
 
 import (
+	"fmt"
 	"os/user"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/vsphere"
-	"github.com/golang/glog"
+	"github.com/alecthomas/kingpin"
+	glog "github.com/sirupsen/logrus"
+
+	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
 )
+
+const (
+	DefaultMaxGracePeriod    time.Duration = 30 * time.Second
+	DefaultMaxRequestTimeout time.Duration = 30 * time.Second
+	DefaultMaxDeletionPeriod time.Duration = 2 * time.Minute
+)
+
+type Config struct {
+	APIServerURL    string
+	KubeConfig      string
+	RequestTimeout  time.Duration
+	DeletionTimeout time.Duration
+	MaxGracePeriod  time.Duration
+	Config          string
+	SaveLocation    string
+	DisplayVersion  bool
+	LogFormat       string
+	LogLevel        string
+	MinCpus         int64
+	MinMemory       int64
+	MaxCpus         int64
+	MaxMemory       int64
+}
+
+func (c *Config) GetResourceLimiter() *ResourceLimiter {
+	return &ResourceLimiter{
+		MinLimits: map[string]int64{constantes.ResourceNameCores: c.MinCpus, constantes.ResourceNameMemory: c.MinMemory * 1024 * 1024},
+		MaxLimits: map[string]int64{constantes.ResourceNameCores: c.MaxCpus, constantes.ResourceNameMemory: c.MaxMemory * 1024 * 1024},
+	}
+}
+
+// A PodFilterFunc returns true if the supplied pod passes the filter.
+type PodFilterFunc func(p apiv1.Pod) (bool, error)
+
+// ClientGenerator provides clients
+type ClientGenerator interface {
+	KubeClient() (kubernetes.Interface, error)
+
+	PodList(nodeName string, podFilter PodFilterFunc) ([]apiv1.Pod, error)
+	NodeList() (*apiv1.NodeList, error)
+	UncordonNode(nodeName string) error
+	CordonNode(nodeName string) error
+	MarkDrainNode(nodeName string) error
+	DrainNode(nodeName string, ignoreDaemonSet, deleteLocalData bool) error
+	DeleteNode(nodeName string) error
+	AnnoteNode(nodeName string, annotations map[string]string) error
+	LabelNode(nodeName string, labels map[string]string) error
+	WaitNodeToBeReady(nodeName string, timeToWaitInSeconds int) error
+}
 
 // ResourceLimiter define limit, not really used
 type ResourceLimiter struct {
@@ -100,13 +157,13 @@ type AutoScalerServerConfig struct {
 	MaxNode            int                               `json:"maxNode"`                       // Mandatory, Max AutoScaler VM
 	NodePrice          float64                           `json:"nodePrice"`                     // Optional, The VM price
 	PodPrice           float64                           `json:"podPrice"`                      // Optional, The pod price
-	KubeConfig         string                            `json:"-"`
 	KubeAdm            KubeJoinConfig                    `json:"kubeadm"`
 	DefaultMachineType string                            `default:"{\"standard\": {}}" json:"default-machine"`
 	Machines           map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
 	CloudInit          interface{}                       `json:"cloud-init"`                            // Optional, The cloud init conf file
 	SyncFolders        *AutoScalerServerSyncFolders      `json:"sync-folder"`                           // Optional, do rsync between host and guest
 	Optionals          *AutoScalerServerOptionals        `json:"optionals"`
+	ResourceLimiter    *ResourceLimiter                  `json:"limits"`
 	SSH                *AutoScalerServerSSH              `json:"ssh-infos"`
 	VMwareInfos        map[string]*vsphere.Configuration `json:"vmware"`
 }
@@ -124,4 +181,71 @@ func (conf *AutoScalerServerConfig) GetVSphereConfiguration(name string) *vspher
 	}
 
 	return vsphere
+}
+
+// NewConfig returns new Config object
+func NewConfig() *Config {
+	return &Config{
+		APIServerURL:    "",
+		KubeConfig:      "",
+		RequestTimeout:  DefaultMaxRequestTimeout,
+		DeletionTimeout: DefaultMaxDeletionPeriod,
+		MaxGracePeriod:  DefaultMaxGracePeriod,
+		DisplayVersion:  false,
+		Config:          "/etc/cluster/vmware-cluster-autoscaler.json",
+		MinCpus:         2,
+		MinMemory:       1024,
+		MaxCpus:         24,
+		MaxMemory:       1024 * 24,
+		LogFormat:       "text",
+		LogLevel:        glog.InfoLevel.String(),
+	}
+}
+
+// allLogLevelsAsStrings returns all logrus levels as a list of strings
+func allLogLevelsAsStrings() []string {
+	var levels []string
+	for _, level := range glog.AllLevels {
+		levels = append(levels, level.String())
+	}
+	return levels
+}
+
+func (cfg *Config) ParseFlags(args []string, version string) error {
+	app := kingpin.New("vmware-autoscaler", "Kubernetes VMWare autoscaler create VM instances at demand for autoscaling.\n\nNote that all flags may be replaced with env vars - `--flag` -> `VMWARE_AUTOSCALER_FLAG=1` or `--flag value` -> `VMWARE_AUTOSCALER_FLAG=value`")
+
+	//	app.Version(version)
+	app.HelpFlag.Short('h')
+	app.DefaultEnvars()
+
+	app.Flag("log-format", "The format in which log messages are printed (default: text, options: text, json)").Default(cfg.LogFormat).EnumVar(&cfg.LogFormat, "text", "json")
+	app.Flag("log-level", "Set the level of logging. (default: info, options: panic, debug, info, warning, error, fatal").Default(cfg.LogLevel).EnumVar(&cfg.LogLevel, allLogLevelsAsStrings()...)
+
+	// Flags related to Kubernetes
+	app.Flag("server", "The Kubernetes API server to connect to (default: auto-detect)").Default(cfg.APIServerURL).StringVar(&cfg.APIServerURL)
+	app.Flag("kubeconfig", "Retrieve target cluster configuration from a Kubernetes configuration file (default: auto-detect)").Default(cfg.KubeConfig).StringVar(&cfg.KubeConfig)
+	app.Flag("request-timeout", "Request timeout when calling Kubernetes APIs. 0s means no timeout").Default(DefaultMaxRequestTimeout.String()).DurationVar(&cfg.RequestTimeout)
+	app.Flag("deletion-timeout", "Deletion timeout when delete node. 0s means no timeout").Default(DefaultMaxDeletionPeriod.String()).DurationVar(&cfg.DeletionTimeout)
+	app.Flag("max-grace-period", "Maximum time evicted pods will be given to terminate gracefully.").Default(DefaultMaxGracePeriod.String()).DurationVar(&cfg.MaxGracePeriod)
+
+	app.Flag("min-cpus", "Limits: minimum cpu (default: 1)").Default(strconv.FormatInt(cfg.MinCpus, 10)).Int64Var(&cfg.MinCpus)
+	app.Flag("min-memory", "Limits: minimum memory in MB (default: 1G)").Default(strconv.FormatInt(cfg.MinMemory, 10)).Int64Var(&cfg.MinMemory)
+	app.Flag("max-cpus", "Limits: max cpu (default: 24)").Default(strconv.FormatInt(cfg.MaxCpus, 10)).Int64Var(&cfg.MaxCpus)
+	app.Flag("max-memory", "Limits: max memory in MB (default: 24G)").Default(strconv.FormatInt(cfg.MaxMemory, 10)).Int64Var(&cfg.MaxMemory)
+
+	app.Flag("version", "Display version and exit").BoolVar(&cfg.DisplayVersion)
+
+	app.Flag("config", "The config for the server").Default(cfg.Config).StringVar(&cfg.Config)
+	app.Flag("save", "The file to persists the server").Default(cfg.SaveLocation).StringVar(&cfg.SaveLocation)
+
+	_, err := app.Parse(args)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (cfg *Config) String() string {
+	return fmt.Sprintf("APIServerURL:%s KubeConfig:%s RequestTimeout:%s Config:%s SaveLocation:%s DisplayVersion:%s", cfg.APIServerURL, cfg.KubeConfig, cfg.RequestTimeout, cfg.Config, cfg.SaveLocation, strconv.FormatBool(cfg.DisplayVersion))
 }

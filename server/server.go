@@ -27,6 +27,7 @@ type AutoScalerServerApp struct {
 	KubeAdmConfiguration *apigrpc.KubeAdmConfig                `json:"kubeadm"`
 	NodesDefinition      []*apigrpc.NodeGroupDef               `json:"nodedefs"`
 	AutoProvision        bool                                  `json:"auto"`
+	kubeClient           types.ClientGenerator
 }
 
 //var phAutoScalerServer *AutoScalerServerApp
@@ -83,7 +84,7 @@ func (s *AutoScalerServerApp) deleteNodeGroup(nodeGroupID string) error {
 
 	glog.Infof("Delete node group, ID:%s", nodeGroupID)
 
-	if err := nodeGroup.deleteNodeGroup(); err != nil {
+	if err := nodeGroup.deleteNodeGroup(s.kubeClient); err != nil {
 		glog.Errorf(constantes.ErrUnableToDeleteNodeGroup, nodeGroupID, err)
 		return err
 	}
@@ -107,7 +108,7 @@ func (s *AutoScalerServerApp) createNodeGroup(nodeGroupID string) (*AutoScalerSe
 
 			glog.Infof("Create node group, ID:%s", nodeGroupID)
 
-			if err := nodeGroup.addNodes(nodeGroup.MinNodeSize); err != nil {
+			if err := nodeGroup.addNodes(s.kubeClient, nodeGroup.MinNodeSize); err != nil {
 				glog.Errorf(err.Error())
 
 				return nil, err
@@ -133,7 +134,10 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 			ng = s.Groups[nodeGroupIdentifier]
 
 			if ng == nil {
-				systemLabels := make(map[string]string)
+				systemLabels := map[string]string{
+					constantes.NodeLabelWorkerRole: "",
+				}
+
 				labels := map[string]string{
 					constantes.NodeLabelGroupName: nodeGroupIdentifier,
 				}
@@ -147,10 +151,10 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 
 				glog.Infof("Auto provision for nodegroup:%s, minSize:%d, maxSize:%d", nodeGroupIdentifier, node.MinSize, node.MaxSize)
 
-				if ng, err = s.newNodeGroup(nodeGroupIdentifier, node.MinSize, node.MaxSize, s.Configuration.DefaultMachineType, labels, systemLabels, true); err == nil {
+				if _, err = s.newNodeGroup(nodeGroupIdentifier, node.MinSize, node.MaxSize, s.Configuration.DefaultMachineType, labels, systemLabels, true); err == nil {
 					if ng, err = s.createNodeGroup(nodeGroupIdentifier); err == nil {
 						if node.GetIncludeExistingNode() {
-							if err = ng.autoDiscoveryNodes(true, s.Configuration.KubeConfig); err == nil {
+							if err = ng.autoDiscoveryNodes(s.kubeClient, true); err == nil {
 								return err
 							}
 						}
@@ -163,7 +167,7 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 			} else {
 				// If the nodegroup already exists, reparse nodes
 				if node.GetIncludeExistingNode() {
-					if err = ng.autoDiscoveryNodes(true, s.Configuration.KubeConfig); err == nil {
+					if err = ng.autoDiscoveryNodes(s.kubeClient, true); err == nil {
 						return err
 					}
 				}
@@ -431,14 +435,16 @@ func (s *AutoScalerServerApp) NewNodeGroup(ctx context.Context, request *apigrpc
 	labels := make(map[string]string)
 	systemLabels := make(map[string]string)
 
-	if request.GetLabels() != nil {
-		for k2, v2 := range request.GetLabels() {
+	systemLabels[constantes.NodeLabelWorkerRole] = ""
+
+	if reqLabels := request.GetLabels(); reqLabels != nil {
+		for k2, v2 := range reqLabels {
 			labels[k2] = v2
 		}
 	}
 
-	if request.GetSystemLabels() != nil {
-		for k2, v2 := range request.GetSystemLabels() {
+	if reqSystemLabels := request.GetSystemLabels(); reqSystemLabels != nil {
+		for k2, v2 := range reqSystemLabels {
 			systemLabels[k2] = v2
 		}
 	}
@@ -538,7 +544,7 @@ func (s *AutoScalerServerApp) Cleanup(ctx context.Context, request *apigrpc.Clou
 	}
 
 	for _, nodeGroup := range s.Groups {
-		if err := nodeGroup.cleanup(); err != nil {
+		if err := nodeGroup.cleanup(s.kubeClient); err != nil {
 			lastError = &apigrpc.Error{
 				Code:   constantes.CloudProviderError,
 				Reason: err.Error(),
@@ -709,7 +715,7 @@ func (s *AutoScalerServerApp) IncreaseSize(ctx context.Context, request *apigrpc
 		}, nil
 	}
 
-	err := nodeGroup.setNodeGroupSize(newSize)
+	err := nodeGroup.setNodeGroupSize(s.kubeClient, newSize)
 
 	if err != nil {
 		return &apigrpc.IncreaseSizeReply{
@@ -801,9 +807,9 @@ func (s *AutoScalerServerApp) DeleteNodes(ctx context.Context, request *apigrpc.
 		}
 
 		// Delete the node in the group
-		nodeName, err = utils.NodeNameFromProviderID(s.Configuration.ProviderID, nodeName)
+		nodeName, _ = utils.NodeNameFromProviderID(s.Configuration.ProviderID, nodeName)
 
-		err = nodeGroup.deleteNodeByName(nodeName)
+		err = nodeGroup.deleteNodeByName(s.kubeClient, nodeName)
 
 		if err != nil {
 			return &apigrpc.DeleteNodesReply{
@@ -870,7 +876,7 @@ func (s *AutoScalerServerApp) DecreaseTargetSize(ctx context.Context, request *a
 		}, nil
 	}
 
-	err := nodeGroup.setNodeGroupSize(newSize)
+	err := nodeGroup.setNodeGroupSize(s.kubeClient, newSize)
 
 	if err != nil {
 		return &apigrpc.DecreaseTargetSizeReply{
@@ -1157,7 +1163,7 @@ func (s *AutoScalerServerApp) Belongs(ctx context.Context, request *apigrpc.Belo
 	}
 
 	providerID := utils.GetNodeProviderID(s.Configuration.ProviderID, node)
-	nodeGroup, err := s.nodeGroupForNode(providerID)
+	nodeGroup, _ := s.nodeGroupForNode(providerID)
 
 	var belong bool
 
@@ -1281,17 +1287,12 @@ func (s *AutoScalerServerApp) Load(fileName string) error {
 }
 
 // StartServer start the service
-func StartServer(kubeConfig, saveState, configFileName string) {
+func StartServer(p types.ClientGenerator, c *types.Config) {
 	var config types.AutoScalerServerConfig
 	var autoScalerServer *AutoScalerServerApp
 
-	if len(kubeConfig) == 0 {
-		kubeConfig = fmt.Sprintf("%s/.kube/config", homedir.HomeDir())
-	}
-
-	if _, err := os.Stat(kubeConfig); err != nil {
-		glog.Fatalf(fmt.Sprintf("Can't stat kubeconfig:%s, error:%v", kubeConfig, err))
-	}
+	saveState := c.SaveLocation
+	configFileName := c.Config
 
 	if len(saveState) > 0 {
 		phSavedState = saveState
@@ -1309,7 +1310,9 @@ func StartServer(kubeConfig, saveState, configFileName string) {
 		glog.Fatalf("failed to decode config file:%s, error:%v", configFileName, err)
 	}
 
-	config.KubeConfig = kubeConfig
+	if _, err = p.KubeClient(); err != nil {
+		glog.Fatalf("failed to get kubernetes client, error:%v", configFileName, err)
+	}
 
 	if config.Optionals == nil {
 		config.Optionals = &types.AutoScalerServerOptionals{
@@ -1322,19 +1325,17 @@ func StartServer(kubeConfig, saveState, configFileName string) {
 		}
 	}
 
-	kubeAdmConfig := &apigrc.KubeAdmConfig{
+	kubeAdmConfig := &apigrpc.KubeAdmConfig{
 		KubeAdmAddress:        config.KubeAdm.Address,
 		KubeAdmToken:          config.KubeAdm.Token,
 		KubeAdmCACert:         config.KubeAdm.CACert,
 		KubeAdmExtraArguments: config.KubeAdm.ExtraArguments,
 	}
 
-	if phSaveState == false || utils.FileExists(phSavedState) == false {
+	if !phSaveState || !utils.FileExists(phSavedState) {
 		autoScalerServer = &AutoScalerServerApp{
-			ResourceLimiter: &types.ResourceLimiter{
-				MinLimits: map[string]int64{constantes.ResourceNameCores: 1, constantes.ResourceNameMemory: 10000000},
-				MaxLimits: map[string]int64{constantes.ResourceNameCores: 5, constantes.ResourceNameMemory: 100000000},
-			},
+			kubeClient:           p,
+			ResourceLimiter:      c.GetResourceLimiter(),
 			Configuration:        &config,
 			Groups:               make(map[string]*AutoScalerServerNodeGroup),
 			KubeAdmConfiguration: kubeAdmConfig,
@@ -1346,7 +1347,9 @@ func StartServer(kubeConfig, saveState, configFileName string) {
 			}
 		}
 	} else {
-		autoScalerServer = &AutoScalerServerApp{}
+		autoScalerServer = &AutoScalerServerApp{
+			kubeClient: p,
+		}
 
 		if err := autoScalerServer.Load(phSavedState); err != nil {
 			log.Fatalf(constantes.ErrFailedToLoadServerState, err)
