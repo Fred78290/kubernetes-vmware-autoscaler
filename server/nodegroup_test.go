@@ -34,6 +34,10 @@ func (m mockupClientGenerator) CordonNode(nodeName string) error {
 	return nil
 }
 
+func (m mockupClientGenerator) SetProviderID(nodeName, providerID string) error {
+	return nil
+}
+
 func (m mockupClientGenerator) MarkDrainNode(nodeName string) error {
 	return nil
 }

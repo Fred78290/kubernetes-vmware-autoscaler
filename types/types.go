@@ -55,6 +55,7 @@ type ClientGenerator interface {
 
 	PodList(nodeName string, podFilter PodFilterFunc) ([]apiv1.Pod, error)
 	NodeList() (*apiv1.NodeList, error)
+	SetProviderID(nodeName, providerID string) error
 	UncordonNode(nodeName string) error
 	CordonNode(nodeName string) error
 	MarkDrainNode(nodeName string) error

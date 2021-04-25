@@ -321,6 +321,32 @@ func (p *SingletonClientGenerator) CordonNode(nodeName string) error {
 	return p.cordonOrUncordonNode(nodeName, true)
 }
 
+func (p *SingletonClientGenerator) SetProviderID(nodeName, providerID string) error {
+	var node *apiv1.Node
+	kubeclient, err := p.KubeClient()
+
+	if err != nil {
+		return err
+	}
+
+	ctx := p.newRequestContext()
+	defer ctx.Cancel()
+
+	if node, err = kubeclient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{}); err != nil {
+		return err
+	}
+
+	if node.Spec.ProviderID == providerID {
+		return nil
+	}
+
+	node.Spec.ProviderID = providerID
+
+	_, err = kubeclient.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{})
+
+	return err
+}
+
 func (p *SingletonClientGenerator) MarkDrainNode(nodeName string) error {
 	var node *apiv1.Node
 	now := metav1.Time{Time: time.Now()}

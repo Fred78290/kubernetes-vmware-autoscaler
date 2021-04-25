@@ -2,8 +2,6 @@ package server
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"strconv"
 	"strings"
 
@@ -61,39 +59,6 @@ type AutoScalerServerNode struct {
 
 func (s AutoScalerServerNodeState) String() string {
 	return autoScalerServerNodeStateString[s]
-}
-
-func (vm *AutoScalerServerNode) prepareKubelet() (string, error) {
-	var out string
-	var err error
-	var fName = fmt.Sprintf("/tmp/set-kubelet-default-%s.sh", vm.NodeName)
-
-	kubeletDefault := []string{
-		"#!/bin/bash",
-		". /etc/default/kubelet",
-		fmt.Sprintf("echo \"KUBELET_EXTRA_ARGS=\\\"$KUBELET_EXTRA_ARGS --provider-id=%s\\\"\" > /etc/default/kubelet", vm.ProviderID),
-		"systemctl restart kubelet",
-	}
-
-	if err = ioutil.WriteFile(fName, []byte(strings.Join(kubeletDefault, "\n")), 0755); err != nil {
-		return out, err
-	}
-
-	defer os.Remove(fName)
-
-	if err = utils.Scp(vm.serverConfig.SSH, vm.Addresses[0], fName, fName); err != nil {
-		glog.Errorf("Unable to scp node %s address:%s, reason:%s", vm.Addresses[0], vm.NodeName, err)
-
-		return out, err
-	}
-
-	if out, err = utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], fmt.Sprintf("bash %s", fName)); err != nil {
-		glog.Errorf("Unable to ssh node %s address:%s, reason:%s", vm.Addresses[0], vm.NodeName, err)
-
-		return out, err
-	}
-
-	return "", nil
 }
 
 func (vm *AutoScalerServerNode) waitReady(c types.ClientGenerator) error {
@@ -203,17 +168,13 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 
 		err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
 
-	} else if output, err = vm.syncFolders(); err != nil {
-
-		err = fmt.Errorf(constantes.ErrRsyncError, vm.NodeName, output, err)
-
-	} else if output, err = vm.prepareKubelet(); err != nil {
-
-		err = fmt.Errorf(constantes.ErrKubeletNotConfigured, vm.NodeName, output, err)
-
 	} else if err = vm.kubeAdmJoin(); err != nil {
 
 		err = fmt.Errorf(constantes.ErrKubeAdmJoinFailed, vm.NodeName, err)
+
+	} else if err = c.SetProviderID(vm.NodeName, vm.ProviderID); err != nil {
+
+		err = fmt.Errorf(constantes.ErrProviderIDNotConfigured, vm.NodeName, err)
 
 	} else if err = vm.waitReady(c); err != nil {
 
