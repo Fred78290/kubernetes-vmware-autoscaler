@@ -2,6 +2,7 @@ package vsphere
 
 import (
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
+	glog "github.com/sirupsen/logrus"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25"

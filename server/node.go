@@ -15,7 +15,7 @@ import (
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/vsphere"
-	"github.com/golang/glog"
+	glog "github.com/sirupsen/logrus"
 )
 
 // AutoScalerServerNodeState VM state
@@ -280,7 +280,7 @@ func (vm *AutoScalerServerNode) syncFolders() (string, error) {
 }
 
 func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabel) error {
-	glog.V(5).Infof("AutoScalerNode::launchVM, node:%s", vm.NodeName)
+	glog.Debugf("AutoScalerNode::launchVM, node:%s", vm.NodeName)
 
 	var err error
 	var status AutoScalerServerNodeState
@@ -354,7 +354,7 @@ func (vm *AutoScalerServerNode) launchVM(nodeLabels, systemLabels KubernetesLabe
 }
 
 func (vm *AutoScalerServerNode) startVM() error {
-	glog.V(5).Infof("AutoScalerNode::startVM, node:%s", vm.NodeName)
+	glog.Debugf("AutoScalerNode::startVM, node:%s", vm.NodeName)
 
 	var err error
 	var state AutoScalerServerNodeState
@@ -475,7 +475,7 @@ func (vm *AutoScalerServerNode) stopVM() error {
 }
 
 func (vm *AutoScalerServerNode) deleteVM() error {
-	glog.V(5).Infof("AutoScalerNode::deleteVM, node:%s", vm.NodeName)
+	glog.Debugf("AutoScalerNode::deleteVM, node:%s", vm.NodeName)
 
 	var err error
 	var status *vsphere.Status
@@ -542,7 +542,7 @@ func (vm *AutoScalerServerNode) deleteVM() error {
 }
 
 func (vm *AutoScalerServerNode) statusVM() (AutoScalerServerNodeState, error) {
-	glog.V(5).Infof("AutoScalerNode::statusVM, node:%s", vm.NodeName)
+	glog.Debugf("AutoScalerNode::statusVM, node:%s", vm.NodeName)
 
 	// Get VM infos
 	var status *vsphere.Status

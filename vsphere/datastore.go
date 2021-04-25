@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
+	glog "github.com/sirupsen/logrus"
 
 	"github.com/vmware/govmomi/govc/flags"
 	"github.com/vmware/govmomi/object"

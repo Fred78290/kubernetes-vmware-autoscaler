@@ -9,7 +9,7 @@ import (
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
-	"github.com/golang/glog"
+	glog "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 )
 
@@ -54,7 +54,7 @@ type AutoScalerServerNodeGroup struct {
 }
 
 func (g *AutoScalerServerNodeGroup) cleanup() error {
-	glog.V(5).Infof("AutoScalerServerNodeGroup::cleanup, nodeGroupID:%s", g.NodeGroupIdentifier)
+	glog.Debugf("AutoScalerServerNodeGroup::cleanup, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	var lastError error
 
@@ -62,7 +62,7 @@ func (g *AutoScalerServerNodeGroup) cleanup() error {
 
 	g.pendingNodesWG.Wait()
 
-	glog.V(5).Infof("AutoScalerServerNodeGroup::cleanup, nodeGroupID:%s, iterate node to delete", g.NodeGroupIdentifier)
+	glog.Debugf("AutoScalerServerNodeGroup::cleanup, nodeGroupID:%s, iterate node to delete", g.NodeGroupIdentifier)
 
 	for _, node := range g.Nodes {
 		if lastError = node.deleteVM(); lastError != nil {
@@ -78,13 +78,13 @@ func (g *AutoScalerServerNodeGroup) cleanup() error {
 }
 
 func (g *AutoScalerServerNodeGroup) targetSize() int {
-	glog.V(5).Infof("AutoScalerServerNodeGroup::targetSize, nodeGroupID:%s", g.NodeGroupIdentifier)
+	glog.Debugf("AutoScalerServerNodeGroup::targetSize, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	return len(g.pendingNodes) + len(g.Nodes)
 }
 
 func (g *AutoScalerServerNodeGroup) setNodeGroupSize(newSize int) error {
-	glog.V(5).Infof("AutoScalerServerNodeGroup::setNodeGroupSize, nodeGroupID:%s", g.NodeGroupIdentifier)
+	glog.Debugf("AutoScalerServerNodeGroup::setNodeGroupSize, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	var err error
 
@@ -104,7 +104,7 @@ func (g *AutoScalerServerNodeGroup) setNodeGroupSize(newSize int) error {
 }
 
 func (g *AutoScalerServerNodeGroup) refresh() {
-	glog.V(5).Infof("AutoScalerServerNodeGroup::refresh, nodeGroupID:%s", g.NodeGroupIdentifier)
+	glog.Debugf("AutoScalerServerNodeGroup::refresh, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	for _, node := range g.Nodes {
 		node.statusVM()
@@ -113,7 +113,7 @@ func (g *AutoScalerServerNodeGroup) refresh() {
 
 // delta must be negative!!!!
 func (g *AutoScalerServerNodeGroup) deleteNodes(delta int) error {
-	glog.V(5).Infof("AutoScalerServerNodeGroup::deleteNodes, nodeGroupID:%s", g.NodeGroupIdentifier)
+	glog.Debugf("AutoScalerServerNodeGroup::deleteNodes, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	var err error
 
@@ -142,7 +142,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodes(delta int) error {
 }
 
 func (g *AutoScalerServerNodeGroup) addNodes(delta int) error {
-	glog.V(5).Infof("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s", g.NodeGroupIdentifier)
+	glog.Debugf("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	tempNodes := make([]*AutoScalerServerNode, 0, delta)
 
@@ -150,7 +150,7 @@ func (g *AutoScalerServerNodeGroup) addNodes(delta int) error {
 
 	for nodeIndex := 0; nodeIndex < delta; nodeIndex++ {
 		if g.Status != NodegroupCreated {
-			glog.V(5).Infof("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s -> g.status != nodegroupCreated", g.NodeGroupIdentifier)
+			glog.Debugf("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s -> g.status != nodegroupCreated", g.NodeGroupIdentifier)
 			break
 		}
 
@@ -188,7 +188,7 @@ func (g *AutoScalerServerNodeGroup) addNodes(delta int) error {
 
 	for _, node := range tempNodes {
 		if g.Status != NodegroupCreated {
-			glog.V(5).Infof("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s -> g.status != nodegroupCreated", g.NodeGroupIdentifier)
+			glog.Debugf("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s -> g.status != nodegroupCreated", g.NodeGroupIdentifier)
 			break
 		}
 
@@ -342,7 +342,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(scaleDownDisabled bool, k
 }
 
 func (g *AutoScalerServerNodeGroup) deleteNodeByName(nodeName string) error {
-	glog.V(5).Infof("AutoScalerServerNodeGroup::deleteNodeByName, nodeGroupID:%s, nodeName:%s", g.NodeGroupIdentifier, nodeName)
+	glog.Debugf("AutoScalerServerNodeGroup::deleteNodeByName, nodeGroupID:%s, nodeName:%s", g.NodeGroupIdentifier, nodeName)
 
 	var err error
 
@@ -361,7 +361,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodeByName(nodeName string) error {
 }
 
 func (g *AutoScalerServerNodeGroup) setConfiguration(config *types.AutoScalerServerConfig) {
-	glog.V(5).Infof("AutoScalerServerNodeGroup::setConfiguration, nodeGroupID:%s", g.NodeGroupIdentifier)
+	glog.Debugf("AutoScalerServerNodeGroup::setConfiguration, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	g.configuration = config
 
@@ -371,7 +371,7 @@ func (g *AutoScalerServerNodeGroup) setConfiguration(config *types.AutoScalerSer
 }
 
 func (g *AutoScalerServerNodeGroup) deleteNodeGroup() error {
-	glog.V(5).Infof("AutoScalerServerNodeGroup::deleteNodeGroup, nodeGroupID:%s", g.NodeGroupIdentifier)
+	glog.Debugf("AutoScalerServerNodeGroup::deleteNodeGroup, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	return g.cleanup()
 }

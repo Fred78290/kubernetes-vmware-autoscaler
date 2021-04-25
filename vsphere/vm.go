@@ -10,6 +10,7 @@ import (
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
+	glog "github.com/sirupsen/logrus"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25"
