@@ -5,9 +5,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/golang/glog"
+	glog "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/vsphere"
@@ -121,7 +122,7 @@ func Test_getVM(t *testing.T) {
 	if testFeature("Test_getVM") {
 		config := loadFromJson(confName)
 
-		ctx := vsphere.NewContext(config.Timeout)
+		ctx := context.NewContext(config.Timeout)
 		defer ctx.Cancel()
 
 		vm, err := config.VirtualMachineWithContext(ctx, config.VM)
@@ -142,7 +143,7 @@ func Test_listVM(t *testing.T) {
 	if testFeature("Test_listVM") {
 		config := loadFromJson(confName)
 
-		ctx := vsphere.NewContext(config.Timeout)
+		ctx := context.NewContext(config.Timeout)
 		defer ctx.Cancel()
 
 		vms, err := config.VirtualMachineListWithContext(ctx)

@@ -1,7 +1,7 @@
 package vsphere
 
 import (
-	"github.com/golang/glog"
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25"
@@ -18,7 +18,7 @@ type Datacenter struct {
 }
 
 // Datacenter return a Datacenter
-func (dc *Datacenter) Datacenter(ctx *Context) *object.Datacenter {
+func (dc *Datacenter) Datacenter(ctx *context.Context) *object.Datacenter {
 	if d := ctx.Value(datacenterKey); d != nil {
 		return d.(*object.Datacenter)
 	}
@@ -42,7 +42,7 @@ func (dc *Datacenter) VimClient() *vim25.Client {
 }
 
 // NewFinder create a finder
-func (dc *Datacenter) NewFinder(ctx *Context) *find.Finder {
+func (dc *Datacenter) NewFinder(ctx *context.Context) *find.Finder {
 	d := object.NewDatacenter(dc.VimClient(), dc.Ref)
 	f := find.NewFinder(dc.VimClient(), true)
 	f.SetDatacenter(d)
@@ -51,7 +51,7 @@ func (dc *Datacenter) NewFinder(ctx *Context) *find.Finder {
 }
 
 // GetDatastore retrieve named datastore
-func (dc *Datacenter) GetDatastore(ctx *Context, name string) (*Datastore, error) {
+func (dc *Datacenter) GetDatastore(ctx *context.Context, name string) (*Datastore, error) {
 	var ds *object.Datastore
 	var err error
 

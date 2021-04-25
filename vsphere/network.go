@@ -2,7 +2,6 @@ package vsphere
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"encoding/binary"
 	"fmt"
@@ -10,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
@@ -165,7 +165,7 @@ func (net *Network) GetDeclaredExistingInterfaces() []*NetworkInterface {
 }
 
 // Devices return all devices
-func (net *Network) Devices(ctx *Context, devices object.VirtualDeviceList, dc *Datacenter) (object.VirtualDeviceList, error) {
+func (net *Network) Devices(ctx *context.Context, devices object.VirtualDeviceList, dc *Datacenter) (object.VirtualDeviceList, error) {
 	var err error
 	var device types.BaseVirtualDevice
 
@@ -194,7 +194,7 @@ func generateMacAddress() string {
 
 // See func (p DistributedVirtualPortgroup) EthernetCardBackingInfo(ctx context.Context) (types.BaseVirtualDeviceBackingInfo, error)
 // Lack permissions workaround
-func distributedVirtualPortgroupEthernetCardBackingInfo(ctx context.Context, p *object.DistributedVirtualPortgroup) (string, error) {
+func distributedVirtualPortgroupEthernetCardBackingInfo(ctx *context.Context, p *object.DistributedVirtualPortgroup) (string, error) {
 	var dvp mo.DistributedVirtualPortgroup
 
 	prop := "config.distributedVirtualSwitch"
@@ -208,7 +208,7 @@ func distributedVirtualPortgroupEthernetCardBackingInfo(ctx context.Context, p *
 
 // MatchInterface return if this interface match the virtual device
 // Due missing read permission, I can't create BackingInfo network card, so I use collected info to construct backing info
-func (net *NetworkInterface) MatchInterface(ctx *Context, dc *Datacenter, card *types.VirtualEthernetCard) (bool, error) {
+func (net *NetworkInterface) MatchInterface(ctx *context.Context, dc *Datacenter, card *types.VirtualEthernetCard) (bool, error) {
 
 	equal := false
 
@@ -303,7 +303,7 @@ func (net *NetworkInterface) SetMacAddress(device types.BaseVirtualDevice) types
 }
 
 // Reference return the network reference
-func (net *NetworkInterface) Reference(ctx *Context, dc *Datacenter) (object.NetworkReference, error) {
+func (net *NetworkInterface) Reference(ctx *context.Context, dc *Datacenter) (object.NetworkReference, error) {
 	var err error
 
 	if net.networkReference == nil {
@@ -317,7 +317,7 @@ func (net *NetworkInterface) Reference(ctx *Context, dc *Datacenter) (object.Net
 }
 
 // Device return a device
-func (net *NetworkInterface) Device(ctx *Context, dc *Datacenter) (types.BaseVirtualDevice, error) {
+func (net *NetworkInterface) Device(ctx *context.Context, dc *Datacenter) (types.BaseVirtualDevice, error) {
 	var backing types.BaseVirtualDeviceBackingInfo
 
 	network, err := net.Reference(ctx, dc)
