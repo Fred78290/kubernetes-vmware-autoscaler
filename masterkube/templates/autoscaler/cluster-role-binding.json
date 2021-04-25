@@ -18,6 +18,11 @@
             "kind": "ServiceAccount",
             "name": "cluster-autoscaler",
             "namespace": "kube-system"
+        },
+        {
+            "kind": "ServiceAccount",
+            "name": "vsphere-autoscaler",
+            "namespace": "kube-system"
         }
     ]
 }
