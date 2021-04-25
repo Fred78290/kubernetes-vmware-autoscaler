@@ -117,12 +117,12 @@ func Sudo(connect *types.AutoScalerServerSSH, host string, command ...string) (s
 
 	connection, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", host), sshConfig)
 	if err != nil {
-		return "", fmt.Errorf("Failed to dial: %s", err)
+		return "", fmt.Errorf("failed to dial: %s", err)
 	}
 
 	session, err := connection.NewSession()
 	if err != nil {
-		return "", fmt.Errorf("Failed to create session: %s", err)
+		return "", fmt.Errorf("failed to create session: %s", err)
 	}
 
 	defer session.Close()

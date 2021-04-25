@@ -157,7 +157,7 @@ func (ds *Datastore) vmFolder(ctx *context.Context, name string) (*object.Folder
 			}
 		}
 
-		return nil, fmt.Errorf("Folder %s not found", name)
+		return nil, fmt.Errorf("folder %s not found", name)
 	}
 
 	return f.DefaultFolder(ctx)
@@ -261,12 +261,15 @@ func (ds *Datastore) CreateVirtualMachine(ctx *context.Context, name, templateNa
 					customizationSpecManager := object.NewCustomizationSpecManager(ds.VimClient())
 					// check if customization specification exists
 					exists, err := customizationSpecManager.DoesCustomizationSpecExist(ctx, customization)
+
 					if err != nil {
 						return nil, err
 					}
-					if exists == false {
-						return nil, fmt.Errorf("Customization specification %s does not exists", customization)
+
+					if !exists {
+						return nil, fmt.Errorf("customization specification %s does not exists", customization)
 					}
+
 					// get the customization specification
 					customSpecItem, err := customizationSpecManager.GetCustomizationSpec(ctx, customization)
 					if err != nil {

@@ -49,13 +49,13 @@ func Copy(dst interface{}, src interface{}) error {
 	bytes, err := json.Marshal(src)
 
 	if err != nil {
-		return fmt.Errorf("Unable to marshal src: %s", err)
+		return fmt.Errorf("unable to marshal src: %s", err)
 	}
 
 	err = json.Unmarshal(bytes, dst)
 
 	if err != nil {
-		return fmt.Errorf("Unable to unmarshal into dst: %s", err)
+		return fmt.Errorf("unable to unmarshal into dst: %s", err)
 	}
 
 	return nil
@@ -84,7 +84,7 @@ func (conf *Configuration) Clone(nodeIndex int) (*Configuration, error) {
 
 	if dup.Network != nil {
 		for _, inf := range dup.Network.Interfaces {
-			if inf.DHCP == false {
+			if !inf.DHCP {
 				ip := net.ParseIP(inf.IPAddress)
 				address := ip.To4()
 				address[3] += byte(nodeIndex)

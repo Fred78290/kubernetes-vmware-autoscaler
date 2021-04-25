@@ -196,7 +196,7 @@ func (vm *VirtualMachine) addHardDrive(ctx *context.Context, virtualMachine *obj
 
 				if len(existingDevices.SelectByBackingInfo(disk.Backing)) != 0 {
 
-					err = fmt.Errorf("Disk %s already exists", drivePath)
+					err = fmt.Errorf("disk %s already exists", drivePath)
 
 				} else {
 
@@ -333,7 +333,7 @@ func (vm *VirtualMachine) WaitForToolsRunning(ctx *context.Context) (bool, error
 		if powerState == types.VirtualMachinePowerStatePoweredOn {
 			running, err = vm.waitForToolsRunning(ctx, v)
 		} else {
-			err = fmt.Errorf("The VM: %s is not powered", v.InventoryPath)
+			err = fmt.Errorf("the VM: %s is not powered", v.InventoryPath)
 		}
 	}
 
@@ -362,7 +362,7 @@ func (vm *VirtualMachine) WaitForIP(ctx *context.Context) (string, error) {
 		if powerState == types.VirtualMachinePowerStatePoweredOn {
 			ip, err = vm.waitForIP(ctx, v)
 		} else {
-			err = fmt.Errorf("The VM: %s is not powered", v.InventoryPath)
+			err = fmt.Errorf("the VM: %s is not powered", v.InventoryPath)
 		}
 	}
 
@@ -383,7 +383,7 @@ func (vm *VirtualMachine) PowerOn(ctx *context.Context) error {
 				err = task.Wait(ctx)
 			}
 		} else {
-			err = fmt.Errorf("The VM: %s is already powered", v.InventoryPath)
+			err = fmt.Errorf("the VM: %s is already powered", v.InventoryPath)
 		}
 	}
 
@@ -404,7 +404,7 @@ func (vm *VirtualMachine) PowerOff(ctx *context.Context) error {
 				err = task.Wait(ctx)
 			}
 		} else {
-			err = fmt.Errorf("The VM: %s is already off", v.InventoryPath)
+			err = fmt.Errorf("the VM: %s is already off", v.InventoryPath)
 		}
 	}
 
@@ -427,7 +427,7 @@ func (vm *VirtualMachine) ShutdownGuest(ctx *context.Context) error {
 				}
 			}
 		} else {
-			err = fmt.Errorf("The VM: %s is already power off", v.InventoryPath)
+			err = fmt.Errorf("the VM: %s is already power off", v.InventoryPath)
 		}
 	}
 
@@ -448,7 +448,7 @@ func (vm *VirtualMachine) Delete(ctx *context.Context) error {
 				err = task.Wait(ctx)
 			}
 		} else {
-			err = fmt.Errorf("The VM: %s is powered", v.InventoryPath)
+			err = fmt.Errorf("the VM: %s is powered", v.InventoryPath)
 		}
 	}
 
@@ -456,7 +456,7 @@ func (vm *VirtualMachine) Delete(ctx *context.Context) error {
 }
 
 // Status refresh status virtual machine
-func (vm *VirtualMachine) Status(ctx *Context) (*Status, error) {
+func (vm *VirtualMachine) Status(ctx *context.Context) (*Status, error) {
 	var powerState types.VirtualMachinePowerState
 	var err error
 	var status *Status
@@ -487,7 +487,7 @@ func (vm *VirtualMachine) SetGuestInfo(ctx *context.Context, guestInfos *GuestIn
 	vmConfigSpec := types.VirtualMachineConfigSpec{}
 	v := vm.VirtualMachine(ctx)
 
-	if guestInfos != nil && guestInfos.isEmpty() == false {
+	if guestInfos != nil && !guestInfos.isEmpty() {
 		vmConfigSpec.ExtraConfig = guestInfos.toExtraConfig()
 	} else {
 		vmConfigSpec.ExtraConfig = []types.BaseOptionValue{}

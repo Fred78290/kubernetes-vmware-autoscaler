@@ -170,7 +170,7 @@ func (net *Network) Devices(ctx *context.Context, devices object.VirtualDeviceLi
 	var device types.BaseVirtualDevice
 
 	for _, n := range net.Interfaces {
-		if n.Existing == false {
+		if !n.Existing {
 			if device, err = n.Device(ctx, dc); err == nil {
 				devices = append(devices, n.SetMacAddress(device))
 			} else {
