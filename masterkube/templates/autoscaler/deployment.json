@@ -29,6 +29,23 @@
                 "nodeSelector": {
                     "master": "true"
                 },
+                "initContainers": [
+                    {
+                        "image": "busybox",
+                        "name": "cluster-autoscaler-init",
+                        "command":[
+                            "/bin/sh",
+                            "-c",
+                            "rm -f /var/run/cluster-autoscaler/vmware.sock"
+                        ],
+                        "volumeMounts": [
+                            {
+                                "name": "cluster-socket",
+                                "mountPath": "/var/run/cluster-autoscaler"
+                            }
+                        ]
+                    }
+                ],
                 "containers": [
                     {
                         "image": "$REGISTRY/vsphere-autoscaler:v1.21.0",
