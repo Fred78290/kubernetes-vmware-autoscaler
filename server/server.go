@@ -9,15 +9,11 @@ import (
 	"os"
 	"time"
 
-	"k8s.io/client-go/util/homedir"
-
-	apigrc "github.com/Fred78290/kubernetes-vmware-autoscaler/grpc"
-
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	apigrpc "github.com/Fred78290/kubernetes-vmware-autoscaler/grpc"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
-	"github.com/golang/glog"
+	glog "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	apiv1 "k8s.io/api/core/v1"
@@ -31,6 +27,7 @@ type AutoScalerServerApp struct {
 	KubeAdmConfiguration *apigrpc.KubeAdmConfig                `json:"kubeadm"`
 	NodesDefinition      []*apigrpc.NodeGroupDef               `json:"nodedefs"`
 	AutoProvision        bool                                  `json:"auto"`
+	kubeClient           types.ClientGenerator
 }
 
 //var phAutoScalerServer *AutoScalerServerApp
@@ -87,7 +84,7 @@ func (s *AutoScalerServerApp) deleteNodeGroup(nodeGroupID string) error {
 
 	glog.Infof("Delete node group, ID:%s", nodeGroupID)
 
-	if err := nodeGroup.deleteNodeGroup(); err != nil {
+	if err := nodeGroup.deleteNodeGroup(s.kubeClient); err != nil {
 		glog.Errorf(constantes.ErrUnableToDeleteNodeGroup, nodeGroupID, err)
 		return err
 	}
@@ -111,7 +108,7 @@ func (s *AutoScalerServerApp) createNodeGroup(nodeGroupID string) (*AutoScalerSe
 
 			glog.Infof("Create node group, ID:%s", nodeGroupID)
 
-			if err := nodeGroup.addNodes(nodeGroup.MinNodeSize); err != nil {
+			if err := nodeGroup.addNodes(s.kubeClient, nodeGroup.MinNodeSize); err != nil {
 				glog.Errorf(err.Error())
 
 				return nil, err
@@ -125,7 +122,7 @@ func (s *AutoScalerServerApp) createNodeGroup(nodeGroupID string) (*AutoScalerSe
 }
 
 func (s *AutoScalerServerApp) doAutoProvision() error {
-	glog.V(5).Info("Call server doAutoProvision")
+	glog.Debug("Call server doAutoProvision")
 
 	var ng *AutoScalerServerNodeGroup
 	var err error
@@ -137,7 +134,10 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 			ng = s.Groups[nodeGroupIdentifier]
 
 			if ng == nil {
-				systemLabels := make(map[string]string)
+				systemLabels := map[string]string{
+					constantes.NodeLabelWorkerRole: "",
+				}
+
 				labels := map[string]string{
 					constantes.NodeLabelGroupName: nodeGroupIdentifier,
 				}
@@ -151,10 +151,10 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 
 				glog.Infof("Auto provision for nodegroup:%s, minSize:%d, maxSize:%d", nodeGroupIdentifier, node.MinSize, node.MaxSize)
 
-				if ng, err = s.newNodeGroup(nodeGroupIdentifier, node.MinSize, node.MaxSize, s.Configuration.DefaultMachineType, labels, systemLabels, true); err == nil {
+				if _, err = s.newNodeGroup(nodeGroupIdentifier, node.MinSize, node.MaxSize, s.Configuration.DefaultMachineType, labels, systemLabels, true); err == nil {
 					if ng, err = s.createNodeGroup(nodeGroupIdentifier); err == nil {
 						if node.GetIncludeExistingNode() {
-							if err = ng.autoDiscoveryNodes(true, s.Configuration.KubeConfig); err == nil {
+							if err = ng.autoDiscoveryNodes(s.kubeClient, true); err == nil {
 								return err
 							}
 						}
@@ -167,7 +167,7 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 			} else {
 				// If the nodegroup already exists, reparse nodes
 				if node.GetIncludeExistingNode() {
-					if err = ng.autoDiscoveryNodes(true, s.Configuration.KubeConfig); err == nil {
+					if err = ng.autoDiscoveryNodes(s.kubeClient, true); err == nil {
 						return err
 					}
 				}
@@ -180,7 +180,7 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 
 // Connect allows client to connect
 func (s *AutoScalerServerApp) Connect(ctx context.Context, request *apigrpc.ConnectRequest) (*apigrpc.ConnectReply, error) {
-	glog.V(5).Infof("Call server Connect: %v", request)
+	glog.Debugf("Call server Connect: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -218,7 +218,7 @@ func (s *AutoScalerServerApp) Connect(ctx context.Context, request *apigrpc.Conn
 
 // Name returns name of the cloud provider.
 func (s *AutoScalerServerApp) Name(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.NameReply, error) {
-	glog.V(5).Infof("Call server Name: %v", request)
+	glog.Debugf("Call server Name: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -232,7 +232,7 @@ func (s *AutoScalerServerApp) Name(ctx context.Context, request *apigrpc.CloudPr
 
 // NodeGroups returns all node groups configured for this cloud provider.
 func (s *AutoScalerServerApp) NodeGroups(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.NodeGroupsReply, error) {
-	glog.V(5).Infof("Call server NodeGroups: %v", request)
+	glog.Debugf("Call server NodeGroups: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -283,7 +283,7 @@ func (s *AutoScalerServerApp) nodeGroupForNode(providerID string) (*AutoScalerSe
 // should not be processed by cluster autoscaler, or non-nil error if such
 // occurred. Must be implemented.
 func (s *AutoScalerServerApp) NodeGroupForNode(ctx context.Context, request *apigrpc.NodeGroupForNodeRequest) (*apigrpc.NodeGroupForNodeReply, error) {
-	glog.V(5).Infof("Call server NodeGroupForNode: %v", request)
+	glog.Debugf("Call server NodeGroupForNode: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -308,7 +308,7 @@ func (s *AutoScalerServerApp) NodeGroupForNode(ctx context.Context, request *api
 	providerID := utils.GetNodeProviderID(s.Configuration.ProviderID, node)
 
 	if len(providerID) == 0 {
-		glog.V(5).Info("node.Spec.ProviderID is empty")
+		glog.Debug("node.Spec.ProviderID is empty")
 		return &apigrpc.NodeGroupForNodeReply{
 			Response: &apigrpc.NodeGroupForNodeReply_NodeGroup{
 				NodeGroup: &apigrpc.NodeGroup{},
@@ -351,7 +351,7 @@ func (s *AutoScalerServerApp) NodeGroupForNode(ctx context.Context, request *api
 // Pricing returns pricing model for this cloud provider or error if not available.
 // Implementation optional.
 func (s *AutoScalerServerApp) Pricing(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.PricingModelReply, error) {
-	glog.V(5).Infof("Call server Pricing: %v", request)
+	glog.Debugf("Call server Pricing: %v", request)
 
 	if s.Configuration.Optionals.Pricing {
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
@@ -374,7 +374,7 @@ func (s *AutoScalerServerApp) Pricing(ctx context.Context, request *apigrpc.Clou
 // GetAvailableMachineTypes get all machine types that can be requested from the cloud provider.
 // Implementation optional.
 func (s *AutoScalerServerApp) GetAvailableMachineTypes(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.AvailableMachineTypesReply, error) {
-	glog.V(5).Infof("Call server GetAvailableMachineTypes: %v", request)
+	glog.Debugf("Call server GetAvailableMachineTypes: %v", request)
 
 	if s.Configuration.Optionals.GetAvailableMachineTypes {
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
@@ -404,7 +404,7 @@ func (s *AutoScalerServerApp) GetAvailableMachineTypes(ctx context.Context, requ
 // created on the cloud provider side. The node group is not returned by NodeGroups() until it is created.
 // Implementation optional.
 func (s *AutoScalerServerApp) NewNodeGroup(ctx context.Context, request *apigrpc.NewNodeGroupRequest) (*apigrpc.NewNodeGroupReply, error) {
-	glog.V(5).Infof("Call server NewNodeGroup: %v", request)
+	glog.Debugf("Call server NewNodeGroup: %v", request)
 
 	if s.Configuration.Optionals.NewNodeGroup {
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
@@ -435,14 +435,16 @@ func (s *AutoScalerServerApp) NewNodeGroup(ctx context.Context, request *apigrpc
 	labels := make(map[string]string)
 	systemLabels := make(map[string]string)
 
-	if request.GetLabels() != nil {
-		for k2, v2 := range request.GetLabels() {
+	systemLabels[constantes.NodeLabelWorkerRole] = ""
+
+	if reqLabels := request.GetLabels(); reqLabels != nil {
+		for k2, v2 := range reqLabels {
 			labels[k2] = v2
 		}
 	}
 
-	if request.GetSystemLabels() != nil {
-		for k2, v2 := range request.GetSystemLabels() {
+	if reqSystemLabels := request.GetSystemLabels(); reqSystemLabels != nil {
+		for k2, v2 := range reqSystemLabels {
 			systemLabels[k2] = v2
 		}
 	}
@@ -481,7 +483,7 @@ func (s *AutoScalerServerApp) NewNodeGroup(ctx context.Context, request *apigrpc
 
 // GetResourceLimiter returns struct containing limits (max, min) for resources (cores, memory etc.).
 func (s *AutoScalerServerApp) GetResourceLimiter(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.ResourceLimiterReply, error) {
-	glog.V(5).Infof("Call server GetResourceLimiter: %v", request)
+	glog.Debugf("Call server GetResourceLimiter: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -500,7 +502,7 @@ func (s *AutoScalerServerApp) GetResourceLimiter(ctx context.Context, request *a
 
 // GPULabel returns the label added to nodes with GPU resource.
 func (s *AutoScalerServerApp) GPULabel(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.GPULabelReply, error) {
-	glog.V(5).Infof("Call server GPULabel: %v", request)
+	glog.Debugf("Call server GPULabel: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -516,7 +518,7 @@ func (s *AutoScalerServerApp) GPULabel(ctx context.Context, request *apigrpc.Clo
 
 // GetAvailableGPUTypes return all available GPU types cloud provider supports.
 func (s *AutoScalerServerApp) GetAvailableGPUTypes(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.GetAvailableGPUTypesReply, error) {
-	glog.V(5).Infof("Call server GetAvailableGPUTypes: %v", request)
+	glog.Debugf("Call server GetAvailableGPUTypes: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -532,7 +534,7 @@ func (s *AutoScalerServerApp) GetAvailableGPUTypes(ctx context.Context, request 
 
 // Cleanup cleans up open resources before the cloud provider is destroyed, i.e. go routines etc.
 func (s *AutoScalerServerApp) Cleanup(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.CleanupReply, error) {
-	glog.V(5).Infof("Call server Cleanup: %v", request)
+	glog.Debugf("Call server Cleanup: %v", request)
 
 	var lastError *apigrpc.Error
 
@@ -542,7 +544,7 @@ func (s *AutoScalerServerApp) Cleanup(ctx context.Context, request *apigrpc.Clou
 	}
 
 	for _, nodeGroup := range s.Groups {
-		if err := nodeGroup.cleanup(); err != nil {
+		if err := nodeGroup.cleanup(s.kubeClient); err != nil {
 			lastError = &apigrpc.Error{
 				Code:   constantes.CloudProviderError,
 				Reason: err.Error(),
@@ -550,7 +552,7 @@ func (s *AutoScalerServerApp) Cleanup(ctx context.Context, request *apigrpc.Clou
 		}
 	}
 
-	glog.V(5).Info("Leave server Cleanup, done")
+	glog.Debug("Leave server Cleanup, done")
 
 	s.Groups = make(map[string]*AutoScalerServerNodeGroup)
 
@@ -562,7 +564,7 @@ func (s *AutoScalerServerApp) Cleanup(ctx context.Context, request *apigrpc.Clou
 // Refresh is called before every main loop and can be used to dynamically update cloud provider state.
 // In particular the list of node groups returned by NodeGroups can change as a result of CloudProvider.Refresh().
 func (s *AutoScalerServerApp) Refresh(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.RefreshReply, error) {
-	glog.V(5).Infof("Call server Refresh: %v", request)
+	glog.Debugf("Call server Refresh: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -586,7 +588,7 @@ func (s *AutoScalerServerApp) Refresh(ctx context.Context, request *apigrpc.Clou
 
 // MaxSize returns maximum size of the node group.
 func (s *AutoScalerServerApp) MaxSize(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.MaxSizeReply, error) {
-	glog.V(5).Infof("Call server MaxSize: %v", request)
+	glog.Debugf("Call server MaxSize: %v", request)
 
 	var maxSize int
 
@@ -610,7 +612,7 @@ func (s *AutoScalerServerApp) MaxSize(ctx context.Context, request *apigrpc.Node
 
 // MinSize returns minimum size of the node group.
 func (s *AutoScalerServerApp) MinSize(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.MinSizeReply, error) {
-	glog.V(5).Infof("Call server MinSize: %v", request)
+	glog.Debugf("Call server MinSize: %v", request)
 
 	var minSize int
 
@@ -636,7 +638,7 @@ func (s *AutoScalerServerApp) MinSize(ctx context.Context, request *apigrpc.Node
 // to Size() once everything stabilizes (new nodes finish startup and registration or
 // removed nodes are deleted completely). Implementation required.
 func (s *AutoScalerServerApp) TargetSize(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.TargetSizeReply, error) {
-	glog.V(5).Infof("Call server TargetSize: %v", request)
+	glog.Debugf("Call server TargetSize: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -669,7 +671,7 @@ func (s *AutoScalerServerApp) TargetSize(ctx context.Context, request *apigrpc.N
 // to explicitly name it and use DeleteNode. This function should wait until
 // node group size is updated. Implementation required.
 func (s *AutoScalerServerApp) IncreaseSize(ctx context.Context, request *apigrpc.IncreaseSizeRequest) (*apigrpc.IncreaseSizeReply, error) {
-	glog.V(5).Infof("Call server IncreaseSize: %v", request)
+	glog.Debugf("Call server IncreaseSize: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -713,7 +715,7 @@ func (s *AutoScalerServerApp) IncreaseSize(ctx context.Context, request *apigrpc
 		}, nil
 	}
 
-	err := nodeGroup.setNodeGroupSize(newSize)
+	err := nodeGroup.setNodeGroupSize(s.kubeClient, newSize)
 
 	if err != nil {
 		return &apigrpc.IncreaseSizeReply{
@@ -733,7 +735,7 @@ func (s *AutoScalerServerApp) IncreaseSize(ctx context.Context, request *apigrpc
 // failure or if the given node doesn't belong to this node group. This function
 // should wait until node group size is updated. Implementation required.
 func (s *AutoScalerServerApp) DeleteNodes(ctx context.Context, request *apigrpc.DeleteNodesRequest) (*apigrpc.DeleteNodesReply, error) {
-	glog.V(5).Infof("Call server DeleteNodes: %v", request)
+	glog.Debugf("Call server DeleteNodes: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -805,9 +807,9 @@ func (s *AutoScalerServerApp) DeleteNodes(ctx context.Context, request *apigrpc.
 		}
 
 		// Delete the node in the group
-		nodeName, err = utils.NodeNameFromProviderID(s.Configuration.ProviderID, nodeName)
+		nodeName, _ = utils.NodeNameFromProviderID(s.Configuration.ProviderID, nodeName)
 
-		err = nodeGroup.deleteNodeByName(nodeName)
+		err = nodeGroup.deleteNodeByName(s.kubeClient, nodeName)
 
 		if err != nil {
 			return &apigrpc.DeleteNodesReply{
@@ -830,7 +832,7 @@ func (s *AutoScalerServerApp) DeleteNodes(ctx context.Context, request *apigrpc.
 // It is assumed that cloud provider will not delete the existing nodes when there
 // is an option to just decrease the target. Implementation required.
 func (s *AutoScalerServerApp) DecreaseTargetSize(ctx context.Context, request *apigrpc.DecreaseTargetSizeRequest) (*apigrpc.DecreaseTargetSizeReply, error) {
-	glog.V(5).Infof("Call server DecreaseTargetSize: %v", request)
+	glog.Debugf("Call server DecreaseTargetSize: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -874,7 +876,7 @@ func (s *AutoScalerServerApp) DecreaseTargetSize(ctx context.Context, request *a
 		}, nil
 	}
 
-	err := nodeGroup.setNodeGroupSize(newSize)
+	err := nodeGroup.setNodeGroupSize(s.kubeClient, newSize)
 
 	if err != nil {
 		return &apigrpc.DecreaseTargetSizeReply{
@@ -892,7 +894,7 @@ func (s *AutoScalerServerApp) DecreaseTargetSize(ctx context.Context, request *a
 
 // Id returns an unique identifier of the node group.
 func (s *AutoScalerServerApp) Id(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.IdReply, error) {
-	glog.V(5).Infof("Call server Id: %v", request)
+	glog.Debugf("Call server Id: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -913,7 +915,7 @@ func (s *AutoScalerServerApp) Id(ctx context.Context, request *apigrpc.NodeGroup
 
 // Debug returns a string containing all information regarding this node group.
 func (s *AutoScalerServerApp) Debug(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.DebugReply, error) {
-	glog.V(5).Infof("Call server Debug: %v", request)
+	glog.Debugf("Call server Debug: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -937,7 +939,7 @@ func (s *AutoScalerServerApp) Debug(ctx context.Context, request *apigrpc.NodeGr
 // It is required that Instance objects returned by this method have Id field set.
 // Other fields are optional.
 func (s *AutoScalerServerApp) Nodes(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.NodesReply, error) {
-	glog.V(5).Infof("Call server Nodes: %v", request)
+	glog.Debugf("Call server Nodes: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -987,7 +989,7 @@ func (s *AutoScalerServerApp) Nodes(ctx context.Context, request *apigrpc.NodeGr
 // capacity and allocatable information as well as all pods that are started on
 // the node by default, using manifest (most likely only kube-proxy). Implementation optional.
 func (s *AutoScalerServerApp) TemplateNodeInfo(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.TemplateNodeInfoReply, error) {
-	glog.V(5).Infof("Call server TemplateNodeInfo: %v", request)
+	glog.Debugf("Call server TemplateNodeInfo: %v", request)
 
 	if s.Configuration.Optionals.TemplateNodeInfo {
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
@@ -1030,7 +1032,7 @@ func (s *AutoScalerServerApp) TemplateNodeInfo(ctx context.Context, request *api
 // Exist checks if the node group really exists on the cloud provider side. Allows to tell the
 // theoretical node group from the real one. Implementation required.
 func (s *AutoScalerServerApp) Exist(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.ExistReply, error) {
-	glog.V(5).Infof("Call server Exist: %v", request)
+	glog.Debugf("Call server Exist: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -1046,7 +1048,7 @@ func (s *AutoScalerServerApp) Exist(ctx context.Context, request *apigrpc.NodeGr
 
 // Create creates the node group on the cloud provider side. Implementation optional.
 func (s *AutoScalerServerApp) Create(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.CreateReply, error) {
-	glog.V(5).Infof("Call server Create: %v", request)
+	glog.Debugf("Call server Create: %v", request)
 
 	if s.Configuration.Optionals.Create {
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
@@ -1085,7 +1087,7 @@ func (s *AutoScalerServerApp) Create(ctx context.Context, request *apigrpc.NodeG
 // This will be executed only for autoprovisioned node groups, once their size drops to 0.
 // Implementation optional.
 func (s *AutoScalerServerApp) Delete(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.DeleteReply, error) {
-	glog.V(5).Infof("Call server Delete: %v", request)
+	glog.Debugf("Call server Delete: %v", request)
 
 	if s.Configuration.Optionals.Delete {
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
@@ -1116,7 +1118,7 @@ func (s *AutoScalerServerApp) Delete(ctx context.Context, request *apigrpc.NodeG
 // Autoprovisioned returns true if the node group is autoprovisioned. An autoprovisioned group
 // was created by CA and can be deleted when scaled to 0.
 func (s *AutoScalerServerApp) Autoprovisioned(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.AutoprovisionedReply, error) {
-	glog.V(5).Infof("Call server Autoprovisioned: %v", request)
+	glog.Debugf("Call server Autoprovisioned: %v", request)
 
 	var b bool
 
@@ -1138,7 +1140,7 @@ func (s *AutoScalerServerApp) Autoprovisioned(ctx context.Context, request *apig
 
 // Belongs returns true if the given node belongs to the NodeGroup.
 func (s *AutoScalerServerApp) Belongs(ctx context.Context, request *apigrpc.BelongsRequest) (*apigrpc.BelongsReply, error) {
-	glog.V(5).Infof("Call server Belongs: %v", request)
+	glog.Debugf("Call server Belongs: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -1161,7 +1163,7 @@ func (s *AutoScalerServerApp) Belongs(ctx context.Context, request *apigrpc.Belo
 	}
 
 	providerID := utils.GetNodeProviderID(s.Configuration.ProviderID, node)
-	nodeGroup, err := s.nodeGroupForNode(providerID)
+	nodeGroup, _ := s.nodeGroupForNode(providerID)
 
 	var belong bool
 
@@ -1194,7 +1196,7 @@ func (s *AutoScalerServerApp) Belongs(ctx context.Context, request *apigrpc.Belo
 // NodePrice returns a price of running the given node for a given period of time.
 // All prices returned by the structure should be in the same currency.
 func (s *AutoScalerServerApp) NodePrice(ctx context.Context, request *apigrpc.NodePriceRequest) (*apigrpc.NodePriceReply, error) {
-	glog.V(5).Infof("Call server NodePrice: %v", request)
+	glog.Debugf("Call server NodePrice: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -1211,7 +1213,7 @@ func (s *AutoScalerServerApp) NodePrice(ctx context.Context, request *apigrpc.No
 // PodPrice returns a theoretical minimum price of running a pod for a given
 // period of time on a perfectly matching machine.
 func (s *AutoScalerServerApp) PodPrice(ctx context.Context, request *apigrpc.PodPriceRequest) (*apigrpc.PodPriceReply, error) {
-	glog.V(5).Infof("Call server PodPrice: %v", request)
+	glog.Debugf("Call server PodPrice: %v", request)
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
@@ -1285,17 +1287,12 @@ func (s *AutoScalerServerApp) Load(fileName string) error {
 }
 
 // StartServer start the service
-func StartServer(kubeConfig, saveState, configFileName string) {
+func StartServer(p types.ClientGenerator, c *types.Config) {
 	var config types.AutoScalerServerConfig
 	var autoScalerServer *AutoScalerServerApp
 
-	if len(kubeConfig) == 0 {
-		kubeConfig = fmt.Sprintf("%s/.kube/config", homedir.HomeDir())
-	}
-
-	if _, err := os.Stat(kubeConfig); err != nil {
-		glog.Fatalf(fmt.Sprintf("Can't stat kubeconfig:%s, error:%v", kubeConfig, err))
-	}
+	saveState := c.SaveLocation
+	configFileName := c.Config
 
 	if len(saveState) > 0 {
 		phSavedState = saveState
@@ -1313,7 +1310,9 @@ func StartServer(kubeConfig, saveState, configFileName string) {
 		glog.Fatalf("failed to decode config file:%s, error:%v", configFileName, err)
 	}
 
-	config.KubeConfig = kubeConfig
+	if _, err = p.KubeClient(); err != nil {
+		glog.Fatalf("failed to get kubernetes client, error:%v", configFileName, err)
+	}
 
 	if config.Optionals == nil {
 		config.Optionals = &types.AutoScalerServerOptionals{
@@ -1326,19 +1325,17 @@ func StartServer(kubeConfig, saveState, configFileName string) {
 		}
 	}
 
-	kubeAdmConfig := &apigrc.KubeAdmConfig{
+	kubeAdmConfig := &apigrpc.KubeAdmConfig{
 		KubeAdmAddress:        config.KubeAdm.Address,
 		KubeAdmToken:          config.KubeAdm.Token,
 		KubeAdmCACert:         config.KubeAdm.CACert,
 		KubeAdmExtraArguments: config.KubeAdm.ExtraArguments,
 	}
 
-	if phSaveState == false || utils.FileExists(phSavedState) == false {
+	if !phSaveState || !utils.FileExists(phSavedState) {
 		autoScalerServer = &AutoScalerServerApp{
-			ResourceLimiter: &types.ResourceLimiter{
-				MinLimits: map[string]int64{constantes.ResourceNameCores: 1, constantes.ResourceNameMemory: 10000000},
-				MaxLimits: map[string]int64{constantes.ResourceNameCores: 5, constantes.ResourceNameMemory: 100000000},
-			},
+			kubeClient:           p,
+			ResourceLimiter:      c.GetResourceLimiter(),
 			Configuration:        &config,
 			Groups:               make(map[string]*AutoScalerServerNodeGroup),
 			KubeAdmConfiguration: kubeAdmConfig,
@@ -1350,7 +1347,9 @@ func StartServer(kubeConfig, saveState, configFileName string) {
 			}
 		}
 	} else {
-		autoScalerServer = &AutoScalerServerApp{}
+		autoScalerServer = &AutoScalerServerApp{
+			kubeClient: p,
+		}
 
 		if err := autoScalerServer.Load(phSavedState); err != nil {
 			log.Fatalf(constantes.ErrFailedToLoadServerState, err)
@@ -1369,9 +1368,9 @@ func StartServer(kubeConfig, saveState, configFileName string) {
 
 	defer server.Stop()
 
-	apigrc.RegisterCloudProviderServiceServer(server, autoScalerServer)
-	apigrc.RegisterNodeGroupServiceServer(server, autoScalerServer)
-	apigrc.RegisterPricingModelServiceServer(server, autoScalerServer)
+	apigrpc.RegisterCloudProviderServiceServer(server, autoScalerServer)
+	apigrpc.RegisterNodeGroupServiceServer(server, autoScalerServer)
+	apigrpc.RegisterPricingModelServiceServer(server, autoScalerServer)
 
 	reflection.Register(server)
 
@@ -1380,5 +1379,4 @@ func StartServer(kubeConfig, saveState, configFileName string) {
 	}
 
 	glog.Infof("End listening server")
-	glog.Flush()
 }

@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"os/exec"
 	"strings"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
-	"github.com/golang/glog"
+	glog "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -42,56 +41,6 @@ func AuthMethodFromPrivateKey(key string) ssh.AuthMethod {
 	return nil
 }
 
-// Pipe execute local command and return output
-func Pipe(args ...string) (string, error) {
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	glog.V(5).Infof("Shell:%v", args)
-
-	cmd := exec.Command(args[0], args[1:]...)
-
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		s := strings.TrimSpace(stderr.String())
-
-		return s, fmt.Errorf("%s, %s", err.Error(), s)
-	}
-
-	return strings.TrimSpace(stdout.String()), nil
-}
-
-// Shell execute local command ignore output
-func Shell(args ...string) error {
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	glog.V(5).Infof("Shell:%v", args)
-
-	cmd := exec.Command(args[0], args[1:]...)
-
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("%s, %s", err.Error(), strings.TrimSpace(stderr.String()))
-	}
-
-	return nil
-}
-
-// Scp copy file
-func Scp(connect *types.AutoScalerServerSSH, host, src, dst string) error {
-	return Shell("scp",
-		"-i", connect.GetAuthKeys(),
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "UserKnownHostsFile=/dev/null",
-		src,
-		fmt.Sprintf("%s@%s:%s", connect.GetUserName(), host, dst))
-}
-
 // Sudo exec ssh command as sudo
 func Sudo(connect *types.AutoScalerServerSSH, host string, command ...string) (string, error) {
 	var sshConfig *ssh.ClientConfig
@@ -117,12 +66,12 @@ func Sudo(connect *types.AutoScalerServerSSH, host string, command ...string) (s
 
 	connection, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", host), sshConfig)
 	if err != nil {
-		return "", fmt.Errorf("Failed to dial: %s", err)
+		return "", fmt.Errorf("failed to dial: %s", err)
 	}
 
 	session, err := connection.NewSession()
 	if err != nil {
-		return "", fmt.Errorf("Failed to create session: %s", err)
+		return "", fmt.Errorf("failed to create session: %s", err)
 	}
 
 	defer session.Close()
@@ -140,7 +89,7 @@ func Sudo(connect *types.AutoScalerServerSSH, host string, command ...string) (s
 	var stdout bytes.Buffer
 
 	for _, cmd := range command {
-		glog.V(5).Infof("Shell:%s", cmd)
+		glog.Debugf("Shell:%s", cmd)
 
 		if out, err := session.CombinedOutput(fmt.Sprintf("sudo %s", cmd)); err != nil {
 			return "", err

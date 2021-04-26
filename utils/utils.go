@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
-	"github.com/golang/glog"
+	glog "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 )
 

@@ -4,6 +4,7 @@
 # It will generate:
 # Custom vmware image with every thing for kubernetes
 # Config file to deploy the cluster autoscaler.
+# kubectl run busybox --rm -ti --image=busybox -n kube-public /bin/sh
 
 set -e
 
@@ -16,6 +17,7 @@ export PROVIDERID="${SCHEME}://${NODEGROUP_NAME}/object?type=node&name=${MASTERK
 export SSH_PRIVATE_KEY=~/.ssh/id_rsa
 export SSH_KEY=$(cat "${SSH_PRIVATE_KEY}.pub")
 export KUBERNETES_VERSION=v1.20.5
+export KUBERNETES_USER=kubernetes
 export KUBERNETES_PASSWORD=
 export KUBECONFIG=$HOME/.kube/config
 export SEED_USER=ubuntu
@@ -39,7 +41,6 @@ export DEFAULT_MACHINE="medium"
 export UNREMOVABLENODERECHECKTIMEOUT="1m"
 export OSDISTRO=$(uname -s)
 export TRANSPORT="tcp"
-export USER=ubuntu
 export NET_DOMAIN=home
 export NET_IP=192.168.1.20
 export NET_GATEWAY=10.0.0.1
@@ -48,6 +49,7 @@ export NET_MASK=255.255.255.0
 export NET_MASK_CIDR=24
 export VC_NETWORK_PRIVATE="Private Network"
 export VC_NETWORK_PUBLIC="Public Network"
+export REGISTRY=devregistry.aldunelabs.com
 export LAUNCH_CA=YES
 
 if [ "$OSDISTRO" == "Linux" ]; then
@@ -243,32 +245,6 @@ fi
 
 echo "Transport set to:${TRANSPORT}, listen endpoint at ${LISTEN}"
 
-# Cloud init fragment
-PACKAGE_UPGRADE="true"
-
-# Cloud init fragment
-KUBERNETES_USER=$(
-    cat <<EOF
-[
-    {
-        "name": "kubernetes",
-        "primary_group": "kubernetes",
-        "groups": [
-            "adm",
-            "users"
-        ],
-        "lock_passwd": false,
-        "passwd": "${KUBERNETES_PASSWORD}",
-        "sudo": "ALL=(ALL) NOPASSWD:ALL",
-        "shell": "/bin/bash",
-        "ssh_authorized_keys": [
-            "${SSH_KEY}"
-        ]
-    }
-]
-EOF
-)
-
 # Sample machine definition
 MACHINE_DEFS=$(
     cat <<EOF
@@ -342,6 +318,51 @@ delete-masterkube.sh
 
 echo "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
 
+cat > ./config/buildenv <<EOF
+export SCHEME="$SCHEME"
+export NODEGROUP_NAME="$NODEGROUP_NAME"
+export MASTERKUBE="$MASTERKUBE"
+export PROVIDERID="$PROVIDERID"
+export SSH_PRIVATE_KEY=$SSH_PRIVATE_KEY
+export SSH_KEY=$SSH_KEY
+export KUBERNETES_VERSION=$KUBERNETES_VERSION
+export KUBERNETES_USER=${KUBERNETES_USER}
+export KUBERNETES_PASSWORD=$KUBERNETES_PASSWORD
+export KUBECONFIG=$KUBECONFIG
+export SEED_USER=$SEED_USER
+export SEED_IMAGE="$SEED_IMAGE"
+export ROOT_IMG_NAME=$ROOT_IMG_NAME
+export TARGET_IMAGE=$TARGET_IMAGE
+export CNI_VERSION=$CNI_VERSION
+export MINNODES=$MINNODES
+export MAXNODES=$MAXNODES
+export MAXTOTALNODES=$MAXTOTALNODES
+export CORESTOTAL=$CORESTOTAL
+export MEMORYTOTAL=$MEMORYTOTAL
+export MAXAUTOPROVISIONNEDNODEGROUPCOUNT=$MAXAUTOPROVISIONNEDNODEGROUPCOUNT
+export SCALEDOWNENABLED=$SCALEDOWNENABLED
+export SCALEDOWNDELAYAFTERADD=$SCALEDOWNDELAYAFTERADD
+export SCALEDOWNDELAYAFTERDELETE=$SCALEDOWNDELAYAFTERDELETE
+export SCALEDOWNDELAYAFTERFAILURE=$SCALEDOWNDELAYAFTERFAILURE
+export SCALEDOWNUNEEDEDTIME=$SCALEDOWNUNEEDEDTIME
+export SCALEDOWNUNREADYTIME=$SCALEDOWNUNREADYTIME
+export DEFAULT_MACHINE=$DEFAULT_MACHINE
+export UNREMOVABLENODERECHECKTIMEOUT=$UNREMOVABLENODERECHECKTIMEOUT
+export OSDISTRO=$OSDISTRO
+export TRANSPORT=$TRANSPORT
+export NET_DOMAIN=$NET_DOMAIN
+export NET_IP=$NET_IP
+export NET_GATEWAY=$NET_GATEWAY
+export NET_DNS=$NET_DNS
+export NET_MASK=$NET_MASK
+export NET_MASK_CIDR=$NET_MASK_CIDR
+export VC_NETWORK_PRIVATE=$VC_NETWORK_PRIVATE
+export VC_NETWORK_PUBLIC=$VC_NETWORK_PUBLIC
+export REGISTRY=$REGISTRY
+export LAUNCH_CA=$LAUNCH_CA
+EOF
+
+
 cat >./config/network.yaml <<EOF
 network:
   version: 2
@@ -368,7 +389,7 @@ users:
     - default
 system_info:
     default_user:
-        name: kubernetes
+        name: ${KUBERNETES_USER}
 EOF
 
 # Cloud init meta-data
@@ -427,13 +448,13 @@ echo "Wait for IP from ${MASTERKUBE}"
 IPADDR=$(govc vm.ip -wait 5m "${MASTERKUBE}")
 
 echo "Prepare ${MASTERKUBE} instance"
-scp -r bin $USER@${IPADDR}:~
+scp -r bin ${KUBERNETES_USER}@${IPADDR}:~
 
 echo "Start kubernetes ${MASTERKUBE} instance master node, kubernetes version=${KUBERNETES_VERSION}, providerID=${PROVIDERID}"
-ssh $USER@${IPADDR} sudo mv /home/ubuntu/bin/* /usr/local/bin
-ssh $USER@${IPADDR} sudo create-cluster.sh flannel eth1 "${KUBERNETES_VERSION}" "\"${PROVIDERID}\""
+ssh ${KUBERNETES_USER}@${IPADDR} sudo mv /home/${KUBERNETES_USER}/bin/* /usr/local/bin
+ssh ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh flannel eth1 "${KUBERNETES_VERSION}" "\"${PROVIDERID}\""
 
-scp $USER@${IPADDR}:/etc/cluster/* ./cluster
+scp ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ./cluster
 
 MASTER_IP=$(cat ./cluster/manager-ip)
 TOKEN=$(cat ./cluster/token)
@@ -489,10 +510,8 @@ AUTOSCALER_CONFIG=$(cat <<EOF
         "package_update": false,
         "package_upgrade": false
     },
-    "sync-folder": {
-    },
     "ssh-infos" : {
-        "user": "kubernetes",
+        "user": "${KUBERNETES_USER}",
         "ssh-private-key": "${SSH_PRIVATE_KEY_LOCAL}"
     },
     "vmware": {
@@ -550,8 +569,8 @@ EOF
 echo "$AUTOSCALER_CONFIG" | jq . > config/kubernetes-vmware-autoscaler.json
 
 # Recopy config file on master node
-scp ${SSH_PRIVATE_KEY} ./config/grpc-config.json ./config/kubernetes-vmware-autoscaler.json $USER@${IPADDR}:/tmp
-ssh $USER@${IPADDR} sudo cp "/tmp/${SSH_KEY_FNAME}" /tmp/grpc-config.json /tmp/kubernetes-vmware-autoscaler.json /etc/cluster
+scp ${SSH_PRIVATE_KEY} ./config/grpc-config.json ./config/kubernetes-vmware-autoscaler.json ${KUBERNETES_USER}@${IPADDR}:/tmp
+ssh ${KUBERNETES_USER}@${IPADDR} sudo cp "/tmp/${SSH_KEY_FNAME}" /tmp/grpc-config.json /tmp/kubernetes-vmware-autoscaler.json /etc/cluster
 
 # Update /etc/hosts
 if [ "${OSDISTRO}" == "Linux" ]; then

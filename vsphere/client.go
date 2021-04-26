@@ -1,6 +1,7 @@
 package vsphere
 
 import (
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
@@ -40,7 +41,7 @@ func (c *Client) Datacenter(ref types.ManagedObjectReference) *object.Datacenter
 }
 
 // GetDatacenter return the datacenter
-func (c *Client) GetDatacenter(ctx *Context, name string) (*Datacenter, error) {
+func (c *Client) GetDatacenter(ctx *context.Context, name string) (*Datacenter, error) {
 	var dc *object.Datacenter
 	var err error
 

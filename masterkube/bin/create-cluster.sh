@@ -31,11 +31,6 @@ fi
 
 if [ ! -f /etc/kubernetes/kubelet.conf ]; then
 
-    if [ -z "$(grep 'provider-id' /etc/default/kubelet)" ]; then
-        echo "KUBELET_EXTRA_ARGS='--fail-swap-on=false --read-only-port=10255 --provider-id=${PROVIDERID}'" > /etc/default/kubelet
-        systemctl restart kubelet
-    fi
-
     if [ -z "$CNI" ]; then
         CNI="calico"
     fi
@@ -116,6 +111,13 @@ if [ ! -f /etc/kubernetes/kubelet.conf ]; then
     
     echo "Allow master to host pod"
     kubectl taint nodes --all node-role.kubernetes.io/master- 2>&1
+
+cat > patch.yaml <<EOF
+spec:
+    providerID: '${PROVIDERID}'
+EOF
+
+    kubectl patch node ${HOSTNAME} --patch-file patch.yaml
 
     if [ "$CNI" = "calico" ]; then
 

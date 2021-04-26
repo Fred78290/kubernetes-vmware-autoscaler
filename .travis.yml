@@ -3,6 +3,9 @@
 os: linux
 dist: bionic
 language: minimal
+env:
+  global:
+    - DOCKER_CLI_EXPERIMENTAL=enabled
 addons:
   sonarcloud:
     organization: fred78290-github
@@ -32,7 +35,10 @@ jobs:
       before_deploy:
         - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
       after_deploy:
-        - docker push fred78290/vsphere-autoscaler:$TRAVIS_TAG
+        - docker push fred78290/vsphere-autoscaler-amd64:$TRAVIS_TAG
+        - docker push fred78290/vsphere-autoscaler-arm64:$TRAVIS_TAG
+        - docker manifest create fred78290/vsphere-autoscaler:$TRAVIS_TAG --amend fred78290/vsphere-autoscaler-amd64:$TRAVIS_TAG --amend fred78290/vsphere-autoscaler-arm64:$TRAVIS_TAG
+        - docker manifest push fred78290/vsphere-autoscaler:$TRAVIS_TAG
       deploy:
         provider: releases
         api_key: $GITHUB_OAUTH_TOKEN
@@ -41,5 +47,5 @@ jobs:
           tags: true
           repo: Fred78290/kubernetes-vmware-autoscaler
         file:
-          - out/vsphere-autoscaler-darwin-amd64
-          - out/vsphere-autoscaler-linux-amd64
+          - out/vsphere-autoscaler-amd64
+          - out/vsphere-autoscaler-arm64

@@ -9,6 +9,9 @@ const (
 )
 
 const (
+	// NodeLabelWorkerRole k8s annotation
+	NodeLabelWorkerRole = "node-role.kubernetes.io/worker"
+
 	// NodeLabelGroupName k8s annotation
 	NodeLabelGroupName = "cluster.autoscaler.nodegroup/name"
 

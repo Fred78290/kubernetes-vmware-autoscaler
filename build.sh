@@ -1,4 +1,7 @@
 #!/bin/bash
+sudo rm -rf out
 
-make -e REGISTRY=fred78290 -e TAG=v1.20.5 container
+VERSION=v1.20.5
+REGISTRY=devregistry.aldunelabs.com
 
+make -e REGISTRY=$REGISTRY -e TAG=$VERSION container-push-manifest
