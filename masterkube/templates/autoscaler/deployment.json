@@ -29,9 +29,26 @@
                 "nodeSelector": {
                     "master": "true"
                 },
+                "initContainers": [
+                    {
+                        "image": "busybox",
+                        "name": "cluster-autoscaler-init",
+                        "command":[
+                            "/bin/sh",
+                            "-c",
+                            "rm -f /var/run/cluster-autoscaler/vmware.sock"
+                        ],
+                        "volumeMounts": [
+                            {
+                                "name": "cluster-socket",
+                                "mountPath": "/var/run/cluster-autoscaler"
+                            }
+                        ]
+                    }
+                ],
                 "containers": [
                     {
-                        "image": "fred78290/vsphere-autoscaler:v1.21.0",
+                        "image": "$REGISTRY/vsphere-autoscaler:v1.21.0",
                         "name": "vsphere-autoscaler",
                         "resources": {
                             "limits": {
@@ -44,7 +61,7 @@
                             }
                         },
                         "command": [
-                            "./vsphere-autoscaler",
+                            "/usr/local/bin/vsphere-autoscaler",
                             "--config=/etc/cluster/kubernetes-vmware-autoscaler.json",
                             "--save=/etc/cluster/vmware-autoscaler-state.json",
                             "--log-level=info"
@@ -62,7 +79,7 @@
                         ]
                     },
                     {
-                        "image": "devregistry.aldunelabs.com/cluster-autoscaler:v1.21.0",
+                        "image": "$REGISTRY/cluster-autoscaler:v1.21.0",
                         "name": "cluster-autoscaler",
                         "resources": {
                             "limits": {

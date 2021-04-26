@@ -18,6 +18,10 @@ func (m mockupClientGenerator) KubeClient() (kubernetes.Interface, error) {
 	return nil, nil
 }
 
+func (m mockupClientGenerator) PodList(nodeName string, podFilter types.PodFilterFunc) ([]apiv1.Pod, error) {
+	return nil, nil
+}
+
 func (m mockupClientGenerator) NodeList() (*apiv1.NodeList, error) {
 	return &apiv1.NodeList{}, nil
 }
@@ -30,7 +34,15 @@ func (m mockupClientGenerator) CordonNode(nodeName string) error {
 	return nil
 }
 
-func (m mockupClientGenerator) DrainNode(nodeName string) error {
+func (m mockupClientGenerator) SetProviderID(nodeName, providerID string) error {
+	return nil
+}
+
+func (m mockupClientGenerator) MarkDrainNode(nodeName string) error {
+	return nil
+}
+
+func (m mockupClientGenerator) DrainNode(nodeName string, ignoreDaemonSet, deleteLocalData bool) error {
 	return nil
 }
 

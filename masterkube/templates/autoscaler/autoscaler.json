@@ -31,7 +31,7 @@
                 },
                 "containers": [
                     {
-                        "image": "devregistry.aldunelabs.com/cluster-autoscaler:v1.21.0",
+                        "image": "$REGISTRY/cluster-autoscaler:v1.21.0",
                         "name": "cluster-autoscaler",
                         "resources": {
                             "limits": {
@@ -49,7 +49,6 @@
                             "--stderrthreshold=info",
                             "--cloud-provider=grpc",
                             "--cloud-config=/etc/cluster/grpc-config.json",
-                            "--kubeconfig=/etc/kubernetes/config",
                             "--nodes=$MINNODES:$MAXNODES:true/$NODEGROUP_NAME",
                             "--max-nodes-total=$MAXTOTALNODES",
                             "--cores-total=$CORESTOTAL",
@@ -75,11 +74,6 @@
                                 "name": "cluster-autoscaler",
                                 "mountPath": "/etc/cluster",
                                 "readOnly": true
-                            },
-                            {
-                                "name": "kubernetes",
-                                "mountPath": "/etc/kubernetes/config",
-                                "readOnly": true
                             }
                         ]
                     }
@@ -89,12 +83,6 @@
                         "name": "cluster-autoscaler",
                         "hostPath": {
                             "path": "/etc/cluster"
-                        }
-                    },
-                    {
-                        "name": "kubernetes",
-                        "hostPath": {
-                            "path": "/etc/kubernetes/admin.conf"
                         }
                     },
                     {

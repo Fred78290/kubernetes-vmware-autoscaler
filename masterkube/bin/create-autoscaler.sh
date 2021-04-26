@@ -3,8 +3,6 @@ LAUNCH_CA=$1
 
 CURDIR=$(dirname $0)
 
-[ $(uname -s) == "Darwin" ] && GOOS=darwin || GOOS=linux
-
 pushd $CURDIR/../
 
 MASTER_IP=$(cat ./cluster/manager-ip)
@@ -38,7 +36,7 @@ if [ "$LAUNCH_CA" == YES ]; then
 elif [ "$LAUNCH_CA" == "DEBUG" ]; then
     deploy autoscaler
 elif [ "$LAUNCH_CA" == "LOCAL" ]; then
-    nohup ../out/vsphere-autoscaler-$GOOS-amd64 \
+    nohup ../out/vsphere-autoscaler-$(go env GOARCH) \
         --kubeconfig=$KUBECONFIG \
         --config=$PWD/config/kubernetes-vmware-autoscaler.json \
         --save=$PWD/config/vmware-autoscaler-state.json \

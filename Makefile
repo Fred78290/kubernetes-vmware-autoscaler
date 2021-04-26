@@ -1,19 +1,20 @@
+ALL_ARCH = amd64 arm64
+
 .EXPORT_ALL_VARIABLES:
 
-all: build
-VERSION_MAJOR ?= 0
-VERSION_MINOR ?= 2
+all: $(addprefix build-arch-,$(ALL_ARCH))
+
+VERSION_MAJOR ?= 1
+VERSION_MINOR ?= 21
 VERSION_BUILD ?= 0
-DEB_VERSION ?= $(VERSION_MAJOR).$(VERSION_MINOR)-$(VERSION_BUILD)
 TAG?=v$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_BUILD)
 FLAGS=
 ENVVAR=
 GOOS?=linux
-GOARCH?=amd64
+GOARCH?=$(shell go env GOARCH)
 REGISTRY?=fred78290
-BASEIMAGE?=k8s.gcr.io/debian-base-amd64:v1.0.0
 BUILD_DATE?=`date +%Y-%m-%dT%H:%M:%SZ`
-VERSION_LDFLAGS=-X main.phVersion=$(TAGS)
+VERSION_LDFLAGS=-X main.phVersion=$(TAG)
 
 ifdef BUILD_TAGS
   TAGS_FLAG=--tags ${BUILD_TAGS}
@@ -25,30 +26,65 @@ else
   FOR_PROVIDER=
 endif
 
+IMAGE=$(REGISTRY)/vsphere-autoscaler$(PROVIDER)
+
 deps:
 	go mod vendor
 #	wget "https://raw.githubusercontent.com/Fred78290/autoscaler/master/cluster-autoscaler/cloudprovider/grpc/grpc.proto" -O grpc/grpc.proto
 #	protoc -I . -I vendor grpc/grpc.proto --go_out=plugins=grpc:.
 
-build:
-	$(ENVVAR) GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags="-X main.phVersion=$(TAG) -X main.phBuildDate=$(BUILD_DATE)" -a -o out/vsphere-autoscaler-$(GOOS)-$(GOARCH) ${TAGS_FLAG}
+build: build-arch-$(GOARCH)
 
-make-image:
+build-arch-%: deps clean-arch-%
+	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -ldflags="-X main.phVersion=$(TAG) -X main.phBuildDate=$(BUILD_DATE)" -a -o out/vsphere-autoscaler-$* ${TAGS_FLAG}
+
+test-unit: clean build
+	go test --test.short -race ./... ${TAGS_FLAG}
+
+dev-release: $(addprefix dev-release-arch-,$(ALL_ARCH)) push-manifest
+
+dev-release-arch-%: build-arch-% make-image-arch-% push-image-arch-%
+	@echo "Release ${TAG}${FOR_PROVIDER}-$* completed"
+
+make-image: make-image-arch-$(GOARCH)
+
+make-image-arch-%:
+ifdef BASEIMAGE
 	docker build --pull --build-arg BASEIMAGE=${BASEIMAGE} \
-	    -t ${REGISTRY}/vsphere-autoscaler${PROVIDER}:${TAG} .
+		-t ${IMAGE}-$*:${TAG} \
+		-f Dockerfile.$* .
+else
+	docker build --pull \
+		-t ${IMAGE}-$*:${TAG} \
+		-f Dockerfile.$* .
+endif
+	@echo "Image ${TAG}${FOR_PROVIDER}-$* completed"
 
-build-binary: clean deps
-	$(ENVVAR) make -e BUILD_DATE=${BUILD_DATE} -e REGISTRY=${REGISTRY} -e TAG=${TAG} -e GOOS=linux -e GOARCH=amd64 build
-	$(ENVVAR) make -e BUILD_DATE=${BUILD_DATE} -e REGISTRY=${REGISTRY} -e TAG=${TAG} -e GOOS=darwin -e GOARCH=amd64 build
+push-image: push-image-arch-$(GOARCH)
 
-test-unit: clean deps
-	./scripts/run-tests.sh'
+push-image-arch-%:
+	./push_image.sh ${IMAGE}-$*:${TAG}
 
-dev-release: build-binary execute-release
+docker-push: docker-push-arch-$(GOARCH)
+
+docker-push-arch-%:
+	docker push ${IMAGE}-$*:${TAG}
+
+push-manifest:
+	docker manifest create ${IMAGE}:${TAG} \
+	    $(addprefix --amend $(REGISTRY)/vsphere-autoscaler$(PROVIDER)-, $(addsuffix :$(TAG), $(ALL_ARCH)))
+	docker manifest push --purge ${IMAGE}:${TAG}
+
+container-push-manifest: container $(addprefix docker-push-arch-,$(ALL_ARCH)) push-manifest
+
+
+execute-release: $(addprefix make-image-arch-,$(ALL_ARCH)) $(addprefix push-image-arch-,$(ALL_ARCH)) push-manifest
 	@echo "Release ${TAG}${FOR_PROVIDER} completed"
 
-clean:
-#	sudo rm -rf out
+clean: clean-arch-$(GOARCH)
+
+clean-arch-%:
+	rm -f ./out/vsphere-autoscaler$(PROVIDER)-$*
 
 format:
 	test -z "$$(find . -path ./vendor -prune -type f -o -name '*.go' -exec gofmt -s -d {} + | tee /dev/stderr)" || \
@@ -57,20 +93,23 @@ format:
 docker-builder:
 	docker build -t kubernetes-vmware-autoscaler-builder ./builder
 
-build-in-docker: docker-builder
-	docker run --rm -v `pwd`:/gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler/ kubernetes-vmware-autoscaler-builder:latest bash \
-		-c 'cd /gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler \
-		&& BUILD_TAGS=${BUILD_TAGS} make -e REGISTRY=${REGISTRY} -e TAG=${TAG} -e BUILD_DATE=`date +%Y-%m-%dT%H:%M:%SZ` build-binary'
+build-in-docker: build-in-docker-arch-$(GOARCH)
 
-release: build-in-docker execute-release
+build-in-docker-arch-%: clean-arch-% docker-builder
+	docker run --rm -v `pwd`:/gopath/src/github.com/Fred78290/vsphere-autoscaler/ kubernetes-vmware-autoscaler-builder:latest bash \
+		-c 'cd /gopath/src/github.com/Fred78290/vsphere-autoscaler \
+		&& BUILD_TAGS=${BUILD_TAGS} make -e REGISTRY=${REGISTRY} -e TAG=${TAG} -e BUILD_DATE=`date +%Y-%m-%dT%H:%M:%SZ` build-arch-$*'
+
+release: $(addprefix build-in-docker-arch-,$(ALL_ARCH)) execute-release
 	@echo "Full in-docker release ${TAG}${FOR_PROVIDER} completed"
 
-container: clean build-in-docker make-image
-	@echo "Created in-docker image ${TAG}${FOR_PROVIDER}"
+container: $(addprefix container-arch-,$(ALL_ARCH))
+
+container-arch-%: build-in-docker-arch-% make-image-arch-%
+	@echo "Full in-docker image ${TAG}${FOR_PROVIDER}-$* completed"
 
 test-in-docker: clean docker-builder
 	docker run --rm -v `pwd`:/gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler/ kubernetes-vmware-autoscaler-builder:latest bash \
 		-c 'cd /gopath/src/github.com/Fred78290/kubernetes-vmware-autoscaler && bash ./scripts/run-tests.sh'
 
-.PHONY: all deps build test-unit clean format execute-release dev-release docker-builder build-in-docker release generate
-
+.PHONY: all build test-unit clean format execute-release dev-release docker-builder build-in-docker release generate push-image push-manifest

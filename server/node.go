@@ -2,8 +2,6 @@ package server
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"strconv"
 	"strings"
 
@@ -61,39 +59,6 @@ type AutoScalerServerNode struct {
 
 func (s AutoScalerServerNodeState) String() string {
 	return autoScalerServerNodeStateString[s]
-}
-
-func (vm *AutoScalerServerNode) prepareKubelet() (string, error) {
-	var out string
-	var err error
-	var fName = fmt.Sprintf("/tmp/set-kubelet-default-%s.sh", vm.NodeName)
-
-	kubeletDefault := []string{
-		"#!/bin/bash",
-		". /etc/default/kubelet",
-		fmt.Sprintf("echo \"KUBELET_EXTRA_ARGS=\\\"$KUBELET_EXTRA_ARGS --provider-id=%s\\\"\" > /etc/default/kubelet", vm.ProviderID),
-		"systemctl restart kubelet",
-	}
-
-	if err = ioutil.WriteFile(fName, []byte(strings.Join(kubeletDefault, "\n")), 0755); err != nil {
-		return out, err
-	}
-
-	defer os.Remove(fName)
-
-	if err = utils.Scp(vm.serverConfig.SSH, vm.Addresses[0], fName, fName); err != nil {
-		glog.Errorf("Unable to scp node %s address:%s, reason:%s", vm.Addresses[0], vm.NodeName, err)
-
-		return out, err
-	}
-
-	if out, err = utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], fmt.Sprintf("bash %s", fName)); err != nil {
-		glog.Errorf("Unable to ssh node %s address:%s, reason:%s", vm.Addresses[0], vm.NodeName, err)
-
-		return out, err
-	}
-
-	return "", nil
 }
 
 func (vm *AutoScalerServerNode) waitReady(c types.ClientGenerator) error {
@@ -159,70 +124,11 @@ func (vm *AutoScalerServerNode) setNodeLabels(c types.ClientGenerator, nodeLabel
 	return nil
 }
 
-var phDefaultRsyncFlags = []string{
-	"--verbose",
-	"--archive",
-	"-z",
-	"--copy-links",
-	"--no-owner",
-	"--no-group",
-	"--delete",
-}
-
-func (vm *AutoScalerServerNode) syncFolders() (string, error) {
-
-	syncFolders := vm.serverConfig.SyncFolders
-
-	if syncFolders != nil && len(syncFolders.Folders) > 0 {
-		for _, folder := range syncFolders.Folders {
-			var rsync = []string{
-				"rsync",
-			}
-
-			tempFile, _ := ioutil.TempFile(os.TempDir(), "vmware-rsync")
-
-			defer tempFile.Close()
-
-			if len(syncFolders.RsyncOptions) == 0 {
-				rsync = append(rsync, phDefaultRsyncFlags...)
-			} else {
-				rsync = append(rsync, syncFolders.RsyncOptions...)
-			}
-
-			sshOptions := []string{
-				"--rsync-path",
-				"sudo rsync",
-				"-e",
-				fmt.Sprintf("ssh -p 22 -o LogLevel=FATAL -o ControlMaster=auto -o ControlPath=%s -o ControlPersist=10m  -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i '%s'", tempFile.Name(), syncFolders.RsyncSSHKey),
-			}
-
-			excludes := make([]string, 0, len(folder.Excludes)*2)
-
-			for _, exclude := range folder.Excludes {
-				excludes = append(excludes, "--exclude", exclude)
-			}
-
-			rsync = append(rsync, sshOptions...)
-			rsync = append(rsync, excludes...)
-			rsync = append(rsync, folder.Source, fmt.Sprintf("%s@%s:%s", syncFolders.RsyncUser, vm.Addresses[0], folder.Destination))
-
-			if out, err := utils.Pipe(rsync...); err != nil {
-				return out, err
-			}
-		}
-	}
-	//["/usr/bin/rsync", "--verbose", "--archive", "--delete", "-z", "--copy-links", "--no-owner", "--no-group", "--rsync-path", "sudo rsync", "-e",
-	// "ssh -p 22 -o LogLevel=FATAL  -o ControlMaster=auto -o ControlPath=/tmp/vagrant-rsync-20181227-31508-1sjw4bm -o ControlPersist=10m  -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i '/home/fboltz/.ssh/id_rsa'",
-	// "--exclude", ".vagrant/", "/home/fboltz/Projects/vagrant-multipass/", "vagrant@10.196.85.125:/vagrant"]
-	return "", nil
-}
-
 func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, systemLabels KubernetesLabel) error {
 	glog.Debugf("AutoScalerNode::launchVM, node:%s", vm.NodeName)
 
 	var err error
 	var status AutoScalerServerNodeState
-	var output string
 
 	vsphere := vm.VSphereConfig
 	network := vsphere.Network
@@ -230,7 +136,7 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 
 	glog.Infof("Launch VM:%s for nodegroup: %s", vm.NodeName, vm.NodeGroupID)
 
-	if vm.AutoProvisionned == false {
+	if !vm.AutoProvisionned {
 
 		err = fmt.Errorf(constantes.ErrVMNotProvisionnedByMe, vm.NodeName)
 
@@ -262,17 +168,13 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 
 		err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
 
-	} else if output, err = vm.syncFolders(); err != nil {
-
-		err = fmt.Errorf(constantes.ErrRsyncError, vm.NodeName, output, err)
-
-	} else if output, err = vm.prepareKubelet(); err != nil {
-
-		err = fmt.Errorf(constantes.ErrKubeletNotConfigured, vm.NodeName, output, err)
-
 	} else if err = vm.kubeAdmJoin(); err != nil {
 
 		err = fmt.Errorf(constantes.ErrKubeAdmJoinFailed, vm.NodeName, err)
+
+	} else if err = c.SetProviderID(vm.NodeName, vm.ProviderID); err != nil {
+
+		err = fmt.Errorf(constantes.ErrProviderIDNotConfigured, vm.NodeName, err)
 
 	} else if err = vm.waitReady(c); err != nil {
 
@@ -301,7 +203,7 @@ func (vm *AutoScalerServerNode) startVM(c types.ClientGenerator) error {
 
 	vsphere := vm.VSphereConfig
 
-	if vm.AutoProvisionned == false {
+	if !vm.AutoProvisionned {
 
 		err = fmt.Errorf(constantes.ErrVMNotProvisionnedByMe, vm.NodeName)
 
@@ -359,7 +261,7 @@ func (vm *AutoScalerServerNode) stopVM(c types.ClientGenerator) error {
 
 	vsphere := vm.VSphereConfig
 
-	if vm.AutoProvisionned == false {
+	if !vm.AutoProvisionned {
 
 		err = fmt.Errorf(constantes.ErrVMNotProvisionnedByMe, vm.NodeName)
 
@@ -399,14 +301,18 @@ func (vm *AutoScalerServerNode) deleteVM(c types.ClientGenerator) error {
 	var err error
 	var status *vsphere.Status
 
-	if vm.AutoProvisionned == false {
+	if !vm.AutoProvisionned {
 		err = fmt.Errorf(constantes.ErrVMNotProvisionnedByMe, vm.NodeName)
 	} else {
 		vsphere := vm.VSphereConfig
 
 		if status, err = vsphere.Status(vm.NodeName); err == nil {
 			if status.Powered {
-				if err = c.DrainNode(vm.NodeName); err != nil {
+				if err = c.MarkDrainNode(vm.NodeName); err != nil {
+					glog.Errorf(constantes.ErrCordonNodeReturnError, vm.NodeName, err)
+				}
+
+				if err = c.DrainNode(vm.NodeName, true, true); err != nil {
 					glog.Errorf(constantes.ErrDrainNodeReturnError, vm.NodeName, err)
 				}
 
@@ -468,7 +374,8 @@ func (vm *AutoScalerServerNode) statusVM() (AutoScalerServerNodeState, error) {
 	return AutoScalerServerNodeStateUndefined, fmt.Errorf(constantes.ErrAutoScalerInfoNotFound, vm.NodeName)
 }
 
-func (vm *AutoScalerServerNode) getVSphere() *vsphere.Configuration {
+// GetVSphere method
+func (vm *AutoScalerServerNode) GetVSphere() *vsphere.Configuration {
 	var vsphere *vsphere.Configuration
 
 	if vsphere = vm.serverConfig.VMwareInfos[vm.NodeGroupID]; vsphere == nil {

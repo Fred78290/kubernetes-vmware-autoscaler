@@ -6,6 +6,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
 	glog "github.com/sirupsen/logrus"
 
 	"github.com/vmware/govmomi/govc/flags"
@@ -84,7 +85,7 @@ func (o *listOutput) add(r types.HostDatastoreBrowserSearchResults) {
 }
 
 // Datastore create govmomi Datastore object
-func (ds *Datastore) Datastore(ctx *Context) *object.Datastore {
+func (ds *Datastore) Datastore(ctx *context.Context) *object.Datastore {
 	if d := ctx.Value(datastoreKey); d != nil {
 		return d.(*object.Datastore)
 	}
@@ -108,7 +109,7 @@ func (ds *Datastore) VimClient() *vim25.Client {
 	return ds.Datacenter.VimClient()
 }
 
-func (ds *Datastore) findVM(ctx *Context, name string) (*object.VirtualMachine, error) {
+func (ds *Datastore) findVM(ctx *context.Context, name string) (*object.VirtualMachine, error) {
 	key := fmt.Sprintf("[%s] %s", ds.Name, name)
 
 	if v := ctx.Value(key); v != nil {
@@ -127,13 +128,13 @@ func (ds *Datastore) findVM(ctx *Context, name string) (*object.VirtualMachine, 
 	return vm, err
 }
 
-func (ds *Datastore) resourcePool(ctx *Context, name string) (*object.ResourcePool, error) {
+func (ds *Datastore) resourcePool(ctx *context.Context, name string) (*object.ResourcePool, error) {
 	f := ds.Datacenter.NewFinder(ctx)
 
 	return f.ResourcePoolOrDefault(ctx, name)
 }
 
-func (ds *Datastore) vmFolder(ctx *Context, name string) (*object.Folder, error) {
+func (ds *Datastore) vmFolder(ctx *context.Context, name string) (*object.Folder, error) {
 	f := ds.Datacenter.NewFinder(ctx)
 
 	if len(name) != 0 {
@@ -156,13 +157,13 @@ func (ds *Datastore) vmFolder(ctx *Context, name string) (*object.Folder, error)
 			}
 		}
 
-		return nil, fmt.Errorf("Folder %s not found", name)
+		return nil, fmt.Errorf("folder %s not found", name)
 	}
 
 	return f.DefaultFolder(ctx)
 }
 
-func (ds *Datastore) output(ctx *Context) *flags.OutputFlag {
+func (ds *Datastore) output(ctx *context.Context) *flags.OutputFlag {
 	if v := ctx.Value(outputKey); v != nil {
 		return v.(*flags.OutputFlag)
 	}
@@ -174,7 +175,7 @@ func (ds *Datastore) output(ctx *Context) *flags.OutputFlag {
 }
 
 // CreateVirtualMachine create a new virtual machine
-func (ds *Datastore) CreateVirtualMachine(ctx *Context, name, templateName, vmFolder, resourceName string, template bool, linkedClone bool, network *Network, customization string) (*VirtualMachine, error) {
+func (ds *Datastore) CreateVirtualMachine(ctx *context.Context, name, templateName, vmFolder, resourceName string, template bool, linkedClone bool, network *Network, customization string) (*VirtualMachine, error) {
 	var templateVM *object.VirtualMachine
 	var folder *object.Folder
 	var resourcePool *object.ResourcePool
@@ -260,12 +261,15 @@ func (ds *Datastore) CreateVirtualMachine(ctx *Context, name, templateName, vmFo
 					customizationSpecManager := object.NewCustomizationSpecManager(ds.VimClient())
 					// check if customization specification exists
 					exists, err := customizationSpecManager.DoesCustomizationSpecExist(ctx, customization)
+
 					if err != nil {
 						return nil, err
 					}
-					if exists == false {
-						return nil, fmt.Errorf("Customization specification %s does not exists", customization)
+
+					if !exists {
+						return nil, fmt.Errorf("customization specification %s does not exists", customization)
 					}
+
 					// get the customization specification
 					customSpecItem, err := customizationSpecManager.GetCustomizationSpec(ctx, customization)
 					if err != nil {
@@ -296,7 +300,7 @@ func (ds *Datastore) CreateVirtualMachine(ctx *Context, name, templateName, vmFo
 }
 
 // VirtualMachine retrieve the specified virtual machine
-func (ds *Datastore) VirtualMachine(ctx *Context, name string) (*VirtualMachine, error) {
+func (ds *Datastore) VirtualMachine(ctx *context.Context, name string) (*VirtualMachine, error) {
 
 	vm, err := ds.findVM(ctx, name)
 
@@ -312,7 +316,7 @@ func (ds *Datastore) VirtualMachine(ctx *Context, name string) (*VirtualMachine,
 }
 
 // ListPath return object list matching path
-func (ds *Datastore) ListPath(ctx *Context, b *object.HostDatastoreBrowser, path string, spec types.HostDatastoreBrowserSearchSpec, recurse bool) ([]types.HostDatastoreBrowserSearchResults, error) {
+func (ds *Datastore) ListPath(ctx *context.Context, b *object.HostDatastoreBrowser, path string, spec types.HostDatastoreBrowserSearchSpec, recurse bool) ([]types.HostDatastoreBrowserSearchResults, error) {
 	path = ds.Datastore(ctx).Path(path)
 
 	search := b.SearchDatastore
@@ -352,7 +356,7 @@ func isInvalid(err error) bool {
 }
 
 // List list VM inside the datastore
-func (ds *Datastore) List(ctx *Context) ([]*VirtualMachine, error) {
+func (ds *Datastore) List(ctx *context.Context) ([]*VirtualMachine, error) {
 	var browser *object.HostDatastoreBrowser
 	var err error
 	var vms []*VirtualMachine

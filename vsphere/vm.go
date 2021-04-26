@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
 	glog "github.com/sirupsen/logrus"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
@@ -141,7 +142,7 @@ func (g GuestInfos) toExtraConfig() []types.BaseOptionValue {
 }
 
 // VirtualMachine return govmomi virtual machine
-func (vm *VirtualMachine) VirtualMachine(ctx *Context) *object.VirtualMachine {
+func (vm *VirtualMachine) VirtualMachine(ctx *context.Context) *object.VirtualMachine {
 	key := vm.Ref.String()
 
 	if v := ctx.Value(key); v != nil {
@@ -169,7 +170,7 @@ func (vm *VirtualMachine) VimClient() *vim25.Client {
 	return vm.Datastore.VimClient()
 }
 
-func (vm *VirtualMachine) addNetwork(ctx *Context, network *Network, devices object.VirtualDeviceList) (object.VirtualDeviceList, error) {
+func (vm *VirtualMachine) addNetwork(ctx *context.Context, network *Network, devices object.VirtualDeviceList) (object.VirtualDeviceList, error) {
 	var err error
 
 	if network != nil && len(network.Interfaces) > 0 {
@@ -179,7 +180,7 @@ func (vm *VirtualMachine) addNetwork(ctx *Context, network *Network, devices obj
 	return devices, err
 }
 
-func (vm *VirtualMachine) addHardDrive(ctx *Context, virtualMachine *object.VirtualMachine, diskSize int, devices object.VirtualDeviceList) (object.VirtualDeviceList, error) {
+func (vm *VirtualMachine) addHardDrive(ctx *context.Context, virtualMachine *object.VirtualMachine, diskSize int, devices object.VirtualDeviceList) (object.VirtualDeviceList, error) {
 	var err error
 	var existingDevices object.VirtualDeviceList
 	var controller types.BaseVirtualController
@@ -195,7 +196,7 @@ func (vm *VirtualMachine) addHardDrive(ctx *Context, virtualMachine *object.Virt
 
 				if len(existingDevices.SelectByBackingInfo(disk.Backing)) != 0 {
 
-					err = fmt.Errorf("Disk %s already exists", drivePath)
+					err = fmt.Errorf("disk %s already exists", drivePath)
 
 				} else {
 
@@ -217,7 +218,7 @@ func (vm *VirtualMachine) addHardDrive(ctx *Context, virtualMachine *object.Virt
 }
 
 // Configure set characteristic of VM a virtual machine
-func (vm *VirtualMachine) Configure(ctx *Context, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory int, cpus int, disk int) error {
+func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory int, cpus int, disk int) error {
 	var devices object.VirtualDeviceList
 	var err error
 	var task *object.Task
@@ -261,7 +262,7 @@ func (vm *VirtualMachine) Configure(ctx *Context, userName, authKey string, clou
 	return err
 }
 
-func (vm VirtualMachine) isToolsRunning(ctx *Context, v *object.VirtualMachine) (bool, error) {
+func (vm VirtualMachine) isToolsRunning(ctx *context.Context, v *object.VirtualMachine) (bool, error) {
 	var o mo.VirtualMachine
 
 	running, err := v.IsToolsRunning(ctx)
@@ -282,13 +283,13 @@ func (vm VirtualMachine) isToolsRunning(ctx *Context, v *object.VirtualMachine) 
 }
 
 // IsToolsRunning returns true if VMware Tools is currently running in the guest OS, and false otherwise.
-func (vm VirtualMachine) IsToolsRunning(ctx *Context) (bool, error) {
+func (vm VirtualMachine) IsToolsRunning(ctx *context.Context) (bool, error) {
 	v := vm.VirtualMachine(ctx)
 
 	return vm.isToolsRunning(ctx, v)
 }
 
-func (vm *VirtualMachine) waitForToolsRunning(ctx *Context, v *object.VirtualMachine) (bool, error) {
+func (vm *VirtualMachine) waitForToolsRunning(ctx *context.Context, v *object.VirtualMachine) (bool, error) {
 	var running bool
 
 	p := property.DefaultCollector(vm.VimClient())
@@ -321,7 +322,7 @@ func (vm *VirtualMachine) waitForToolsRunning(ctx *Context, v *object.VirtualMac
 }
 
 // WaitForToolsRunning wait vmware tool starts
-func (vm *VirtualMachine) WaitForToolsRunning(ctx *Context) (bool, error) {
+func (vm *VirtualMachine) WaitForToolsRunning(ctx *context.Context) (bool, error) {
 	var powerState types.VirtualMachinePowerState
 	var err error
 	var running bool
@@ -332,14 +333,14 @@ func (vm *VirtualMachine) WaitForToolsRunning(ctx *Context) (bool, error) {
 		if powerState == types.VirtualMachinePowerStatePoweredOn {
 			running, err = vm.waitForToolsRunning(ctx, v)
 		} else {
-			err = fmt.Errorf("The VM: %s is not powered", v.InventoryPath)
+			err = fmt.Errorf("the VM: %s is not powered", v.InventoryPath)
 		}
 	}
 
 	return running, err
 }
 
-func (vm *VirtualMachine) waitForIP(ctx *Context, v *object.VirtualMachine) (string, error) {
+func (vm *VirtualMachine) waitForIP(ctx *context.Context, v *object.VirtualMachine) (string, error) {
 	if running, err := vm.isToolsRunning(ctx, v); running {
 		return v.WaitForIP(ctx)
 	} else if err != nil {
@@ -350,7 +351,7 @@ func (vm *VirtualMachine) waitForIP(ctx *Context, v *object.VirtualMachine) (str
 }
 
 // WaitForIP wait ip
-func (vm *VirtualMachine) WaitForIP(ctx *Context) (string, error) {
+func (vm *VirtualMachine) WaitForIP(ctx *context.Context) (string, error) {
 	var powerState types.VirtualMachinePowerState
 	var err error
 	var ip string
@@ -361,7 +362,7 @@ func (vm *VirtualMachine) WaitForIP(ctx *Context) (string, error) {
 		if powerState == types.VirtualMachinePowerStatePoweredOn {
 			ip, err = vm.waitForIP(ctx, v)
 		} else {
-			err = fmt.Errorf("The VM: %s is not powered", v.InventoryPath)
+			err = fmt.Errorf("the VM: %s is not powered", v.InventoryPath)
 		}
 	}
 
@@ -369,7 +370,7 @@ func (vm *VirtualMachine) WaitForIP(ctx *Context) (string, error) {
 }
 
 // PowerOn power on a virtual machine
-func (vm *VirtualMachine) PowerOn(ctx *Context) error {
+func (vm *VirtualMachine) PowerOn(ctx *context.Context) error {
 	var powerState types.VirtualMachinePowerState
 	var err error
 	var task *object.Task
@@ -382,7 +383,7 @@ func (vm *VirtualMachine) PowerOn(ctx *Context) error {
 				err = task.Wait(ctx)
 			}
 		} else {
-			err = fmt.Errorf("The VM: %s is already powered", v.InventoryPath)
+			err = fmt.Errorf("the VM: %s is already powered", v.InventoryPath)
 		}
 	}
 
@@ -390,7 +391,7 @@ func (vm *VirtualMachine) PowerOn(ctx *Context) error {
 }
 
 // PowerOff power off a virtual machine
-func (vm *VirtualMachine) PowerOff(ctx *Context) error {
+func (vm *VirtualMachine) PowerOff(ctx *context.Context) error {
 	var powerState types.VirtualMachinePowerState
 	var err error
 	var task *object.Task
@@ -403,7 +404,7 @@ func (vm *VirtualMachine) PowerOff(ctx *Context) error {
 				err = task.Wait(ctx)
 			}
 		} else {
-			err = fmt.Errorf("The VM: %s is already off", v.InventoryPath)
+			err = fmt.Errorf("the VM: %s is already off", v.InventoryPath)
 		}
 	}
 
@@ -411,7 +412,7 @@ func (vm *VirtualMachine) PowerOff(ctx *Context) error {
 }
 
 // ShutdownGuest power off a virtual machine
-func (vm *VirtualMachine) ShutdownGuest(ctx *Context) error {
+func (vm *VirtualMachine) ShutdownGuest(ctx *context.Context) error {
 	var powerState types.VirtualMachinePowerState
 	var err error
 	var task *object.Task
@@ -426,7 +427,7 @@ func (vm *VirtualMachine) ShutdownGuest(ctx *Context) error {
 				}
 			}
 		} else {
-			err = fmt.Errorf("The VM: %s is already power off", v.InventoryPath)
+			err = fmt.Errorf("the VM: %s is already power off", v.InventoryPath)
 		}
 	}
 
@@ -434,7 +435,7 @@ func (vm *VirtualMachine) ShutdownGuest(ctx *Context) error {
 }
 
 // Delete delete the virtual machine
-func (vm *VirtualMachine) Delete(ctx *Context) error {
+func (vm *VirtualMachine) Delete(ctx *context.Context) error {
 	var powerState types.VirtualMachinePowerState
 	var err error
 	var task *object.Task
@@ -447,7 +448,7 @@ func (vm *VirtualMachine) Delete(ctx *Context) error {
 				err = task.Wait(ctx)
 			}
 		} else {
-			err = fmt.Errorf("The VM: %s is powered", v.InventoryPath)
+			err = fmt.Errorf("the VM: %s is powered", v.InventoryPath)
 		}
 	}
 
@@ -455,7 +456,7 @@ func (vm *VirtualMachine) Delete(ctx *Context) error {
 }
 
 // Status refresh status virtual machine
-func (vm *VirtualMachine) Status(ctx *Context) (*Status, error) {
+func (vm *VirtualMachine) Status(ctx *context.Context) (*Status, error) {
 	var powerState types.VirtualMachinePowerState
 	var err error
 	var status *Status
@@ -479,14 +480,14 @@ func (vm *VirtualMachine) Status(ctx *Context) (*Status, error) {
 }
 
 // SetGuestInfo change guest ingos
-func (vm *VirtualMachine) SetGuestInfo(ctx *Context, guestInfos *GuestInfos) error {
+func (vm *VirtualMachine) SetGuestInfo(ctx *context.Context, guestInfos *GuestInfos) error {
 	var task *object.Task
 	var err error
 
 	vmConfigSpec := types.VirtualMachineConfigSpec{}
 	v := vm.VirtualMachine(ctx)
 
-	if guestInfos != nil && guestInfos.isEmpty() == false {
+	if guestInfos != nil && !guestInfos.isEmpty() {
 		vmConfigSpec.ExtraConfig = guestInfos.toExtraConfig()
 	} else {
 		vmConfigSpec.ExtraConfig = []types.BaseOptionValue{}
@@ -499,7 +500,7 @@ func (vm *VirtualMachine) SetGuestInfo(ctx *Context, guestInfos *GuestInfos) err
 	return err
 }
 
-func (vm *VirtualMachine) cloudInit(ctx *Context, hostName string, userName, authKey string, cloudInit interface{}, network *Network) ([]types.BaseOptionValue, error) {
+func (vm *VirtualMachine) cloudInit(ctx *context.Context, hostName string, userName, authKey string, cloudInit interface{}, network *Network) ([]types.BaseOptionValue, error) {
 	var metadata, userdata, vendordata, netconfig string
 	var err error
 	var guestInfos *GuestInfos

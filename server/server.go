@@ -134,7 +134,10 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 			ng = s.Groups[nodeGroupIdentifier]
 
 			if ng == nil {
-				systemLabels := make(map[string]string)
+				systemLabels := map[string]string{
+					constantes.NodeLabelWorkerRole: "",
+				}
+
 				labels := map[string]string{
 					constantes.NodeLabelGroupName: nodeGroupIdentifier,
 				}
@@ -432,14 +435,16 @@ func (s *AutoScalerServerApp) NewNodeGroup(ctx context.Context, request *apigrpc
 	labels := make(map[string]string)
 	systemLabels := make(map[string]string)
 
-	if request.GetLabels() != nil {
-		for k2, v2 := range request.GetLabels() {
+	systemLabels[constantes.NodeLabelWorkerRole] = ""
+
+	if reqLabels := request.GetLabels(); reqLabels != nil {
+		for k2, v2 := range reqLabels {
 			labels[k2] = v2
 		}
 	}
 
-	if request.GetSystemLabels() != nil {
-		for k2, v2 := range request.GetSystemLabels() {
+	if reqSystemLabels := request.GetSystemLabels(); reqSystemLabels != nil {
+		for k2, v2 := range reqSystemLabels {
 			systemLabels[k2] = v2
 		}
 	}
@@ -1327,7 +1332,7 @@ func StartServer(p types.ClientGenerator, c *types.Config) {
 		KubeAdmExtraArguments: config.KubeAdm.ExtraArguments,
 	}
 
-	if phSaveState == false || utils.FileExists(phSavedState) == false {
+	if !phSaveState || !utils.FileExists(phSavedState) {
 		autoScalerServer = &AutoScalerServerApp{
 			kubeClient:           p,
 			ResourceLimiter:      c.GetResourceLimiter(),

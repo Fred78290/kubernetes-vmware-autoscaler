@@ -16,19 +16,27 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	DefaultMaxGracePeriod    time.Duration = 30 * time.Second
+	DefaultMaxRequestTimeout time.Duration = 30 * time.Second
+	DefaultMaxDeletionPeriod time.Duration = 2 * time.Minute
+)
+
 type Config struct {
-	APIServerURL   string
-	KubeConfig     string
-	RequestTimeout time.Duration
-	Config         string
-	SaveLocation   string
-	DisplayVersion bool
-	LogFormat      string
-	LogLevel       string
-	MinCpus        int64
-	MinMemory      int64
-	MaxCpus        int64
-	MaxMemory      int64
+	APIServerURL    string
+	KubeConfig      string
+	RequestTimeout  time.Duration
+	DeletionTimeout time.Duration
+	MaxGracePeriod  time.Duration
+	Config          string
+	SaveLocation    string
+	DisplayVersion  bool
+	LogFormat       string
+	LogLevel        string
+	MinCpus         int64
+	MinMemory       int64
+	MaxCpus         int64
+	MaxMemory       int64
 }
 
 func (c *Config) GetResourceLimiter() *ResourceLimiter {
@@ -38,14 +46,20 @@ func (c *Config) GetResourceLimiter() *ResourceLimiter {
 	}
 }
 
+// A PodFilterFunc returns true if the supplied pod passes the filter.
+type PodFilterFunc func(p apiv1.Pod) (bool, error)
+
 // ClientGenerator provides clients
 type ClientGenerator interface {
 	KubeClient() (kubernetes.Interface, error)
 
+	PodList(nodeName string, podFilter PodFilterFunc) ([]apiv1.Pod, error)
 	NodeList() (*apiv1.NodeList, error)
+	SetProviderID(nodeName, providerID string) error
 	UncordonNode(nodeName string) error
 	CordonNode(nodeName string) error
-	DrainNode(nodeName string) error
+	MarkDrainNode(nodeName string) error
+	DrainNode(nodeName string, ignoreDaemonSet, deleteLocalData bool) error
 	DeleteNode(nodeName string) error
 	AnnoteNode(nodeName string, annotations map[string]string) error
 	LabelNode(nodeName string, labels map[string]string) error
@@ -127,14 +141,6 @@ type AutoScalerServerRsync struct {
 	Excludes    []string `json:"excludes"`
 }
 
-// AutoScalerServerSyncFolders declare how to sync file between host and guest
-type AutoScalerServerSyncFolders struct {
-	RsyncOptions []string                `json:"options"`
-	RsyncUser    string                  `json:"user"`
-	RsyncSSHKey  string                  `json:"ssh-key"`
-	Folders      []AutoScalerServerRsync `json:"folders"`
-}
-
 // AutoScalerServerConfig is contains configuration
 type AutoScalerServerConfig struct {
 	Network            string                            `default:"tcp" json:"network"`         // Mandatory, Network to listen (see grpc doc) to listen
@@ -148,7 +154,6 @@ type AutoScalerServerConfig struct {
 	DefaultMachineType string                            `default:"{\"standard\": {}}" json:"default-machine"`
 	Machines           map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
 	CloudInit          interface{}                       `json:"cloud-init"`                            // Optional, The cloud init conf file
-	SyncFolders        *AutoScalerServerSyncFolders      `json:"sync-folder"`                           // Optional, do rsync between host and guest
 	Optionals          *AutoScalerServerOptionals        `json:"optionals"`
 	ResourceLimiter    *ResourceLimiter                  `json:"limits"`
 	SSH                *AutoScalerServerSSH              `json:"ssh-infos"`
@@ -173,17 +178,19 @@ func (conf *AutoScalerServerConfig) GetVSphereConfiguration(name string) *vspher
 // NewConfig returns new Config object
 func NewConfig() *Config {
 	return &Config{
-		APIServerURL:   "",
-		KubeConfig:     "",
-		RequestTimeout: 30,
-		DisplayVersion: false,
-		Config:         "/etc/cluster/vmware-cluster-autoscaler.json",
-		MinCpus:        2,
-		MinMemory:      1024,
-		MaxCpus:        24,
-		MaxMemory:      1024 * 24,
-		LogFormat:      "text",
-		LogLevel:       glog.InfoLevel.String(),
+		APIServerURL:    "",
+		KubeConfig:      "",
+		RequestTimeout:  DefaultMaxRequestTimeout,
+		DeletionTimeout: DefaultMaxDeletionPeriod,
+		MaxGracePeriod:  DefaultMaxGracePeriod,
+		DisplayVersion:  false,
+		Config:          "/etc/cluster/vmware-cluster-autoscaler.json",
+		MinCpus:         2,
+		MinMemory:       1024,
+		MaxCpus:         24,
+		MaxMemory:       1024 * 24,
+		LogFormat:       "text",
+		LogLevel:        glog.InfoLevel.String(),
 	}
 }
 
@@ -209,7 +216,9 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	// Flags related to Kubernetes
 	app.Flag("server", "The Kubernetes API server to connect to (default: auto-detect)").Default(cfg.APIServerURL).StringVar(&cfg.APIServerURL)
 	app.Flag("kubeconfig", "Retrieve target cluster configuration from a Kubernetes configuration file (default: auto-detect)").Default(cfg.KubeConfig).StringVar(&cfg.KubeConfig)
-	app.Flag("request-timeout", "Request timeout when calling Kubernetes APIs. 0s means no timeout").Default(cfg.RequestTimeout.String()).DurationVar(&cfg.RequestTimeout)
+	app.Flag("request-timeout", "Request timeout when calling Kubernetes APIs. 0s means no timeout").Default(DefaultMaxRequestTimeout.String()).DurationVar(&cfg.RequestTimeout)
+	app.Flag("deletion-timeout", "Deletion timeout when delete node. 0s means no timeout").Default(DefaultMaxDeletionPeriod.String()).DurationVar(&cfg.DeletionTimeout)
+	app.Flag("max-grace-period", "Maximum time evicted pods will be given to terminate gracefully.").Default(DefaultMaxGracePeriod.String()).DurationVar(&cfg.MaxGracePeriod)
 
 	app.Flag("min-cpus", "Limits: minimum cpu (default: 1)").Default(strconv.FormatInt(cfg.MinCpus, 10)).Int64Var(&cfg.MinCpus)
 	app.Flag("min-memory", "Limits: minimum memory in MB (default: 1G)").Default(strconv.FormatInt(cfg.MinMemory, 10)).Int64Var(&cfg.MinMemory)
@@ -230,5 +239,5 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 }
 
 func (cfg *Config) String() string {
-	return fmt.Sprintf("APIServerURL:%s\nKubeConfig:%s\nRequestTimeout:%s\nConfig:%s\nSaveLocation:%s\nDisplayVersion:%s", cfg.APIServerURL, cfg.KubeConfig, cfg.RequestTimeout, cfg.Config, cfg.SaveLocation, strconv.FormatBool(cfg.DisplayVersion))
+	return fmt.Sprintf("APIServerURL:%s KubeConfig:%s RequestTimeout:%s Config:%s SaveLocation:%s DisplayVersion:%s", cfg.APIServerURL, cfg.KubeConfig, cfg.RequestTimeout, cfg.Config, cfg.SaveLocation, strconv.FormatBool(cfg.DisplayVersion))
 }

@@ -30,7 +30,7 @@
                 },
                 "containers": [
                     {
-                        "image": "fred78290/vsphere-autoscaler:v1.21.0",
+                        "image": "$REGISTRY/vsphere-autoscaler:v1.21.0",
                         "name": "vsphere-autoscaler",
                         "resources": {
                             "limits": {
@@ -43,8 +43,7 @@
                             }
                         },
                         "command": [
-                            "./vsphere-autoscaler",
-                            "--kubeconfig=/etc/kubernetes/config",
+                            "/usr/local/bin/vsphere-autoscaler",
                             "--config=/etc/cluster/kubernetes-vmware-autoscaler.json",
                             "--save=/etc/cluster/vmware-autoscaler-state.json",
                             "-v=1",
@@ -52,11 +51,6 @@
                         ],
                         "imagePullPolicy": "Always",
                         "volumeMounts": [
-                            {
-                                "name": "kubernetes",
-                                "mountPath": "/etc/kubernetes/config",
-                                "readOnly": true
-                            },
                             {
                                 "name": "vsphere-autoscaler",
                                 "mountPath": "/etc/cluster"
@@ -69,12 +63,6 @@
                         "name": "vsphere-autoscaler",
                         "hostPath": {
                             "path": "/etc/cluster"
-                        }
-                    },
-                    {
-                        "name": "kubernetes",
-                        "hostPath": {
-                            "path": "/etc/kubernetes/admin.conf"
                         }
                     }
                 ]
