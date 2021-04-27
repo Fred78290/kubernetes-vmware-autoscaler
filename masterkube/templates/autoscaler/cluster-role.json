@@ -38,6 +38,17 @@
                 ""
             ],
             "resources": [
+                "nodes/status"
+            ],
+            "verbs": [
+                "update"
+            ]
+        },
+        {
+            "apiGroups": [
+                ""
+            ],
+            "resources": [
                 "pods/status"
             ],
             "verbs": [
@@ -52,11 +63,13 @@
                 "endpoints"
             ],
             "resourceNames": [
-                "cluster-autoscaler"
+                "cluster-autoscaler",
+                "vsphere-autoscaler"
             ],
             "verbs": [
                 "get",
-                "update"
+                "update",
+                "delete"
             ]
         },
         {
@@ -70,7 +83,8 @@
                 "watch",
                 "list",
                 "get",
-                "update"
+                "update",
+                "delete"
             ]
         },
         {
@@ -87,7 +101,8 @@
             "verbs": [
                 "watch",
                 "list",
-                "get"
+                "get",
+                "update"
             ]
         },
         {
@@ -128,7 +143,8 @@
             "verbs": [
                 "watch",
                 "list",
-                "get"
+                "get",
+                "delete"
             ]
         },
         {
