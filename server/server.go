@@ -1311,7 +1311,7 @@ func StartServer(p types.ClientGenerator, c *types.Config) {
 	}
 
 	if _, err = p.KubeClient(); err != nil {
-		glog.Fatalf("failed to get kubernetes client, error:%v", configFileName, err)
+		glog.Fatalf("failed to get kubernetes client, error:%v", err)
 	}
 
 	if config.Optionals == nil {
