@@ -75,7 +75,7 @@ func addressToInteger(mask net.IP) uint32 {
 
 	buf := bytes.NewReader(mask)
 
-	binary.Read(buf, binary.BigEndian, &i)
+	_ = binary.Read(buf, binary.BigEndian, &i)
 
 	return i
 }

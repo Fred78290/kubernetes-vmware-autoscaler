@@ -42,29 +42,6 @@ func testFeature(name string) bool {
 	return true
 }
 
-func saveToJson(fileName string, config *ConfigurationTest) error {
-	file, err := os.Create(fileName)
-
-	if err != nil {
-		glog.Errorf("Failed to open file:%s, error:%v", fileName, err)
-
-		return err
-	}
-
-	defer file.Close()
-
-	encoder := json.NewEncoder(file)
-	err = encoder.Encode(config)
-
-	if err != nil {
-		glog.Errorf("failed to encode config to file:%s, error:%v", fileName, err)
-
-		return err
-	}
-
-	return nil
-}
-
 func loadFromJson(fileName string) *ConfigurationTest {
 	if testConfig == nil {
 		file, err := os.Open(fileName)
@@ -88,9 +65,7 @@ func Test_AuthMethodKey(t *testing.T) {
 
 		signer := utils.AuthMethodFromPrivateKeyFile(config.SSH.GetAuthKeys())
 
-		if assert.NotNil(t, signer) {
-
-		}
+		_ = assert.NotNil(t, signer)
 	}
 }
 

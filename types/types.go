@@ -134,13 +134,6 @@ func (ssh *AutoScalerServerSSH) GetAuthKeys() string {
 	return ssh.AuthKeys
 }
 
-// AutoScalerServerRsync declare an rsync operation
-type AutoScalerServerRsync struct {
-	Source      string   `json:"source"`
-	Destination string   `json:"destination"`
-	Excludes    []string `json:"excludes"`
-}
-
 // AutoScalerServerConfig is contains configuration
 type AutoScalerServerConfig struct {
 	Network            string                            `default:"tcp" json:"network"`         // Mandatory, Network to listen (see grpc doc) to listen

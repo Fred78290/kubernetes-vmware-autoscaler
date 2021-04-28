@@ -139,7 +139,7 @@ func (conf *Configuration) CreateWithContext(ctx *context.Context, name string, 
 
 	// If an error occured delete VM
 	if err != nil && vm != nil {
-		vm.Delete(ctx)
+		_ = vm.Delete(ctx)
 	}
 
 	return vm, err
