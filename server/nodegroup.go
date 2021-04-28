@@ -106,7 +106,7 @@ func (g *AutoScalerServerNodeGroup) refresh() {
 	glog.Debugf("AutoScalerServerNodeGroup::refresh, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	for _, node := range g.Nodes {
-		node.statusVM()
+		_, _ = node.statusVM()
 	}
 }
 
@@ -238,7 +238,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 
 	for _, nodeInfo := range nodeInfos.Items {
 		var providerID = utils.GetNodeProviderID(g.ServiceIdentifier, &nodeInfo)
-		var nodeID = ""
+		var nodeID string
 
 		if len(providerID) > 0 {
 			out, _ = utils.NodeGroupIDFromProviderID(g.ServiceIdentifier, providerID)
@@ -282,7 +282,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 						}
 
 						err = client.AnnoteNode(nodeInfo.Name, map[string]string{
-							constantes.AnnotationScaleDownDisabled:    strconv.FormatBool(scaleDownDisabled && node.AutoProvisionned == false),
+							constantes.AnnotationScaleDownDisabled:    strconv.FormatBool(scaleDownDisabled && !node.AutoProvisionned),
 							constantes.AnnotationNodeAutoProvisionned: strconv.FormatBool(node.AutoProvisionned),
 							constantes.AnnotationNodeIndex:            strconv.Itoa(node.NodeIndex),
 						})
@@ -304,7 +304,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 
 					g.Nodes[nodeID] = node
 
-					node.statusVM()
+					_, _ = node.statusVM()
 				}
 			}
 		}

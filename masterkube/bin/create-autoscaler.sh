@@ -40,8 +40,7 @@ elif [ "$LAUNCH_CA" == "LOCAL" ]; then
         --kubeconfig=$KUBECONFIG \
         --config=$PWD/config/kubernetes-vmware-autoscaler.json \
         --save=$PWD/config/vmware-autoscaler-state.json \
-        -v=1 \
-        -logtostderr=true  1>>config/vmware-autoscaler.log 2>&1 &
+        --log-level=info 1>>config/vmware-autoscaler.log 2>&1 &
     pid="$!"
 
     echo -n "$pid" > config/vmware-autoscaler.pid

@@ -2,11 +2,8 @@
 pushd $(dirname $0)
 
 make container
-
-[ $(uname -s) = "Darwin" ] && GOOS=darwin || GOOS=linux
-
-./out/vsphere-autoscaler-$GOOS-amd64 \
+GOARCH=$(go env GOARCH)
+./out/vsphere-autoscaler-$GOARCH \
     --config=masterkube/config/kubernetes-vmware-autoscaler.json \
     --save=masterkube/config/autoscaler-state.json \
-    -v=9 \
-    -logtostderr=true
+    --log-level=info
