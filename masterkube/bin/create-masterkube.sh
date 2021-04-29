@@ -52,6 +52,8 @@ export VC_NETWORK_PUBLIC="Public Network"
 export REGISTRY=devregistry.aldunelabs.com
 export LAUNCH_CA=YES
 
+SSH_OPTIONS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+
 if [ "$OSDISTRO" == "Linux" ]; then
     TZ=$(cat /etc/timezone)
     BASE64="base64 -w 0"
@@ -448,13 +450,15 @@ echo "Wait for IP from ${MASTERKUBE}"
 IPADDR=$(govc vm.ip -wait 5m "${MASTERKUBE}")
 
 echo "Prepare ${MASTERKUBE} instance"
-scp -r bin ${KUBERNETES_USER}@${IPADDR}:~
+scp ${SSH_OPTIONS} -r bin ${KUBERNETES_USER}@${IPADDR}:~
 
 echo "Start kubernetes ${MASTERKUBE} instance master node, kubernetes version=${KUBERNETES_VERSION}, providerID=${PROVIDERID}"
-ssh ${KUBERNETES_USER}@${IPADDR} sudo mv /home/${KUBERNETES_USER}/bin/* /usr/local/bin
-ssh ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh flannel eth1 "${KUBERNETES_VERSION}" "\"${PROVIDERID}\""
+ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo mv /home/${KUBERNETES_USER}/bin/* /usr/local/bin
+ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh --cni=flannel --net-if=eth1 --kubernetes-version="${KUBERNETES_VERSION}" --provider-id="'${PROVIDERID}'" --cert-extra-sans="${MASTERKUBE}.${DOMAIN_NAME},masterkube-vmware.${DOMAIN_NAME},masterkube-vmware-dashboard.${DOMAIN_NAME}"
 
-scp ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ./cluster
+echo "create cluster done"
+
+scp ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ./cluster
 
 MASTER_IP=$(cat ./cluster/manager-ip)
 TOKEN=$(cat ./cluster/token)
@@ -569,17 +573,19 @@ EOF
 echo "$AUTOSCALER_CONFIG" | jq . > config/kubernetes-vmware-autoscaler.json
 
 # Recopy config file on master node
-scp ${SSH_PRIVATE_KEY} ./config/grpc-config.json ./config/kubernetes-vmware-autoscaler.json ${KUBERNETES_USER}@${IPADDR}:/tmp
-ssh ${KUBERNETES_USER}@${IPADDR} sudo cp "/tmp/${SSH_KEY_FNAME}" /tmp/grpc-config.json /tmp/kubernetes-vmware-autoscaler.json /etc/cluster
+scp ${SSH_OPTIONS} ${SSH_PRIVATE_KEY} ./config/grpc-config.json ./config/kubernetes-vmware-autoscaler.json ${KUBERNETES_USER}@${IPADDR}:/tmp
+ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp "/tmp/${SSH_KEY_FNAME}" /tmp/grpc-config.json /tmp/kubernetes-vmware-autoscaler.json /etc/cluster
 
 # Update /etc/hosts
 if [ "${OSDISTRO}" == "Linux" ]; then
-    sudo sed -i '/masterkube/d' /etc/hosts
+    sudo sed -i "/${MASTERKUBE}.${DOMAIN_NAME}/d" /etc/hosts
+    sed -i -E "s/https:\/\/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:([0-9]+)/https:\/\/${MASTERKUBE}.${DOMAIN_NAME}:\1/g" cluster/config
 else
-    sudo sed -i'' '/masterkube/d' /etc/hosts
+    sudo sed -i'' "/${MASTERKUBE}.${DOMAIN_NAME}/d" /etc/hosts
+    sed -i'' -E "s/https:\/\/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:([0-9]+)/https:\/\/${MASTERKUBE}.${DOMAIN_NAME}:\1/g" cluster/config
 fi
 
-sudo bash -c "echo '${IPADDR} ${MASTERKUBE}.${DOMAIN_NAME} masterkube.${DOMAIN_NAME} masterkube-dashboard.${DOMAIN_NAME}' >> /etc/hosts"
+sudo bash -c "echo '${IPADDR} ${MASTERKUBE}.${DOMAIN_NAME} masterkube-vmware.${DOMAIN_NAME} masterkube-vmware-dashboard.${DOMAIN_NAME}' >> /etc/hosts"
 
 # Create Pods
 create-ingress-controller.sh
