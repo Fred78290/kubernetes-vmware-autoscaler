@@ -8,10 +8,45 @@ KUBERNETES_VERSION=v1.21.0
 CLUSTER_DIR=/etc/cluster
 PROVIDERID="vmware://afp-slyo-ca-k8s/object?type=node&name=${HOSTNAME}"
 
-[ -z "$1" ] || CNI="$1"
-[ -z "$2" ] || NET_IF="$2"
-[ -z "$3" ] || KUBERNETES_VERSION="$3"
-[ -z "$4" ] || PROVIDERID="$4"
+TEMP=$(getopt -o c:k:n:p:x: --long net-if:,provider-id:,cert-extra-sans:,cni:,kubernetes-version: -n "$0" -- "$@")
+
+eval set -- "${TEMP}"
+
+# extract options and their arguments into variables.
+while true; do
+    case "$1" in
+    -c | --cni)
+        CNI=$2
+        shift 2
+        ;;
+    -k | --kubernetes-version)
+        KUBERNETES_VERSION="$2"
+        shift 2
+        ;;
+    -n | --net-if)
+        NET_IF=$2
+        shift 2
+        ;;
+    -p | --provider-id)
+        PROVIDERID=$2
+        shift 2
+        ;;
+    -x | --cert-extra-sans)
+        CERT_EXTRA_SANS=$2
+        shift 2
+        ;;
+
+    --)
+        shift
+        break
+        ;;
+
+    *)
+        echo "$1 - Internal error!"
+        exit 1
+        ;;
+    esac
+done
 
 # Check if interface exists, else take inet default gateway
 ifconfig $NET_IF &> /dev/null || NET_IF=$(ip route get 1|awk '{print $5;exit}')
@@ -27,6 +62,10 @@ if [ "x$KUBERNETES_VERSION" != "x" ]; then
     K8_OPTIONS="--token-ttl 0 --ignore-preflight-errors=All --apiserver-advertise-address $IPADDR --kubernetes-version $KUBERNETES_VERSION"
 else
     K8_OPTIONS="--token-ttl 0 --ignore-preflight-errors=All --apiserver-advertise-address $IPADDR"
+fi
+
+if [ "x$CERT_EXTRA_SANS" != "x" ]; then
+    K8_OPTIONS="$K8_OPTIONS --apiserver-cert-extra-sans=$CERT_EXTRA_SANS"
 fi
 
 if [ ! -f /etc/kubernetes/kubelet.conf ]; then
@@ -169,3 +208,5 @@ EOF
 else
     echo "Already installed k8s master node"
 fi
+
+exit 0
