@@ -574,12 +574,14 @@ ssh ${KUBERNETES_USER}@${IPADDR} sudo cp "/tmp/${SSH_KEY_FNAME}" /tmp/grpc-confi
 
 # Update /etc/hosts
 if [ "${OSDISTRO}" == "Linux" ]; then
-    sudo sed -i '/masterkube/d' /etc/hosts
+    sudo sed -i "/${MASTERKUBE}.${DOMAIN_NAME}/d" /etc/hosts
+    sed -i -E "s/https:\/\/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:([0-9]+)/https:\/\/${MASTERKUBE}.${DOMAIN_NAME}:\1/g" cluster/config
 else
-    sudo sed -i'' '/masterkube/d' /etc/hosts
+    sudo sed -i'' "/${MASTERKUBE}.${DOMAIN_NAME}/d" /etc/hosts
+    sed -i'' -E "s/https:\/\/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:([0-9]+)/https:\/\/${MASTERKUBE}.${DOMAIN_NAME}:\1/g" cluster/config
 fi
 
-sudo bash -c "echo '${IPADDR} ${MASTERKUBE}.${DOMAIN_NAME} masterkube.${DOMAIN_NAME} masterkube-dashboard.${DOMAIN_NAME}' >> /etc/hosts"
+sudo bash -c "echo '${IPADDR} ${MASTERKUBE}.${DOMAIN_NAME} masterkube-vmware.${DOMAIN_NAME} masterkube-vmware-dashboard.${DOMAIN_NAME}' >> /etc/hosts"
 
 # Create Pods
 create-ingress-controller.sh

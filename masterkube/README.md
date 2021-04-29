@@ -34,7 +34,7 @@ Some needed file are located in:
 
 The first thing done by this script is to create a VM Template Ubuntu-20.04.2 image with kubernetes and docker installed. The VM template will be named by default afp-slyo-bionic-kubernetes-(kuberneres version)
 
-Next step will be to launch a cloned VM and create a master node. It will also deploy a dashboard at the URL https://masterkube-dashboard.@your-domain@/
+Next step will be to launch a cloned VM and create a master node. It will also deploy a dashboard at the URL https://masterkube-vmware-dashboard.@your-domain@/
 
 To connect to the dashboard, copy paste the token from file [cluster/dashboard-token](./cluster/dashboard-token)
 
