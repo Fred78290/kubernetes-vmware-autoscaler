@@ -11,6 +11,8 @@ addons:
     organization: fred78290-github
     token:
       secure: "X6QTVwIX6ZGN3CSozfvTevW6XxvVFBXuZZxTSIsloldJ4uwxGZiKUyfO83PSov7I7FghKTaMppPxMgO6ZT5FlBqFNGJZ53QfrajGJ8//tS+fYZ94SucEYMZ4W7B4K+YjEMJERgBSw2mgrMIy6mZ+P4j0mhuHbAtvloFA7tJIjXYMTuoPqfHzeYkuBPGcWJ0r2n0zQTMNGVnjnsbZlj50BPoMx9H7S6dvtp1L67yyom4NnrDKwNNnq/dy5O0lhlIR3KzBXlf8E+pzC+CCDIXiasENhtJawez4yQ63gPtbJSR+9FbUmdoEX3Lr83HnhGrXnWJ5BsxYdjrQSV7E3B9EMJpP2C5pIjKC9HVgNyoeHgLT8nxcKtsQpmSyS/+lbus8/Vj+lTlir7vmcPDlehUHOeIemJajB23kmNiwWfo71MvfSnVt+4MqAYgegUW5G6fJAqEahVA2hgo/o58RXnD6m61EyPOlC273CpLJ8qrFqa6+cHspGkWa9KQ5RNfDIkj8i2iHR+HXkaeNy4L1KM2+6KIx7sJl1R1fo6RYwYM3S0HfL6Qm+HGqYesOhH9tTs2X27whzqBb+GzgwFuxYrBR6X+rAD/SXjF7ubqroJNmN+o4uGeVVevMCkFZc5vI2Q3XW8TU28orhHXm+aGHaq9GJ7I83om+69dcSi9uiNixFNA="
+before_install:
+  - sudo curl https://get.docker.com | bash
 cache:
   directories:
     - $HOME/.sonar/cache
@@ -18,26 +20,20 @@ cache:
 jobs:
   include:
     - stage: build
-      services: docker
       install: true
       script:
-        - make -e REGISTRY=fred78290 -e TAG=dev container
+        - make -e REGISTRY=fred78290 -e TAG=$TRAVIS_TAG container
         - sonar-scanner
     - stage: test
-      services: docker
       install: true
       script: make test-in-docker
     - stage: deploy
       if: tag IS present OR commit_message =~ /\/ci-deploy/
-      services: docker
       install: true
-      script: make -e REGISTRY=fred78290 -e TAG=$TRAVIS_TAG container
-      before_deploy:
+      script:
         - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-      after_deploy:
+        - docker buildx create --use
         - make -e REGISTRY=fred78290 -e TAG=$TRAVIS_TAG push-manifest
-        - cp out/linux/amd64/vsphere-autoscaler vsphere-autoscaler-amd64
-        - cp out/linux/arm64/vsphere-autoscaler vsphere-autoscaler-arm64
       deploy:
         provider: releases
         api_key: $GITHUB_OAUTH_TOKEN
