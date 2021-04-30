@@ -20,12 +20,12 @@ cache:
 jobs:
   include:
     - stage: build
-      install: false
+      install: true
       script:
         - make -e REGISTRY=fred78290 -e TAG=$TRAVIS_TAG container
         - sonar-scanner
     - stage: test
-      install: false
+      install: true
       script: make test-in-docker
     - stage: deploy
       if: tag IS present OR commit_message =~ /\/ci-deploy/
