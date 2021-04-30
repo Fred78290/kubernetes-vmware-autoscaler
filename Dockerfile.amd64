@@ -13,11 +13,11 @@
 # limitations under the License.
 
 #ARG BASEIMAGE=gcr.io/distroless/static:latest-amd64
-ARG BASEIMAGE=k8s.gcr.io/debian-base-amd64:v1.0.0
+ARG BASEIMAGE=ubuntu:focal
 FROM $BASEIMAGE
 LABEL maintainer="Frederic Boltz <frederic.boltz@gmail.com>"
 
-COPY out/vsphere-autoscaler-amd64 /usr/local/bin/vsphere-autoscaler
+COPY out/linux/amd64/vsphere-autoscaler /usr/local/bin/vsphere-autoscaler
 
 EXPOSE 5200
 

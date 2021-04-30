@@ -36,7 +36,9 @@ if [ "$LAUNCH_CA" == YES ]; then
 elif [ "$LAUNCH_CA" == "DEBUG" ]; then
     deploy autoscaler
 elif [ "$LAUNCH_CA" == "LOCAL" ]; then
-    nohup ../out/vsphere-autoscaler-$(go env GOARCH) \
+    GOOS=$(go env GOOS)
+    GOARCH=$(go env GOARCH)
+    nohup ../out/$GOOS/$GOARCH/vsphere-autoscaler \
         --kubeconfig=$KUBECONFIG \
         --config=$PWD/config/kubernetes-vmware-autoscaler.json \
         --save=$PWD/config/vmware-autoscaler-state.json \
