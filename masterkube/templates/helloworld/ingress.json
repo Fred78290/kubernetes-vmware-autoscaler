@@ -16,14 +16,14 @@
         "tls": [
             {
                 "hosts": [
-                    "masterkube.$DOMAIN_NAME"
+                    "masterkube-vmware.$DOMAIN_NAME"
                 ],
                 "secretName": "$K8NAMESPACE"
             }
         ],
         "rules": [
 			{
-				"host": "masterkube.$DOMAIN_NAME",
+				"host": "masterkube-vmware.$DOMAIN_NAME",
 				"http": {
 					"paths": [
 						{

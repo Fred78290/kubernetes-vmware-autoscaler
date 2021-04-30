@@ -1,7 +1,7 @@
 # Use the newer Travis-CI build templates based on the
 # Debian Linux distribution "Xenial" release.
 os: linux
-dist: bionic
+dist: focal
 language: minimal
 env:
   global:
@@ -18,27 +18,31 @@ cache:
 jobs:
   include:
     - stage: build
-      services: docker
+      if: NOT(tag IS present OR commit_message =~ /\/ci-deploy/)
       install: true
       script:
-        - make -e REGISTRY=fred78290 -e TAG=dev container
+        - make -e REGISTRY=fred78290 -e TAG=$TRAVIS_TAG container
         - sonar-scanner
     - stage: test
-      services: docker
+      if: NOT(tag IS present OR commit_message =~ /\/ci-deploy/)
       install: true
-      script: make test-in-docker
+      script: make test-unit
     - stage: deploy
       if: tag IS present OR commit_message =~ /\/ci-deploy/
-      services: docker
+      services:
+        - docker
+      before_install:
+        - mkdir -vp ~/.docker/cli-plugins/
+        - curl --silent -L "https://github.com/docker/buildx/releases/download/v0.5.1/buildx-v0.5.1.linux-amd64" > ~/.docker/cli-plugins/docker-buildx
+        - chmod a+x ~/.docker/cli-plugins/docker-buildx
       install: true
-      script: make -e REGISTRY=fred78290 -e TAG=$TRAVIS_TAG container
-      before_deploy:
+      script:
+        - docker buildx version
         - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-      after_deploy:
-        - docker push fred78290/vsphere-autoscaler-amd64:$TRAVIS_TAG
-        - docker push fred78290/vsphere-autoscaler-arm64:$TRAVIS_TAG
-        - docker manifest create fred78290/vsphere-autoscaler:$TRAVIS_TAG --amend fred78290/vsphere-autoscaler-amd64:$TRAVIS_TAG --amend fred78290/vsphere-autoscaler-arm64:$TRAVIS_TAG
-        - docker manifest push fred78290/vsphere-autoscaler:$TRAVIS_TAG
+        - docker buildx create --use
+        - make -e REGISTRY=fred78290 -e TAG=$TRAVIS_TAG container-push-manifest
+        - cp out/linux/amd64/vsphere-autoscaler vsphere-autoscaler-amd64
+        - cp out/linux/arm64/vsphere-autoscaler vsphere-autoscaler-arm64
       deploy:
         provider: releases
         api_key: $GITHUB_OAUTH_TOKEN
@@ -47,5 +51,5 @@ jobs:
           tags: true
           repo: Fred78290/kubernetes-vmware-autoscaler
         file:
-          - out/vsphere-autoscaler-amd64
-          - out/vsphere-autoscaler-arm64
+          - vsphere-autoscaler-amd64
+          - vsphere-autoscaler-arm64
