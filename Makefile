@@ -39,7 +39,8 @@ build-arch-%: deps clean-arch-%
 	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -ldflags="-X main.phVersion=$(TAG) -X main.phBuildDate=$(BUILD_DATE)" -a -o out/$(GOOS)/$*/vsphere-autoscaler ${TAGS_FLAG}
 
 test-unit: clean build
-	go test --test.short -race ./... ${TAGS_FLAG}
+	go get -u github.com/vmware/govmomi/vcsim
+	bash ./scripts/run-tests.sh
 
 dev-release: $(addprefix dev-release-arch-,$(ALL_ARCH))
 
