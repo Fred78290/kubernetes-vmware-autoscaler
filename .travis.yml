@@ -13,11 +13,6 @@ addons:
       secure: "X6QTVwIX6ZGN3CSozfvTevW6XxvVFBXuZZxTSIsloldJ4uwxGZiKUyfO83PSov7I7FghKTaMppPxMgO6ZT5FlBqFNGJZ53QfrajGJ8//tS+fYZ94SucEYMZ4W7B4K+YjEMJERgBSw2mgrMIy6mZ+P4j0mhuHbAtvloFA7tJIjXYMTuoPqfHzeYkuBPGcWJ0r2n0zQTMNGVnjnsbZlj50BPoMx9H7S6dvtp1L67yyom4NnrDKwNNnq/dy5O0lhlIR3KzBXlf8E+pzC+CCDIXiasENhtJawez4yQ63gPtbJSR+9FbUmdoEX3Lr83HnhGrXnWJ5BsxYdjrQSV7E3B9EMJpP2C5pIjKC9HVgNyoeHgLT8nxcKtsQpmSyS/+lbus8/Vj+lTlir7vmcPDlehUHOeIemJajB23kmNiwWfo71MvfSnVt+4MqAYgegUW5G6fJAqEahVA2hgo/o58RXnD6m61EyPOlC273CpLJ8qrFqa6+cHspGkWa9KQ5RNfDIkj8i2iHR+HXkaeNy4L1KM2+6KIx7sJl1R1fo6RYwYM3S0HfL6Qm+HGqYesOhH9tTs2X27whzqBb+GzgwFuxYrBR6X+rAD/SXjF7ubqroJNmN+o4uGeVVevMCkFZc5vI2Q3XW8TU28orhHXm+aGHaq9GJ7I83om+69dcSi9uiNixFNA="
 services:
   - docker
-before_install:
-  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-  - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-  - sudo apt-get update
-  - sudo apt-get -y -o Dpkg::Options::="--force-confnew" install docker-ce
 cache:
   directories:
     - $HOME/.sonar/cache
