@@ -14,6 +14,7 @@ addons:
 cache:
   directories:
     - $HOME/.sonar/cache
+    - vendor
 jobs:
   include:
     - stage: build
