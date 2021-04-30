@@ -40,7 +40,7 @@ jobs:
         - docker buildx version
         - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
         - docker buildx create --use
-        - make -e REGISTRY=fred78290 -e TAG=$TRAVIS_TAG build container-push-manifest
+        - make -e REGISTRY=fred78290 -e TAG=$TRAVIS_TAG container-push-manifest
         - cp out/linux/amd64/vsphere-autoscaler vsphere-autoscaler-amd64
         - cp out/linux/arm64/vsphere-autoscaler vsphere-autoscaler-arm64
       deploy:
