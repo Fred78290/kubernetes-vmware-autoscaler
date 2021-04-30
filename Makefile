@@ -10,7 +10,7 @@ VERSION_BUILD ?= 0
 TAG?=v$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_BUILD)
 FLAGS=
 ENVVAR=
-GOOS?=linux
+GOOS?=$(shell go env GOOS)
 GOARCH?=$(shell go env GOARCH)
 REGISTRY?=fred78290
 BUILD_DATE?=`date +%Y-%m-%dT%H:%M:%SZ`
@@ -36,12 +36,12 @@ deps:
 build: build-arch-$(GOARCH)
 
 build-arch-%: deps clean-arch-%
-	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -ldflags="-X main.phVersion=$(TAG) -X main.phBuildDate=$(BUILD_DATE)" -a -o out/vsphere-autoscaler-$* ${TAGS_FLAG}
+	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -ldflags="-X main.phVersion=$(TAG) -X main.phBuildDate=$(BUILD_DATE)" -a -o out/$(GOOS)/$*/vsphere-autoscaler ${TAGS_FLAG}
 
 test-unit: clean build
 	go test --test.short -race ./... ${TAGS_FLAG}
 
-dev-release: $(addprefix dev-release-arch-,$(ALL_ARCH)) push-manifest
+dev-release: $(addprefix dev-release-arch-,$(ALL_ARCH))
 
 dev-release-arch-%: build-arch-% make-image-arch-% push-image-arch-%
 	@echo "Release ${TAG}${FOR_PROVIDER}-$* completed"
@@ -71,20 +71,25 @@ docker-push-arch-%:
 	docker push ${IMAGE}-$*:${TAG}
 
 push-manifest:
-	docker manifest create ${IMAGE}:${TAG} \
-	    $(addprefix --amend $(REGISTRY)/vsphere-autoscaler$(PROVIDER)-, $(addsuffix :$(TAG), $(ALL_ARCH)))
-	docker manifest push --purge ${IMAGE}:${TAG}
+ifdef BASEIMAGE
+	docker buildx build --pull --platform linux/amd64,linux/arm64 --push \
+		--build-arg BASEIMAGE=${BASEIMAGE} \
+		-t ${IMAGE}:${TAG} .
+else
+	docker buildx build --pull --platform linux/amd64,linux/arm64 --push \
+		-t ${IMAGE}:${TAG} .
+endif
+	@echo "Image ${TAG}${FOR_PROVIDER}-$* completed"
 
-container-push-manifest: container $(addprefix docker-push-arch-,$(ALL_ARCH)) push-manifest
+container-push-manifest: container push-manifest
 
-
-execute-release: $(addprefix make-image-arch-,$(ALL_ARCH)) $(addprefix push-image-arch-,$(ALL_ARCH)) push-manifest
+execute-release: $(addprefix make-image-arch-,$(ALL_ARCH)) $(addprefix push-image-arch-,$(ALL_ARCH))
 	@echo "Release ${TAG}${FOR_PROVIDER} completed"
 
 clean: clean-arch-$(GOARCH)
 
 clean-arch-%:
-	rm -f ./out/vsphere-autoscaler$(PROVIDER)-$*
+	rm -f ./out/$(GOOS)/$*/vsphere-autoscaler$(PROVIDER)
 
 format:
 	test -z "$$(find . -path ./vendor -prune -type f -o -name '*.go' -exec gofmt -s -d {} + | tee /dev/stderr)" || \
@@ -105,7 +110,7 @@ release: $(addprefix build-in-docker-arch-,$(ALL_ARCH)) execute-release
 
 container: $(addprefix container-arch-,$(ALL_ARCH))
 
-container-arch-%: build-in-docker-arch-% make-image-arch-%
+container-arch-%: build-in-docker-arch-%
 	@echo "Full in-docker image ${TAG}${FOR_PROVIDER}-$* completed"
 
 test-in-docker: clean docker-builder

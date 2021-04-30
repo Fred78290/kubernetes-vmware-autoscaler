@@ -13,11 +13,18 @@
 # limitations under the License.
 
 #ARG BASEIMAGE=gcr.io/distroless/static:latest-amd64
-ARG BASEIMAGE=ubuntu:focal
-FROM $BASEIMAGE
+FROM alpine AS builder
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
+COPY out .
+RUN ls / ; mv /$TARGETPLATFORM/vsphere-autoscaler /vsphere-autoscaler
+
+FROM ubuntu:focal
+
 LABEL maintainer="Frederic Boltz <frederic.boltz@gmail.com>"
 
-COPY out/linux/arm64/vsphere-autoscaler /usr/local/bin/vsphere-autoscaler
+COPY --from=builder /vsphere-autoscaler /usr/local/bin/vsphere-autoscaler
 
 EXPOSE 5200
 
