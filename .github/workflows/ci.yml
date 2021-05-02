@@ -104,7 +104,8 @@ jobs:
         run: sudo chown -R $USER .scannerwork
   deploy:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: test
+    name: Deploy
     runs-on: ubuntu:latest
     env:
       REGISTRY: ${{ secrets.REGISTRY }}
