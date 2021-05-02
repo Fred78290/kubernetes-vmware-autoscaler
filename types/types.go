@@ -17,9 +17,9 @@ import (
 )
 
 const (
-	DefaultMaxGracePeriod    time.Duration = 30 * time.Second
-	DefaultMaxRequestTimeout time.Duration = 30 * time.Second
-	DefaultMaxDeletionPeriod time.Duration = 2 * time.Minute
+	DefaultMaxGracePeriod    time.Duration = 120 * time.Second
+	DefaultMaxRequestTimeout time.Duration = 120 * time.Second
+	DefaultMaxDeletionPeriod time.Duration = 300 * time.Second
 )
 
 type Config struct {
