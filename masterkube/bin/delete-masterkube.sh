@@ -1,6 +1,7 @@
 #!/bin/bash
 CURDIR=$(dirname $0)
 NODEGROUP_NAME="vmware-ca-k8s"
+MASTERKUBE=${NODEGROUP_NAME}-masterkube
 
 echo "Delete masterkube previous instance"
 
@@ -18,7 +19,7 @@ if [ -f ./cluster/config ]; then
     done
 fi
 
-./bin/kubeconfig-delete.sh $NODEGROUP_NAME-masterkube &> /dev/null
+./bin/kubeconfig-delete.sh $MASTERKUBE &> /dev/null
 
 if [ -f config/vmware-autoscaler.pid ]; then
     kill $(cat config/vmware-autoscaler.pid)
@@ -26,5 +27,11 @@ fi
 
 find cluster ! -name '*.md' -type f -exec rm -f "{}" "+"
 find config ! -name '*.md' -type f -exec rm -f "{}" "+"
+
+if [ "$(uname -s)" == "Linux" ]; then
+    sudo sed -i "/${MASTERKUBE}/d" /etc/hosts
+else
+    sudo sed -i'' "/${MASTERKUBE}/d" /etc/hosts
+fi
 
 popd
