@@ -1,0 +1,161 @@
+name: vsphere-autoscaler
+on:
+  push:
+    branches:
+      - '*'
+    tags:
+      - v*
+  pull_request:
+    types: [opened, synchronize, reopened]
+jobs:
+  build:
+    runs-on: ubuntu:latest
+    env:
+      REGISTRY: ${{ secrets.REGISTRY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Cache vendor
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-vendor
+        with:
+          path: vendor
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('go.mod') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+      - name: Prepare
+        id: prep
+        run: |
+          TAG=pr
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            TAG=${GITHUB_REF#refs/tags/}
+          elif [[ $GITHUB_REF == refs/heads/* ]]; then
+            TAG=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
+          fi
+          echo ::set-output name=tag::${TAG}
+          echo "Build with tag=${TAG}"
+      - name:  Setup Go environment
+        uses: actions/setup-go@v2.1.3
+        with:
+          go-version: 1.16
+      - name: Build binary
+        shell: bash
+        run: make -e REGISTRY=$REGISTRY -e TAG="${{ steps.prep.outputs.tag }}" build-in-docker
+      # Directory created with a docker run having user root
+      - name: Fix directory owner
+        shell: bash
+        run: sudo chown -R $USER out vendor
+      - name: Output
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v2.2.3
+        with:
+          name: binaries
+          path: out
+          if-no-files-found: error
+  test:
+    name: Test
+    runs-on: ubuntu:latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Prepare
+        id: prep
+        run: |
+          TAG=pr
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            TAG=${GITHUB_REF#refs/tags/}
+          elif [[ $GITHUB_REF == refs/heads/* ]]; then
+            TAG=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
+          fi
+          echo ::set-output name=tag::${TAG}
+          echo "Build with tag=${TAG}"
+      - name: Cache vendor
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-vendor
+        with:
+          path: vendor
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('go.mod') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+      - name: test-in-docker
+        shell: bash
+        run: make -e REGISTRY=$REGISTRY -e TAG="${{ steps.prep.outputs.tag }}" test-in-docker
+  sonarcloud:
+    if: startsWith(github.ref, 'refs/heads/')
+    name: SonarCloud
+    runs-on: ubuntu:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      # Directory created with a docker run having user root
+      - name: Prepare SonarCloud
+        shell: bash
+        run: sudo chown -R $USER .scannerwork
+  deploy:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu:latest
+    env:
+      REGISTRY: ${{ secrets.REGISTRY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Prepare
+        id: prep
+        run: |
+          TAG=pr
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            TAG=${GITHUB_REF#refs/tags/}
+          elif [[ $GITHUB_REF == refs/heads/* ]]; then
+            TAG=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
+          fi
+          echo ::set-output name=tag::${TAG}
+          echo "Build with tag=${TAG}"
+        # echo ::set-env name=RELEASE_VERSION::${TAG}
+      - name:  Setup Go environment
+        uses: actions/setup-go@v2.1.3
+        with:
+          go-version: 1.16
+      - name: Setup docker buildx
+        uses: docker/setup-buildx-action@v1.3.0
+      - name: Download binaries
+        uses: actions/download-artifact@v2
+        with:
+          name: binaries
+          path: out
+      - name: Prepare docker buildx
+        shell: bash
+        run: |
+          docker buildx version;
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin;
+          docker buildx create --use
+      - name: Build docker image
+        shell: bash
+        run: |
+          make -e REGISTRY=$REGISTRY -e TAG="${{ steps.prep.outputs.tag }}" push-manifest
+      - name: Prepare Release
+        shell: bash
+        run: |
+          cp out/linux/amd64/vsphere-autoscaler vsphere-autoscaler-amd64;
+          cp out/linux/arm64/vsphere-autoscaler vsphere-autoscaler-arm64
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.prep.outputs.tag }}
+        #  release_name: Release ${{ steps.prep.outputs.tag }}
+          draft: false
+          files: |
+            vsphere-autoscaler-amd64
+            vsphere-autoscaler-arm64
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # You don't need to add this in secrets it's by default.      
