@@ -46,7 +46,7 @@ jobs:
       # Directory created with a docker run having user root
       - name: Fix directory owner
         shell: bash
-        run: sudo chown -R $USER vendor
+        run: sudo chown -R $USER out vendor
       - name: Output
         if: startsWith(github.ref, 'refs/tags/v')
         uses: actions/upload-artifact@v2.2.3
@@ -86,7 +86,7 @@ jobs:
         run: make -e REGISTRY=$REGISTRY -e TAG="${{ steps.prep.outputs.tag }}" test-in-docker
       - name: Fix directory owner
         shell: bash
-        run: sudo chown -R $USER out vendor
+        run: sudo chown -R $USER vendor
   sonarcloud:
     if: startsWith(github.ref, 'refs/heads/')
     name: SonarCloud
