@@ -93,22 +93,21 @@ func (vm *AutoScalerServerNode) kubeAdmJoin() error {
 }
 
 func (vm *AutoScalerServerNode) setNodeLabels(c types.ClientGenerator, nodeLabels, systemLabels KubernetesLabel) error {
-	if len(nodeLabels)+len(systemLabels) > 0 {
+	labels := map[string]string{
+		constantes.NodeLabelGroupName: vm.NodeGroupID,
+	}
 
-		labels := map[string]string{}
+	// Append extras arguments
+	for k, v := range nodeLabels {
+		labels[k] = v
+	}
 
-		// Append extras arguments
-		for k, v := range nodeLabels {
-			labels[k] = v
-		}
+	for k, v := range systemLabels {
+		labels[k] = v
+	}
 
-		for k, v := range systemLabels {
-			labels[k] = v
-		}
-
-		if err := c.LabelNode(vm.NodeName, labels); err != nil {
-			return fmt.Errorf(constantes.ErrLabelNodeReturnError, vm.NodeName, err)
-		}
+	if err := c.LabelNode(vm.NodeName, labels); err != nil {
+		return fmt.Errorf(constantes.ErrLabelNodeReturnError, vm.NodeName, err)
 	}
 
 	annotations := map[string]string{
