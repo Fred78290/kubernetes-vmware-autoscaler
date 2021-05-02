@@ -9,6 +9,7 @@ on:
     types: [opened, synchronize, reopened]
 jobs:
   build:
+    name: Build
     runs-on: ubuntu:latest
     env:
       REGISTRY: ${{ secrets.REGISTRY }}
