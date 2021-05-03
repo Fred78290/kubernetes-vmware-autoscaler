@@ -25,6 +25,7 @@ FROM ubuntu:focal
 LABEL maintainer="Frederic Boltz <frederic.boltz@gmail.com>"
 
 COPY --from=builder /vsphere-autoscaler /usr/local/bin/vsphere-autoscaler
+RUN chmod uog+x /usr/local/bin/vsphere-autoscaler
 
 EXPOSE 5200
 
