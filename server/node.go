@@ -147,6 +147,10 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 
 		err = fmt.Errorf(constantes.ErrUnableToLaunchVM, vm.NodeName, err)
 
+	} else if err = vsphere.SetAutoStart(vm.NodeName, -1); err != nil {
+
+		err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
+
 	} else if err = vsphere.PowerOn(vm.NodeName); err != nil {
 
 		err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)

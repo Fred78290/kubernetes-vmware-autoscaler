@@ -448,8 +448,10 @@ govc vm.power -on "${MASTERKUBE}"
 
 echo "Wait for IP from ${MASTERKUBE}"
 IPADDR=$(govc vm.ip -wait 5m "${MASTERKUBE}")
+VMHOST=$(govc vm.info "${MASTERKUBE}" | grep 'Host:' | awk '{print $2}')
 
 echo "Prepare ${MASTERKUBE} instance"
+govc host.autostart.add -host="${VMHOST}" "${MASTERKUBE}"
 scp ${SSH_OPTIONS} -r bin ${KUBERNETES_USER}@${IPADDR}:~
 
 echo "Start kubernetes ${MASTERKUBE} instance master node, kubernetes version=${KUBERNETES_VERSION}, providerID=${PROVIDERID}"
