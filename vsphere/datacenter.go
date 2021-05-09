@@ -6,6 +6,7 @@ import (
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25"
+	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
@@ -67,4 +68,32 @@ func (dc *Datacenter) GetDatastore(ctx *context.Context, name string) (*Datastor
 	}
 
 	return nil, err
+}
+
+// GetHostAutoStartManager return the HostAutoStartManager
+func (dc *Datacenter) GetHostAutoStartManager(ctx *context.Context) (*HostAutoStartManager, error) {
+	var host *object.HostSystem
+	var err error
+	var mhs mo.HostSystem
+	var mhas mo.HostAutoStartManager
+
+	if host, err = dc.GetHostSystem(ctx); err == nil {
+		if err = host.Properties(ctx, host.Reference(), []string{"configManager.autoStartManager"}, &mhs); err == nil {
+			if err = host.Properties(ctx, *mhs.ConfigManager.AutoStartManager, nil, &mhas); err == nil {
+				return &HostAutoStartManager{
+					Ref:        mhas.Self,
+					Datacenter: dc,
+				}, nil
+			}
+		}
+	}
+
+	return nil, err
+}
+
+// GetHostSystem return the default hostsystem
+func (dc *Datacenter) GetHostSystem(ctx *context.Context) (*object.HostSystem, error) {
+	f := dc.NewFinder(ctx)
+
+	return f.DefaultHostSystem(ctx)
 }

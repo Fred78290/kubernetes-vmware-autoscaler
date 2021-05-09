@@ -244,6 +244,24 @@ func (conf *Configuration) WaitForIP(name string) (string, error) {
 	return conf.WaitForIPWithContext(ctx, name)
 }
 
+// SetAutoStartWithContext set autostart for the VM
+func (conf *Configuration) SetAutoStartWithContext(ctx *context.Context, name string, startOrder int) error {
+	var err error
+	var client *Client
+	var dc *Datacenter
+	var host *HostAutoStartManager
+
+	if client, err = conf.GetClient(ctx); err == nil {
+		if dc, err = client.GetDatacenter(ctx, conf.DataCenter); err == nil {
+			if host, err = dc.GetHostAutoStartManager(ctx); err == nil {
+				return host.SetAutoStart(ctx, conf.DataStore, name, startOrder)
+			}
+		}
+	}
+
+	return err
+}
+
 // WaitForToolsRunningWithContext wait vmware tools is running a VM by name
 func (conf *Configuration) WaitForToolsRunningWithContext(ctx *context.Context, name string) (bool, error) {
 	vm, err := conf.VirtualMachineWithContext(ctx, name)
@@ -253,6 +271,14 @@ func (conf *Configuration) WaitForToolsRunningWithContext(ctx *context.Context, 
 	}
 
 	return vm.WaitForToolsRunning(ctx)
+}
+
+// SetAutoStart set autostart for the VM
+func (conf *Configuration) SetAutoStart(name string, startOrder int) error {
+	ctx := context.NewContext(conf.Timeout)
+	defer ctx.Cancel()
+
+	return conf.SetAutoStartWithContext(ctx, name, startOrder)
 }
 
 // WaitForToolsRunning wait vmware tools is running a VM by name

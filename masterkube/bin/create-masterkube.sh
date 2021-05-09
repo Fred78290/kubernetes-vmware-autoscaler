@@ -448,8 +448,10 @@ govc vm.power -on "${MASTERKUBE}"
 
 echo "Wait for IP from ${MASTERKUBE}"
 IPADDR=$(govc vm.ip -wait 5m "${MASTERKUBE}")
+VMHOST=$(govc vm.info "${MASTERKUBE}" | grep 'Host:' | awk '{print $2}')
 
 echo "Prepare ${MASTERKUBE} instance"
+govc host.autostart.add -host="${VMHOST}" "${MASTERKUBE}"
 scp ${SSH_OPTIONS} -r bin ${KUBERNETES_USER}@${IPADDR}:~
 
 echo "Start kubernetes ${MASTERKUBE} instance master node, kubernetes version=${KUBERNETES_VERSION}, providerID=${PROVIDERID}"
@@ -467,6 +469,10 @@ CACERT=$(cat ./cluster/ca.cert)
 kubectl annotate node ${MASTERKUBE} "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "cluster.autoscaler.nodegroup/node-index=0" "cluster.autoscaler.nodegroup/autoprovision=false" "cluster-autoscaler.kubernetes.io/scale-down-disabled=true" --overwrite --kubeconfig=./cluster/config
 kubectl label nodes ${MASTERKUBE} "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "master=true" --overwrite --kubeconfig=./cluster/config
 kubectl create secret tls kube-system -n kube-system --key ./etc/ssl/privkey.pem --cert ./etc/ssl/fullchain.pem --kubeconfig=./cluster/config
+kubectl create configmap masterkube-config --kubeconfig=./cluster/config -n kube-system \
+	--from-file ./cluster/ca.cert \
+    --from-file ./cluster/dashboard-token \
+    --from-file ./cluster/token
 
 kubeconfig-merge.sh ${MASTERKUBE} cluster/config
 
@@ -573,8 +579,9 @@ EOF
 echo "$AUTOSCALER_CONFIG" | jq . > config/kubernetes-vmware-autoscaler.json
 
 # Recopy config file on master node
-scp ${SSH_OPTIONS} ${SSH_PRIVATE_KEY} ./config/grpc-config.json ./config/kubernetes-vmware-autoscaler.json ${KUBERNETES_USER}@${IPADDR}:/tmp
-ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp "/tmp/${SSH_KEY_FNAME}" /tmp/grpc-config.json /tmp/kubernetes-vmware-autoscaler.json /etc/cluster
+kubectl create configmap config-cluster-autoscaler --kubeconfig=./cluster/config -n kube-system \
+	--from-file ./config/grpc-config.json \
+	--from-file ./config/kubernetes-vmware-autoscaler.json \
 
 # Update /etc/hosts
 if [ "${OSDISTRO}" == "Linux" ]; then
