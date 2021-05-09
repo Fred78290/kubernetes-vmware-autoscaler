@@ -49,7 +49,7 @@ export NET_MASK=255.255.255.0
 export NET_MASK_CIDR=24
 export VC_NETWORK_PRIVATE="Private Network"
 export VC_NETWORK_PUBLIC="Public Network"
-export REGISTRY=devregistry.aldunelabs.com
+export REGISTRY=fred78290
 export LAUNCH_CA=YES
 
 SSH_OPTIONS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
