@@ -80,9 +80,9 @@
                 ],
                 "volumes": [
                     {
-                        "name": "cluster-autoscaler",
-                        "hostPath": {
-                            "path": "/etc/cluster"
+                        "name": "config-cluster-autoscaler",
+                        "configMap": {
+                            "name": "config-cluster-autoscaler"
                         }
                     },
                     {

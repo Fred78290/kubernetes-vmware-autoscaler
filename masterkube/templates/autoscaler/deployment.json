@@ -63,7 +63,7 @@
                         "command": [
                             "/usr/local/bin/vsphere-autoscaler",
                             "--config=/etc/cluster/kubernetes-vmware-autoscaler.json",
-                            "--save=/etc/cluster/vmware-autoscaler-state.json",
+                            "--save=/var/run/cluster-autoscaler/vmware-autoscaler-state.json",
                             "--log-level=info"
                         ],
                         "imagePullPolicy": "Always",
@@ -73,7 +73,7 @@
                                 "mountPath": "/var/run/cluster-autoscaler"
                             },
                             {
-                                "name": "cluster-autoscaler",
+                                "name": "config-cluster-autoscaler",
                                 "mountPath": "/etc/cluster"
                             }
                         ]
@@ -123,7 +123,7 @@
                                 "readOnly": true
                             },
                             {
-                                "name": "cluster-autoscaler",
+                                "name": "config-cluster-autoscaler",
                                 "mountPath": "/etc/cluster",
                                 "readOnly": true
                             }
@@ -137,9 +137,9 @@
                         }
                     },
                     {
-                        "name": "cluster-autoscaler",
-                        "hostPath": {
-                            "path": "/etc/cluster"
+                        "name": "config-cluster-autoscaler",
+                        "configMap": {
+                            "name": "config-cluster-autoscaler"
                         }
                     },
                     {
