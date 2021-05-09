@@ -469,10 +469,6 @@ CACERT=$(cat ./cluster/ca.cert)
 kubectl annotate node ${MASTERKUBE} "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "cluster.autoscaler.nodegroup/node-index=0" "cluster.autoscaler.nodegroup/autoprovision=false" "cluster-autoscaler.kubernetes.io/scale-down-disabled=true" --overwrite --kubeconfig=./cluster/config
 kubectl label nodes ${MASTERKUBE} "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "master=true" --overwrite --kubeconfig=./cluster/config
 kubectl create secret tls kube-system -n kube-system --key ./etc/ssl/privkey.pem --cert ./etc/ssl/fullchain.pem --kubeconfig=./cluster/config
-kubectl create configmap masterkube-config --kubeconfig=./cluster/config -n kube-system \
-	--from-file ./cluster/ca.cert \
-    --from-file ./cluster/dashboard-token \
-    --from-file ./cluster/token
 
 kubeconfig-merge.sh ${MASTERKUBE} cluster/config
 
@@ -603,5 +599,11 @@ create-helloworld.sh
 if [ "$LAUNCH_CA" != "NO" ]; then
     create-autoscaler.sh $LAUNCH_CA
 fi
+
+# Add cluster config in configmap
+kubectl create configmap masterkube-config --kubeconfig=./cluster/config -n kube-system \
+	--from-file ./cluster/ca.cert \
+    --from-file ./cluster/dashboard-token \
+    --from-file ./cluster/token
 
 popd
