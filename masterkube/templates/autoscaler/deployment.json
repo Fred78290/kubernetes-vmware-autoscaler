@@ -75,6 +75,10 @@
                             {
                                 "name": "config-cluster-autoscaler",
                                 "mountPath": "/etc/cluster"
+                            },
+                            {
+                                "name": "autoscaler-ssh-keys",
+                                "mountPath": "/root/.ssh"
                             }
                         ]
                     },
@@ -146,6 +150,13 @@
                         "name": "ssl-certs",
                         "hostPath": {
                             "path": "/etc/ssl/certs/ca-certificates.crt"
+                        }
+                    },
+                    {
+                        "name": "autoscaler-ssh-keys",
+                        "secret": {
+                            "secretName": "autoscaler-ssh-keys",
+                            "defaultMode": 384
                         }
                     }
                 ]

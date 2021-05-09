@@ -14,8 +14,8 @@ export SCHEME="vmware"
 export NODEGROUP_NAME="vmware-ca-k8s"
 export MASTERKUBE="${NODEGROUP_NAME}-masterkube"
 export PROVIDERID="${SCHEME}://${NODEGROUP_NAME}/object?type=node&name=${MASTERKUBE}"
-export SSH_PRIVATE_KEY=~/.ssh/id_rsa
-export SSH_KEY=$(cat "${SSH_PRIVATE_KEY}.pub")
+export SSH_PRIVATE_KEY="$HOME/.ssh/id_rsa"
+export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
 export KUBERNETES_VERSION=v1.21.0
 export KUBERNETES_USER=kubernetes
 export KUBERNETES_PASSWORD=
@@ -228,8 +228,9 @@ if [ -z $KUBERNETES_PASSWORD ]; then
     fi
 fi
 
-export SSH_KEY_FNAME=$(basename $SSH_PRIVATE_KEY)
-export SSH_KEY=$(cat "${SSH_PRIVATE_KEY}.pub")
+export SSH_KEY_FNAME="$(basename $SSH_PRIVATE_KEY)"
+export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
+export SSH_KEY=$(cat "${SSH_PUBLIC_KEY}")
 
 # GRPC network endpoint
 if [ "$LAUNCH_CA" != "YES" ]; then
@@ -254,7 +255,7 @@ if [ "$LAUNCH_CA" != "YES" ]; then
         exit -1
     fi
 else
-    SSH_PRIVATE_KEY_LOCAL="/etc/cluster/${SSH_KEY_FNAME}"
+    SSH_PRIVATE_KEY_LOCAL="/root/.ssh/id_rsa"
     TRANSPORT=unix
     LISTEN="/var/run/cluster-autoscaler/vmware.sock"
     CONNECTTO="unix:/var/run/cluster-autoscaler/vmware.sock"
@@ -341,7 +342,9 @@ export NODEGROUP_NAME="$NODEGROUP_NAME"
 export MASTERKUBE="$MASTERKUBE"
 export PROVIDERID="$PROVIDERID"
 export SSH_PRIVATE_KEY=$SSH_PRIVATE_KEY
-export SSH_KEY=$SSH_KEY
+export SSH_PUBLIC_KEY=$SSH_PUBLIC_KEY
+export SSH_KEY="$SSH_KEY"
+export SSH_KEY_FNAME=$SSH_KEY_FNAME
 export KUBERNETES_VERSION=$KUBERNETES_VERSION
 export KUBERNETES_USER=${KUBERNETES_USER}
 export KUBERNETES_PASSWORD=$KUBERNETES_PASSWORD
@@ -484,6 +487,7 @@ CACERT=$(cat ./cluster/ca.cert)
 kubectl annotate node ${MASTERKUBE} "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "cluster.autoscaler.nodegroup/node-index=0" "cluster.autoscaler.nodegroup/autoprovision=false" "cluster-autoscaler.kubernetes.io/scale-down-disabled=true" --overwrite --kubeconfig=./cluster/config
 kubectl label nodes ${MASTERKUBE} "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "master=true" --overwrite --kubeconfig=./cluster/config
 kubectl create secret tls kube-system -n kube-system --key ./etc/ssl/privkey.pem --cert ./etc/ssl/fullchain.pem --kubeconfig=./cluster/config
+kubectl create secret generic autoscaler-ssh-keys -n kube-system --from-file=id_rsa="${SSH_PRIVATE_KEY}" --from-file=id_rsa.pub="${SSH_PUBLIC_KEY}" --kubeconfig=./cluster/config
 
 kubeconfig-merge.sh ${MASTERKUBE} cluster/config
 
