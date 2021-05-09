@@ -71,7 +71,7 @@
                                 "readOnly": true
                             },
                             {
-                                "name": "cluster-autoscaler",
+                                "name": "config-cluster-autoscaler",
                                 "mountPath": "/etc/cluster",
                                 "readOnly": true
                             }
