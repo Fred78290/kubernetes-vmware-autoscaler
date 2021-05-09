@@ -30,3 +30,5 @@ masterkube/guestinfos/*\.yaml
 launch\.sh
 
 kubernetes-vmware-autoscaler
+
+masterkube/bin/govc.defs
