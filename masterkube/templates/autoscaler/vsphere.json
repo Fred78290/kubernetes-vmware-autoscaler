@@ -28,6 +28,23 @@
                 "nodeSelector": {
                     "master": "true"
                 },
+                "initContainers": [
+                    {
+                        "image": "busybox",
+                        "name": "cluster-autoscaler-init",
+                        "command":[
+                            "/bin/sh",
+                            "-c",
+                            "rm -f /var/run/cluster-autoscaler/vmware.sock"
+                        ],
+                        "volumeMounts": [
+                            {
+                                "name": "cluster-socket",
+                                "mountPath": "/var/run/cluster-autoscaler"
+                            }
+                        ]
+                    }
+                ],
                 "containers": [
                     {
                         "image": "$REGISTRY/vsphere-autoscaler:v1.21.0",
@@ -45,14 +62,17 @@
                         "command": [
                             "/usr/local/bin/vsphere-autoscaler",
                             "--config=/etc/cluster/kubernetes-vmware-autoscaler.json",
-                            "--save=/etc/cluster/vmware-autoscaler-state.json",
-                            "-v=1",
-                            "-logtostderr=true"
+                            "--save=/var/run/cluster-autoscaler/vmware-autoscaler-state.json",
+                            "--log-level=info"
                         ],
                         "imagePullPolicy": "Always",
                         "volumeMounts": [
                             {
-                                "name": "vsphere-autoscaler",
+                                "name": "cluster-socket",
+                                "mountPath": "/var/run/cluster-autoscaler"
+                            },
+                            {
+                                "name": "config-cluster-autoscaler",
                                 "mountPath": "/etc/cluster"
                             }
                         ]
@@ -60,9 +80,14 @@
                 ],
                 "volumes": [
                     {
-                        "name": "vsphere-autoscaler",
-                        "hostPath": {
-                            "path": "/etc/cluster"
+                        "name": "cluster-socket",
+                        "emptyDir": {
+                        }
+                    },
+                    {
+                        "name": "config-cluster-autoscaler",
+                        "configMap": {
+                            "name": "config-cluster-autoscaler"
                         }
                     }
                 ]
