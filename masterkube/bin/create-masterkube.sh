@@ -592,7 +592,7 @@ echo "$AUTOSCALER_CONFIG" | jq . > config/kubernetes-vmware-autoscaler.json
 # Recopy config file on master node
 kubectl create configmap config-cluster-autoscaler --kubeconfig=./cluster/config -n kube-system \
 	--from-file ./config/grpc-config.json \
-	--from-file ./config/kubernetes-vmware-autoscaler.json \
+	--from-file ./config/kubernetes-vmware-autoscaler.json
 
 # Update /etc/hosts
 if [ "${OSDISTRO}" == "Linux" ]; then
