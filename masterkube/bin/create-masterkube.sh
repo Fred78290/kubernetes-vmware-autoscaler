@@ -14,8 +14,8 @@ export SCHEME="vmware"
 export NODEGROUP_NAME="vmware-ca-k8s"
 export MASTERKUBE="${NODEGROUP_NAME}-masterkube"
 export PROVIDERID="${SCHEME}://${NODEGROUP_NAME}/object?type=node&name=${MASTERKUBE}"
-export SSH_PRIVATE_KEY=~/.ssh/id_rsa
-export SSH_KEY=$(cat "${SSH_PRIVATE_KEY}.pub")
+export SSH_PRIVATE_KEY="$HOME/.ssh/id_rsa"
+export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
 export KUBERNETES_VERSION=v1.21.0
 export KUBERNETES_USER=kubernetes
 export KUBERNETES_PASSWORD=
@@ -49,10 +49,25 @@ export NET_MASK=255.255.255.0
 export NET_MASK_CIDR=24
 export VC_NETWORK_PRIVATE="Private Network"
 export VC_NETWORK_PUBLIC="Public Network"
-export REGISTRY=devregistry.aldunelabs.com
+export REGISTRY=fred78290
 export LAUNCH_CA=YES
 
+#export GOVC_DATACENTER=
+#export GOVC_DATASTORE=
+#export GOVC_FOLDER=
+#export GOVC_HOST=
+#export GOVC_INSECURE=
+#export GOVC_NETWORK=
+#export GOVC_USERNAME=
+#export GOVC_PASSWORD=
+#export GOVC_RESOURCE_POOL=
+#export GOVC_URL=
+#export GOVC_VIM_VERSION="6.0"
+
 SSH_OPTIONS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+
+# import govc hidden definitions
+source ${CURDIR}/govc.defs
 
 if [ "$OSDISTRO" == "Linux" ]; then
     TZ=$(cat /etc/timezone)
@@ -213,8 +228,9 @@ if [ -z $KUBERNETES_PASSWORD ]; then
     fi
 fi
 
-export SSH_KEY_FNAME=$(basename $SSH_PRIVATE_KEY)
-export SSH_KEY=$(cat "${SSH_PRIVATE_KEY}.pub")
+export SSH_KEY_FNAME="$(basename $SSH_PRIVATE_KEY)"
+export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
+export SSH_KEY=$(cat "${SSH_PUBLIC_KEY}")
 
 # GRPC network endpoint
 if [ "$LAUNCH_CA" != "YES" ]; then
@@ -239,7 +255,7 @@ if [ "$LAUNCH_CA" != "YES" ]; then
         exit -1
     fi
 else
-    SSH_PRIVATE_KEY_LOCAL="/etc/cluster/${SSH_KEY_FNAME}"
+    SSH_PRIVATE_KEY_LOCAL="/root/.ssh/id_rsa"
     TRANSPORT=unix
     LISTEN="/var/run/cluster-autoscaler/vmware.sock"
     CONNECTTO="unix:/var/run/cluster-autoscaler/vmware.sock"
@@ -326,7 +342,9 @@ export NODEGROUP_NAME="$NODEGROUP_NAME"
 export MASTERKUBE="$MASTERKUBE"
 export PROVIDERID="$PROVIDERID"
 export SSH_PRIVATE_KEY=$SSH_PRIVATE_KEY
-export SSH_KEY=$SSH_KEY
+export SSH_PUBLIC_KEY=$SSH_PUBLIC_KEY
+export SSH_KEY="$SSH_KEY"
+export SSH_KEY_FNAME=$SSH_KEY_FNAME
 export KUBERNETES_VERSION=$KUBERNETES_VERSION
 export KUBERNETES_USER=${KUBERNETES_USER}
 export KUBERNETES_PASSWORD=$KUBERNETES_PASSWORD
@@ -469,10 +487,7 @@ CACERT=$(cat ./cluster/ca.cert)
 kubectl annotate node ${MASTERKUBE} "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "cluster.autoscaler.nodegroup/node-index=0" "cluster.autoscaler.nodegroup/autoprovision=false" "cluster-autoscaler.kubernetes.io/scale-down-disabled=true" --overwrite --kubeconfig=./cluster/config
 kubectl label nodes ${MASTERKUBE} "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "master=true" --overwrite --kubeconfig=./cluster/config
 kubectl create secret tls kube-system -n kube-system --key ./etc/ssl/privkey.pem --cert ./etc/ssl/fullchain.pem --kubeconfig=./cluster/config
-kubectl create configmap masterkube-config --kubeconfig=./cluster/config -n kube-system \
-	--from-file ./cluster/ca.cert \
-    --from-file ./cluster/dashboard-token \
-    --from-file ./cluster/token
+kubectl create secret generic autoscaler-ssh-keys -n kube-system --from-file=id_rsa="${SSH_PRIVATE_KEY}" --from-file=id_rsa.pub="${SSH_PUBLIC_KEY}" --kubeconfig=./cluster/config
 
 kubeconfig-merge.sh ${MASTERKUBE} cluster/config
 
@@ -581,7 +596,7 @@ echo "$AUTOSCALER_CONFIG" | jq . > config/kubernetes-vmware-autoscaler.json
 # Recopy config file on master node
 kubectl create configmap config-cluster-autoscaler --kubeconfig=./cluster/config -n kube-system \
 	--from-file ./config/grpc-config.json \
-	--from-file ./config/kubernetes-vmware-autoscaler.json \
+	--from-file ./config/kubernetes-vmware-autoscaler.json
 
 # Update /etc/hosts
 if [ "${OSDISTRO}" == "Linux" ]; then
@@ -603,5 +618,11 @@ create-helloworld.sh
 if [ "$LAUNCH_CA" != "NO" ]; then
     create-autoscaler.sh $LAUNCH_CA
 fi
+
+# Add cluster config in configmap
+kubectl create configmap masterkube-config --kubeconfig=./cluster/config -n kube-system \
+	--from-file ./cluster/ca.cert \
+    --from-file ./cluster/dashboard-token \
+    --from-file ./cluster/token
 
 popd

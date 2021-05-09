@@ -74,6 +74,10 @@
                             {
                                 "name": "config-cluster-autoscaler",
                                 "mountPath": "/etc/cluster"
+                            },
+                            {
+                                "name": "autoscaler-ssh-keys",
+                                "mountPath": "/root/.ssh"
                             }
                         ]
                     }
@@ -88,6 +92,13 @@
                         "name": "config-cluster-autoscaler",
                         "configMap": {
                             "name": "config-cluster-autoscaler"
+                        }
+                    },
+                    {
+                        "name": "autoscaler-ssh-keys",
+                        "secret": {
+                            "secretName": "autoscaler-ssh-keys",
+                            "defaultMode": 384
                         }
                     }
                 ]
