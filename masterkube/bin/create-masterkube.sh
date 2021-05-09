@@ -52,7 +52,22 @@ export VC_NETWORK_PUBLIC="Public Network"
 export REGISTRY=fred78290
 export LAUNCH_CA=YES
 
+#export GOVC_DATACENTER=
+#export GOVC_DATASTORE=
+#export GOVC_FOLDER=
+#export GOVC_HOST=
+#export GOVC_INSECURE=
+#export GOVC_NETWORK=
+#export GOVC_USERNAME=
+#export GOVC_PASSWORD=
+#export GOVC_RESOURCE_POOL=
+#export GOVC_URL=
+#export GOVC_VIM_VERSION="6.0"
+
 SSH_OPTIONS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+
+# import govc hidden definitions
+source ${CURDIR}/govc.defs
 
 if [ "$OSDISTRO" == "Linux" ]; then
     TZ=$(cat /etc/timezone)

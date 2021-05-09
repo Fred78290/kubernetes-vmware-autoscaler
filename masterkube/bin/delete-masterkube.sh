@@ -3,6 +3,9 @@ CURDIR=$(dirname $0)
 NODEGROUP_NAME="vmware-ca-k8s"
 MASTERKUBE=${NODEGROUP_NAME}-masterkube
 
+# import govc hidden definitions
+source ${CURDIR}/govc.defs
+
 echo "Delete masterkube previous instance"
 
 pushd $CURDIR/../
