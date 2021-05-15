@@ -32,7 +32,7 @@ Some needed file are located in:
 | `etc/ssl`  | Your CERT for https. Autosigned will be generated if empty  |
 | `template`  | Templates files to deploy pod & service |
 
-The first thing done by this script is to create a VM Template Ubuntu-20.04.2 image with kubernetes and docker installed. The VM template will be named by default afp-slyo-bionic-kubernetes-(kuberneres version)
+The first thing done by this script is to create a VM Template Ubuntu-20.04.2 image with kubernetes and cri-o and podman installed. The VM template will be named by default focal-kubernetes-(kuberneres version)
 
 Next step will be to launch a cloned VM and create a master node. It will also deploy a dashboard at the URL https://masterkube-vmware-dashboard.@your-domain@/
 

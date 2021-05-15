@@ -49,6 +49,7 @@ export NET_MASK=255.255.255.0
 export NET_MASK_CIDR=24
 export VC_NETWORK_PRIVATE="Private Network"
 export VC_NETWORK_PUBLIC="Public Network"
+export METALLB_IP_RANGE=10.0.0.100-10.0.0.127
 export REGISTRY=fred78290
 export LAUNCH_CA=YES
 
@@ -600,24 +601,30 @@ kubectl create configmap config-cluster-autoscaler --kubeconfig=./cluster/config
 
 # Update /etc/hosts
 if [ "${OSDISTRO}" == "Linux" ]; then
-    sudo sed -i "/${MASTERKUBE}.${DOMAIN_NAME}/d" /etc/hosts
+    sudo sed -i -e "/${MASTERKUBE}.${DOMAIN_NAME}/d" -e "/masterkube-vmware-dashboard.${DOMAIN_NAME}/d" /etc/hosts
     sed -i -E "s/https:\/\/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:([0-9]+)/https:\/\/${MASTERKUBE}.${DOMAIN_NAME}:\1/g" cluster/config
 else
-    sudo sed -i'' "/${MASTERKUBE}.${DOMAIN_NAME}/d" /etc/hosts
+    sudo sed -i'' -e "/${MASTERKUBE}.${DOMAIN_NAME}/d" -e "/masterkube-vmware-dashboard.${DOMAIN_NAME}/d" /etc/hosts
     sed -i'' -E "s/https:\/\/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:([0-9]+)/https:\/\/${MASTERKUBE}.${DOMAIN_NAME}:\1/g" cluster/config
 fi
 
-sudo bash -c "echo '${IPADDR} ${MASTERKUBE}.${DOMAIN_NAME} masterkube-vmware.${DOMAIN_NAME} masterkube-vmware-dashboard.${DOMAIN_NAME}' >> /etc/hosts"
+sudo bash -c "echo '${IPADDR} ${MASTERKUBE}.${DOMAIN_NAME}' >> /etc/hosts"
 
 # Create Pods
+create-metallb.sh
 create-ingress-controller.sh
 create-dashboard.sh
 create-metrics.sh
 create-helloworld.sh
+create-external-dns.sh
 
 if [ "$LAUNCH_CA" != "NO" ]; then
     create-autoscaler.sh $LAUNCH_CA
 fi
+
+NGINX_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+sudo bash -c "echo '${NGINX_IP} masterkube-vmware.${DOMAIN_NAME} masterkube-vmware-dashboard.${DOMAIN_NAME}' >> /etc/hosts"
 
 # Add cluster config in configmap
 kubectl create configmap masterkube-config --kubeconfig=./cluster/config -n kube-system \

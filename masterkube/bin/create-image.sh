@@ -27,6 +27,11 @@ PRIMARY_NETWORK_ADAPTER=vmxnet3
 PRIMARY_NETWORK_NAME=$GOVC_NETWORK
 SECOND_NETWORK_ADAPTER=vmxnet3
 SECOND_NETWORK_NAME=
+ARCH=amd64
+
+if [ "$(uname -m)" == "aarch64" ]; then
+    ARCH=arm64
+fi
 
 if [ "$OSDISTRO" == "Linux" ]; then
     TZ=$(cat /etc/timezone)
@@ -67,10 +72,10 @@ done
 
 case $CNI_VERSION in
     v0.7*)
-        URL_PLUGINS="https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-amd64-${CNI_VERSION}.tgz"
+        URL_PLUGINS="https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-${ARCH}-${CNI_VERSION}.tgz"
     ;;
     *)
-        URL_PLUGINS="https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-amd64-${CNI_VERSION}.tgz"
+        URL_PLUGINS="https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-${ARCH}-${CNI_VERSION}.tgz"
     ;;
 esac
 
@@ -94,17 +99,17 @@ EOF
 # you can try with ovftool to import the ova.
 # If you have the bug "unsupported server", you must do it manually!
 if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
-    [ -f ${CACHE}/focal-server-cloudimg-amd64.ova ] || wget https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.ova -O ${CACHE}/focal-server-cloudimg-amd64.ova
+    [ -f ${CACHE}/focal-server-cloudimg-${ARCH}.ova ] || wget https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-${ARCH}.ova -O ${CACHE}/focal-server-cloudimg-amd64.ova
         
-    MAPPED_NETWORK=$(govc import.spec ${CACHE}/focal-server-cloudimg-amd64.ova | jq .NetworkMapping[0].Name | tr -d '"')
+    MAPPED_NETWORK=$(govc import.spec ${CACHE}/focal-server-cloudimg-${ARCH}.ova | jq .NetworkMapping[0].Name | tr -d '"')
 
     if [ "${IMPORTMODE}" == "govc" ]; then
 
-        govc import.spec ${CACHE}/focal-server-cloudimg-amd64.ova \
+        govc import.spec ${CACHE}/focal-server-cloudimg-${ARCH}.ova \
             | jq --arg GOVC_NETWORK "${PRIMARY_NETWORK_NAME}" --arg MAPPED_NETWORK "${MAPPED_NETWORK}" '.NetworkMapping |= [ { Name: $MAPPED_NETWORK, Network: $GOVC_NETWORK } ]' \
-            > ${CACHE}/focal-server-cloudimg-amd64.spec
+            > ${CACHE}/focal-server-cloudimg-${ARCH}.spec
         
-        cat ${CACHE}/focal-server-cloudimg-amd64.spec \
+        cat ${CACHE}/focal-server-cloudimg-${ARCH}.spec \
             | jq --arg SSH_KEY "${SSH_KEY}" \
                 --arg SSH_KEY "${SSH_KEY}" \
                 --arg USERDATA "${USERDATA}" \
@@ -113,7 +118,7 @@ if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
                 --arg INSTANCEID $(uuidgen) \
                 --arg TARGET_IMAGE "$TARGET_IMAGE" \
                 '.Name = $NAME | .PropertyMapping |= [ { Key: "instance-id", Value: $INSTANCEID }, { Key: "hostname", Value: $TARGET_IMAGE }, { Key: "public-keys", Value: $SSH_KEY }, { Key: "user-data", Value: $USERDATA }, { Key: "password", Value: $PASSWORD } ]' \
-                > ${CACHE}/focal-server-cloudimg-amd64.txt
+                > ${CACHE}/focal-server-cloudimg-${ARCH}.txt
 
         if [ -z "${GOVC_CLUSTER}" ]; then
             DATASTORE="/${GOVC_DATACENTER}/datastore/${GOVC_DATASTORE}"
@@ -123,15 +128,15 @@ if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
             FOLDER="/${GOVC_DATACENTER}/vm/${GOVC_FOLDER}"
         fi
 
-        echo "Import focal-server-cloudimg-amd64.ova to ${SEEDIMAGE} with govc"
+        echo "Import focal-server-cloudimg-${ARCH}.ova to ${SEEDIMAGE} with govc"
         govc import.ova \
-            -options=${CACHE}/focal-server-cloudimg-amd64.txt \
+            -options=${CACHE}/focal-server-cloudimg-${ARCH}.txt \
             -folder="${FOLDER}" \
             -ds="${DATASTORE}" \
             -name="${SEEDIMAGE}" \
-            ${CACHE}/focal-server-cloudimg-amd64.ova
+            ${CACHE}/focal-server-cloudimg-${ARCH}.ova
     else
-        echo "Import focal-server-cloudimg-amd64.ova to ${SEEDIMAGE} with ovftool"
+        echo "Import focal-server-cloudimg-${ARCH}.ova to ${SEEDIMAGE} with ovftool"
 
         ovftool \
             --acceptAllEulas \
@@ -145,7 +150,7 @@ if [ -z "$(govc vm.info $SEEDIMAGE 2>&1)" ]; then
             --prop:user-data="" \
             --prop:password="${PASSWORD}" \
             --net:"${MAPPED_NETWORK}"="${PRIMARY_NETWORK_NAME}" \
-            https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.ova \
+            https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-${ARCH}.ova \
             "vi://${GOVC_USERNAME}:${GOVC_PASSWORD}@${GOVC_HOST}/${GOVC_RESOURCE_POOL}/"
     fi
 
@@ -195,8 +200,9 @@ else
 fi
 
 KUBERNETES_MINOR_RELEASE=$(echo -n $KUBERNETES_VERSION | tr '.' ' ' | awk '{ print $2 }')
+CRIO_VERSION=$(echo -n $KUBERNETES_VERSION | tr -d 'v' | tr '.' ' ' | awk '{ print $1"."$2 }')
 
-echo "Prepare ${TARGET_IMAGE} image"
+echo "Prepare ${TARGET_IMAGE} image with cri-o version: $CRIO_VERSIONand kubernetes: $KUBERNETES_VERSION"
 
 cat > "${ISODIR}/user-data" <<EOF
 #cloud-config
@@ -240,60 +246,68 @@ EOF
 cat > "${ISODIR}/prepare-image.sh" <<EOF
 #!/bin/bash
 
-apt-get update
-apt-get upgrade -y
-apt-get dist-upgrade -y
-apt-get autoremove -y
-apt-get install jq socat conntrack net-tools traceroute -y
-
 mkdir -p /opt/cni/bin
 mkdir -p /usr/local/bin
 
-echo "Prepare to install Docker"
+echo "Prepare to install CRI-O"
 
-# Setup daemon.
-if [ $KUBERNETES_MINOR_RELEASE -ge 14 ]; then
-    mkdir -p /etc/docker
-
-    cat > /etc/docker/daemon.json <<SHELL
-{
-    "exec-opts": [
-        "native.cgroupdriver=systemd"
-    ],
-    "log-driver": "json-file",
-    "log-opts": {
-        "max-size": "100m"
-    },
-    "storage-driver": "overlay2"
-}
+cat <<SHELL > /etc/modules-load.d/crio.conf
+overlay
+br_netfilter
 SHELL
 
-    curl https://get.docker.com | bash
+cat >> /etc/sysctl.d/kubernetes.conf <<SHELL
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+SHELL
 
-    mkdir -p /etc/systemd/system/docker.service.d
+echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables
 
-    # Restart docker.
-    systemctl daemon-reload
-    systemctl restart docker
-else
-    curl https://get.docker.com | bash
-fi
+sysctl --system
 
-# Setup Kube DNS resolver
-#mkdir /etc/systemd/resolved.conf.d/
-#cat > /etc/systemd/resolved.conf.d/kubernetes.conf <<SHELL
-#[Resolve]
-#DNS=10.96.0.10
-#Domains=cluster.local
-#SHELL
+. /etc/os-release
+
+OS=x\${NAME}_\${VERSION_ID}
+
+cat > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list <<SHELL
+deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/\$OS/ /
+SHELL
+
+cat > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:$CRIO_VERSION.list <<SHELL
+deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$CRIO_VERSION/\$OS/ /
+SHELL
+
+curl -s -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/\$OS/Release.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers.gpg add -
+curl -s -L https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$CRIO_VERSION/\$OS/Release.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers-cri-o.gpg add -
+
+apt-get update
+apt-get dist-upgrade -y
+apt-get autoremove -y
+apt-get install -y jq socat conntrack net-tools traceroute podman cri-o cri-o-runc
+
+mkdir -p /etc/crio/crio.conf.d/
+
+cat > /etc/crio/crio.conf.d/02-cgroup-manager.conf <<SHELL
+conmon_cgroup = "pod"
+cgroup_manager = "cgroupfs"
+SHELL
+
+systemctl daemon-reload
+systemctl enable crio --now
+
+alias docker=podman
 
 echo "Prepare to install CNI plugins"
 
 curl -L "${URL_PLUGINS}" | tar -C /opt/cni/bin -xz
 
 cd /usr/local/bin
-curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/amd64/{kubeadm,kubelet,kubectl,kube-proxy}
+curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${KUBERNETES_VERSION}/bin/linux/${ARCH}/{kubeadm,kubelet,kubectl,kube-proxy}
 chmod +x /usr/local/bin/kube*
+
+curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/v${CRIO_VERSION}.0/crictl-v${CRIO_VERSION}.0-linux-${ARCH}.tar.gz  | tar -C /usr/local/bin -xz
+chmod +x /usr/local/bin/crictl
 
 cat > /etc/systemd/system/kubelet.service <<SHELL
 [Unit]
@@ -332,8 +346,6 @@ echo 'export PATH=/opt/cni/bin:\$PATH' >> /etc/profile.d/apps-bin-path.sh
 
 systemctl enable kubelet
 systemctl restart kubelet
-
-usermod -aG docker kubernetes
 
 /usr/local/bin/kubeadm config images pull --kubernetes-version=${KUBERNETES_VERSION}
 

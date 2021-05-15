@@ -1,8 +1,12 @@
 #!/bin/bash
 KUBERNETES_VERSION=$1
 CNI_VERSION="v0.9.1"
+ARCH=amd64
+CRIO_VERSION=$(echo -n $KUBERNETES_VERSION | tr -d 'v' | tr '.' ' ' | awk '{ print $1"."$2 }')
 
-curl -s https://get.docker.com | bash
+if [ "$(uname -m)" == "aarch64" ]; then
+    ARCH=arm64
+fi
 
 if [ "x$KUBERNETES_VERSION" == "x" ]; then
 	RELEASE="v1.20.5"
@@ -10,15 +14,65 @@ else
 	RELEASE=$KUBERNETES_VERSION
 fi
 
+cat <<SHELL > /etc/modules-load.d/crio.conf
+overlay
+br_netfilter
+SHELL
+
+cat >> /etc/sysctl.d/kubernetes.conf <<SHELL
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+SHELL
+
+echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables
+
+sysctl --system
+
+. /etc/os-release
+
+OS=x${NAME}_${VERSION_ID}
+
+cat > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list <<SHELL
+deb https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/ /
+SHELL
+
+cat > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:$CRIO_VERSION.list <<SHELL
+deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$CRIO_VERSION/$OS/ /
+SHELL
+
+curl -s -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/Release.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers.gpg add -
+curl -s -L https://download.opensuse.org/repositories/devel:kubic:libcontainers:stable:cri-o:$CRIO_VERSION/$OS/Release.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/libcontainers-cri-o.gpg add -
+
+apt-get update
+apt-get dist-upgrade -y
+apt-get autoremove -y
+apt-get install -y jq socat conntrack net-tools traceroute podman cri-o cri-o-runc
+
+mkdir -p /etc/crio/crio.conf.d/
+
+cat > /etc/crio/crio.conf.d/02-cgroup-manager.conf <<SHELL
+conmon_cgroup = "pod"
+cgroup_manager = "cgroupfs"
+SHELL
+
+systemctl daemon-reload
+systemctl enable crio --now
+
+alias docker=podman
+
 echo "Prepare kubernetes version $RELEASE"
 
 mkdir -p /opt/cni/bin
-curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-amd64-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
+curl -L "https://github.com/containernetworking/plugins/releases/download/${CNI_VERSION}/cni-plugins-linux-${ARCH}-${CNI_VERSION}.tgz" | tar -C /opt/cni/bin -xz
 
 mkdir -p /usr/local/bin
 cd /usr/local/bin
-curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${RELEASE}/bin/linux/amd64/{kubeadm,kubelet,kubectl,kube-proxy}
+curl -L --remote-name-all https://storage.googleapis.com/kubernetes-release/release/${RELEASE}/bin/linux/${ARCH}/{kubeadm,kubelet,kubectl,kube-proxy}
 chmod +x /usr/local/bin/kube*
+
+curl -L https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRIO_VERSION}.0/crictl-${CRIO_VERSION}.0-linux-${ARCH}.tar.gz  | tar -C /usr/local/bin -xz
+chmod +x /usr/local/bin/crictl
 
 echo "KUBELET_EXTRA_ARGS='--fail-swap-on=false --read-only-port=10255'" > /etc/default/kubelet
 
@@ -26,8 +80,6 @@ cat > /etc/systemd/system/kubelet.service <<SHELL
 [Unit]
 Description=kubelet: The Kubernetes Node Agent
 Documentation=http://kubernetes.io/docs/
-After=docker.service
-Requires=docker.service
 
 [Service]
 ExecStart=/usr/local/bin/kubelet
