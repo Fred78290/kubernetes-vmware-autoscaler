@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: external-dns
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: external-dns
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints", "pods", "services"]
+    verbs: ["get", "watch", "list"]
+  - apiGroups: ["extensions"]
+    resources: ["ingresses"]
+    verbs: ["get", "watch", "list"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: external-dns-viewer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: external-dns
+subjects:
+  - kind: ServiceAccount
+    name: external-dns
+    namespace: external-dns
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: external-dns
+  namespace: external-dns
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: external-dns
+  template:
+    metadata:
+      labels:
+        app: external-dns
+    spec:
+      serviceAccountName: external-dns
+      nodeSelector:
+        kubernetes.io/os: linux
+        master: "true"
+      containers:
+        - name: external-dns
+          image: fred78290/external-dns:v0.8.0-godaddy
+          imagePullPolicy: Always
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 500Mi
+            requests:
+              cpu: 500m
+              memory: 100Mi
+          args:
+            - --source=ingress
+            - --registry=txt
+            - --source=ingress
+            - --log-level=info
+            - --domain-filter=__DOMAIN_NAME__
+            - --annotation-filter=external-dns.alpha.kubernetes.io/register=true
+            - --ignore-ingress-tls-spec
+            - --txt-prefix=vmware.
+            - --txt-owner-id=vmware
+            - --provider=godaddy
+            - --godaddy-api-key=__GODADDY_API_KEY__
+            - --godaddy-api-secret=__GODADDY_API_SECRET__
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: external-dns
+  name: external-dns

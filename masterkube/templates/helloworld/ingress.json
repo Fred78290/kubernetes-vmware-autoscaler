@@ -8,7 +8,8 @@
             "nginx.ingress.kubernetes.io/ssl-redirect": "true",
             "nginx.ingress.kubernetes.io/use-regex": "true",
             "nginx.ingress.kubernetes.io/rewrite-target": "$REWRITE_TARGET",
-            "nginx.ingress.kubernetes.io/backend-protocol": "HTTP"
+            "nginx.ingress.kubernetes.io/backend-protocol": "HTTP",
+            "external-dns.alpha.kubernetes.io/register": "true"
         }
     },
     "spec": {

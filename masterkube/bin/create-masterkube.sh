@@ -616,6 +616,7 @@ create-ingress-controller.sh
 create-dashboard.sh
 create-metrics.sh
 create-helloworld.sh
+create-external-dns.sh
 
 if [ "$LAUNCH_CA" != "NO" ]; then
     create-autoscaler.sh $LAUNCH_CA
