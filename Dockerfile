@@ -20,7 +20,7 @@ ARG BUILDPLATFORM
 COPY out .
 RUN ls / ; mv /$TARGETPLATFORM/vsphere-autoscaler /vsphere-autoscaler
 
-FROM ubuntu:focal
+FROM ubuntu:groovy-20210614
 
 LABEL maintainer="Frederic Boltz <frederic.boltz@gmail.com>"
 
