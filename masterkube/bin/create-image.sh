@@ -202,7 +202,7 @@ fi
 KUBERNETES_MINOR_RELEASE=$(echo -n $KUBERNETES_VERSION | tr '.' ' ' | awk '{ print $2 }')
 CRIO_VERSION=$(echo -n $KUBERNETES_VERSION | tr -d 'v' | tr '.' ' ' | awk '{ print $1"."$2 }')
 
-echo "Prepare ${TARGET_IMAGE} image with cri-o version: $CRIO_VERSIONand kubernetes: $KUBERNETES_VERSION"
+echo "Prepare ${TARGET_IMAGE} image with cri-o version: $CRIO_VERSION and kubernetes: $KUBERNETES_VERSION"
 
 cat > "${ISODIR}/user-data" <<EOF
 #cloud-config
