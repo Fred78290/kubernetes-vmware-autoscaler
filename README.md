@@ -1,4 +1,4 @@
-[![Build Status](https://github.com/fred78290/kubernetes-vmware-autoscaler/actions/workflows/ci.yml/badge.svg?branch=v1.21.0)](https://github.com/Fred78290/Fred78290_kubernetes-vmware-autoscaler/actions)
+[![Build Status](https://github.com/fred78290/kubernetes-vmware-autoscaler/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Fred78290/Fred78290_kubernetes-vmware-autoscaler/actions)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Fred78290_kubernetes-vmware-autoscaler&metric=alert_status)](https://sonarcloud.io/dashboard?id=Fred78290_kubernetes-vmware-autoscaler)
 [![Licence](https://img.shields.io/hexpm/l/plug.svg)](https://github.com/Fred78290/kubernetes-vmware-autoscaler/blob/master/LICENSE)
 

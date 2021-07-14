@@ -16,7 +16,7 @@ export MASTERKUBE="${NODEGROUP_NAME}-masterkube"
 export PROVIDERID="${SCHEME}://${NODEGROUP_NAME}/object?type=node&name=${MASTERKUBE}"
 export SSH_PRIVATE_KEY="$HOME/.ssh/id_rsa"
 export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
-export KUBERNETES_VERSION=v1.21.0
+export KUBERNETES_VERSION=v1.21.2
 export KUBERNETES_USER=kubernetes
 export KUBERNETES_PASSWORD=
 export KUBECONFIG=$HOME/.kube/config

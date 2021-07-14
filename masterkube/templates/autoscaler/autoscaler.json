@@ -31,7 +31,7 @@
                 },
                 "containers": [
                     {
-                        "image": "$REGISTRY/cluster-autoscaler:v1.21.0",
+                        "image": "$REGISTRY/cluster-autoscaler:v1.21.2",
                         "name": "cluster-autoscaler",
                         "resources": {
                             "limits": {
