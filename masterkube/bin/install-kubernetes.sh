@@ -9,7 +9,7 @@ if [ "$(uname -m)" == "aarch64" ]; then
 fi
 
 if [ "x$KUBERNETES_VERSION" == "x" ]; then
-	RELEASE="v1.21.0"
+	RELEASE="v1.22.1"
 else
 	RELEASE=$KUBERNETES_VERSION
 fi

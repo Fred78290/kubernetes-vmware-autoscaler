@@ -19,9 +19,6 @@
             "metadata": {
                 "labels": {
                     "k8s-app": "vsphere-autoscaler"
-                },
-                "annotations": {
-                    "scheduler.alpha.kubernetes.io/critical-pod": ""
                 }
             },
             "spec": {
@@ -47,7 +44,7 @@
                 ],
                 "containers": [
                     {
-                        "image": "$REGISTRY/vsphere-autoscaler:v1.21.0",
+                        "image": "$REGISTRY/vsphere-autoscaler:v1.22.1",
                         "name": "vsphere-autoscaler",
                         "resources": {
                             "limits": {

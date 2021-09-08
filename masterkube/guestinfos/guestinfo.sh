@@ -24,7 +24,7 @@ cat > ${CURDIR}/userdata.yaml <<EOF
 group:
     - kubernetes
 runcmd:
-    - KUBERNETES_VERSION=v1.21.0
+    - KUBERNETES_VERSION=v1.22.1
     - CNI_VERSION=v0.9.1
     - mkdir -p /opt/cni/bin
     - mkdir -p /usr/local/bin
