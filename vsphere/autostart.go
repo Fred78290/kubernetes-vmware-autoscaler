@@ -37,7 +37,7 @@ func (h *HostAutoStartManager) SetAutoStart(ctx *context.Context, datastore, nam
 				},
 			}
 
-			methods.ReconfigureAutostart(ctx, dc.VimClient().RoundTripper, &req)
+			_, err = methods.ReconfigureAutostart(ctx, dc.VimClient(), &req)
 		}
 	}
 
