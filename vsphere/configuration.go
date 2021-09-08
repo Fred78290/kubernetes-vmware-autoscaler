@@ -245,7 +245,7 @@ func (conf *Configuration) WaitForIP(name string) (string, error) {
 }
 
 // SetAutoStartWithContext set autostart for the VM
-func (conf *Configuration) SetAutoStartWithContext(ctx *context.Context, name string, startOrder int) error {
+func (conf *Configuration) SetAutoStartWithContext(ctx *context.Context, esxi, name string, startOrder int) error {
 	var err error
 	var client *Client
 	var dc *Datacenter
@@ -253,7 +253,7 @@ func (conf *Configuration) SetAutoStartWithContext(ctx *context.Context, name st
 
 	if client, err = conf.GetClient(ctx); err == nil {
 		if dc, err = client.GetDatacenter(ctx, conf.DataCenter); err == nil {
-			if host, err = dc.GetHostAutoStartManager(ctx); err == nil {
+			if host, err = dc.GetHostAutoStartManager(ctx, esxi); err == nil {
 				return host.SetAutoStart(ctx, conf.DataStore, name, startOrder)
 			}
 		}
@@ -273,12 +273,30 @@ func (conf *Configuration) WaitForToolsRunningWithContext(ctx *context.Context, 
 	return vm.WaitForToolsRunning(ctx)
 }
 
-// SetAutoStart set autostart for the VM
-func (conf *Configuration) SetAutoStart(name string, startOrder int) error {
+func (conf *Configuration) GetHostSystemWithContext(ctx *context.Context, name string) (string, error) {
+	vm, err := conf.VirtualMachineWithContext(ctx, name)
+
+	if err != nil {
+		return "*", err
+	}
+
+	return vm.HostSystem(ctx)
+}
+
+// GetHostSystem return the host where the virtual machine leave
+func (conf *Configuration) GetHostSystem(name string) (string, error) {
 	ctx := context.NewContext(conf.Timeout)
 	defer ctx.Cancel()
 
-	return conf.SetAutoStartWithContext(ctx, name, startOrder)
+	return conf.GetHostSystemWithContext(ctx, name)
+}
+
+// SetAutoStart set autostart for the VM
+func (conf *Configuration) SetAutoStart(esxi, name string, startOrder int) error {
+	ctx := context.NewContext(conf.Timeout)
+	defer ctx.Cancel()
+
+	return conf.SetAutoStartWithContext(ctx, esxi, name, startOrder)
 }
 
 // WaitForToolsRunning wait vmware tools is running a VM by name
