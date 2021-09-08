@@ -141,6 +141,17 @@ func (g GuestInfos) toExtraConfig() []types.BaseOptionValue {
 	return extraConfig
 }
 
+func (vm *VirtualMachine) HostSystem(ctx *context.Context) (string, error) {
+
+	host, err := vm.VirtualMachine(ctx).HostSystem(ctx)
+
+	if err != nil {
+		return "*", err
+	}
+
+	return host.ObjectName(ctx)
+}
+
 // VirtualMachine return govmomi virtual machine
 func (vm *VirtualMachine) VirtualMachine(ctx *context.Context) *object.VirtualMachine {
 	key := vm.Ref.String()

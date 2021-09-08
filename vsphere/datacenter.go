@@ -71,13 +71,13 @@ func (dc *Datacenter) GetDatastore(ctx *context.Context, name string) (*Datastor
 }
 
 // GetHostAutoStartManager return the HostAutoStartManager
-func (dc *Datacenter) GetHostAutoStartManager(ctx *context.Context) (*HostAutoStartManager, error) {
+func (dc *Datacenter) GetHostAutoStartManager(ctx *context.Context, esxi string) (*HostAutoStartManager, error) {
 	var host *object.HostSystem
 	var err error
 	var mhs mo.HostSystem
 	var mhas mo.HostAutoStartManager
 
-	if host, err = dc.GetHostSystem(ctx); err == nil {
+	if host, err = dc.GetHostSystem(ctx, esxi); err == nil {
 		if err = host.Properties(ctx, host.Reference(), []string{"configManager.autoStartManager"}, &mhs); err == nil {
 			if err = host.Properties(ctx, *mhs.ConfigManager.AutoStartManager, nil, &mhas); err == nil {
 				return &HostAutoStartManager{
@@ -92,8 +92,8 @@ func (dc *Datacenter) GetHostAutoStartManager(ctx *context.Context) (*HostAutoSt
 }
 
 // GetHostSystem return the default hostsystem
-func (dc *Datacenter) GetHostSystem(ctx *context.Context) (*object.HostSystem, error) {
+func (dc *Datacenter) GetHostSystem(ctx *context.Context, esxi string) (*object.HostSystem, error) {
 	f := dc.NewFinder(ctx)
 
-	return f.DefaultHostSystem(ctx)
+	return f.HostSystemOrDefault(ctx, esxi)
 }
