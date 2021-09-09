@@ -48,7 +48,7 @@
                 ],
                 "containers": [
                     {
-                        "image": "$REGISTRY/vsphere-autoscaler:v1.21.2",
+                        "image": "$REGISTRY/vsphere-autoscaler:v1.21.4",
                         "name": "vsphere-autoscaler",
                         "resources": {
                             "limits": {
@@ -83,7 +83,7 @@
                         ]
                     },
                     {
-                        "image": "$REGISTRY/cluster-autoscaler:v1.21.2",
+                        "image": "$REGISTRY/cluster-autoscaler:v1.21.4",
                         "name": "cluster-autoscaler",
                         "resources": {
                             "limits": {
