@@ -76,7 +76,6 @@ if [ "$OSDISTRO" == "Linux" ]; then
     alias base64="base64 -w 0"
 else
     TZ=$(sudo systemsetup -gettimezone | awk '{print $2}')
-    alias sed=gsed
 fi
 
 TEMP=$(getopt -o k:n:p:s:t: --long node-group:,target-image:,seed-image:,seed-user:,vm-public-network:,vm-private-network:,net-address:,net-gateway:,net-dns:,net-domain:,transport:,ssh-private-key:,cni-version:,password:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
@@ -601,9 +600,15 @@ kubectl create configmap config-cluster-autoscaler --kubeconfig=./cluster/config
 	--from-file ./config/kubernetes-vmware-autoscaler.json
 
 # Update /etc/hosts
-sudo sed -i -E "/${MASTERKUBE}.${DOMAIN_NAME}/d" -E "/masterkube-vmware-dashboard.${DOMAIN_NAME}/d" /etc/hosts
+if [ "$OSDISTRO" == "Linux" ]; then
+    sudo sed -i -e "/${MASTERKUBE}.${DOMAIN_NAME}/d" -e "/masterkube-vmware-dashboard.${DOMAIN_NAME}/d" /etc/hosts
+    sed -i -E "s/https:\/\/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:([0-9]+)/https:\/\/${MASTERKUBE}.${DOMAIN_NAME}:\1/g" cluster/config
+else
+    sudo gsed -i -e "/${MASTERKUBE}.${DOMAIN_NAME}/d" -e "/masterkube-vmware-dashboard.${DOMAIN_NAME}/d" /etc/hosts
+    gsed -i -E "s/https:\/\/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:([0-9]+)/https:\/\/${MASTERKUBE}.${DOMAIN_NAME}:\1/g" cluster/config
+fi
+
 sudo bash -c "echo '${IPADDR} ${MASTERKUBE}.${DOMAIN_NAME}' >> /etc/hosts"
-sed -i -E "s/https:\/\/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:([0-9]+)/https:\/\/${MASTERKUBE}.${DOMAIN_NAME}:\1/g" cluster/config
 
 # Create Pods
 create-metallb.sh
