@@ -34,7 +34,7 @@ find config ! -name '*.md' -type f -exec rm -f "{}" "+"
 if [ "$(uname -s)" == "Linux" ]; then
     sudo sed -i "/${MASTERKUBE}/d" /etc/hosts
 else
-    sudo sed -i'' "/${MASTERKUBE}/d" /etc/hosts
+    sudo gsed -i -E "/${MASTERKUBE}/d" /etc/hosts
 fi
 
 popd

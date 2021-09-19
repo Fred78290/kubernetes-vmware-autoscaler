@@ -51,6 +51,9 @@ spec:
       nodeSelector:
         kubernetes.io/os: linux
         master: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
       containers:
         - name: external-dns
           image: k8s.gcr.io/external-dns/external-dns:v0.9.0

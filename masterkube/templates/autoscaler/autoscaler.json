@@ -19,9 +19,6 @@
             "metadata": {
                 "labels": {
                     "k8s-app": "cluster-autoscaler"
-                },
-                "annotations": {
-                    "scheduler.alpha.kubernetes.io/critical-pod": ""
                 }
             },
             "spec": {
@@ -29,6 +26,12 @@
                 "nodeSelector": {
                     "master": "true"
                 },
+                "tolerations": [
+                    {
+                        "key": "node-role.kubernetes.io/master",
+                        "effect": "NoSchedule"
+                    }
+                ],
                 "containers": [
                     {
                         "image": "$REGISTRY/cluster-autoscaler:v1.21.4",
