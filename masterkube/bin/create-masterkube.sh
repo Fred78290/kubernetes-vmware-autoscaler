@@ -43,6 +43,7 @@ export OSDISTRO=$(uname -s)
 export TRANSPORT="tcp"
 export NET_DOMAIN=home
 export NET_IP=192.168.1.20
+export NET_IF=eth1
 export NET_GATEWAY=10.0.0.1
 export NET_DNS=10.0.0.1
 export NET_MASK=255.255.255.0
@@ -475,7 +476,7 @@ scp ${SSH_OPTIONS} -r bin ${KUBERNETES_USER}@${IPADDR}:~
 
 echo "Start kubernetes ${MASTERKUBE} instance master node, kubernetes version=${KUBERNETES_VERSION}, providerID=${PROVIDERID}"
 ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo mv /home/${KUBERNETES_USER}/bin/* /usr/local/bin
-ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh --cni=flannel --net-if=eth1 --kubernetes-version="${KUBERNETES_VERSION}" --provider-id="'${PROVIDERID}'" --cert-extra-sans="${MASTERKUBE}.${DOMAIN_NAME},masterkube-vmware.${DOMAIN_NAME},masterkube-vmware-dashboard.${DOMAIN_NAME}"
+ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh --cni=flannel --net-if=$NET_IF --kubernetes-version="${KUBERNETES_VERSION}" --provider-id="'${PROVIDERID}'" --cert-extra-sans="${MASTERKUBE}.${DOMAIN_NAME},masterkube-vmware.${DOMAIN_NAME},masterkube-vmware-dashboard.${DOMAIN_NAME}"
 
 echo "create cluster done"
 
