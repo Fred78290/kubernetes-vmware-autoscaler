@@ -716,6 +716,9 @@ spec:
     spec:
       nodeSelector:
         master: 'true'
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
       terminationGracePeriodSeconds: 60
       containers:
         - 

@@ -26,6 +26,12 @@
                 "nodeSelector": {
                     "master": "true"
                 },
+                "tolerations": [
+                    {
+                        "key": "node-role.kubernetes.io/master",
+                        "effect": "NoSchedule"
+                    }
+                ],
                 "initContainers": [
                     {
                         "image": "busybox",
