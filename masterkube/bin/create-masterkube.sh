@@ -72,10 +72,10 @@ source ${CURDIR}/govc.defs
 
 if [ "$OSDISTRO" == "Linux" ]; then
     TZ=$(cat /etc/timezone)
-    BASE64="base64 -w 0"
+    alias base64="base64 -w 0"
 else
     TZ=$(sudo systemsetup -gettimezone | awk '{print $2}')
-    BASE64="base64"
+    alias sed=gsed
 fi
 
 TEMP=$(getopt -o k:n:p:s:t: --long node-group:,target-image:,seed-image:,seed-user:,vm-public-network:,vm-private-network:,net-address:,net-gateway:,net-dns:,net-domain:,transport:,ssh-private-key:,cni-version:,password:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
@@ -416,7 +416,7 @@ EOF
 # Cloud init meta-data
 cat >./config/metadata.json <<EOF
 {
-    "network": "$(cat ./config/network.yaml | gzip -c9 | $BASE64)",
+    "network": "$(cat ./config/network.yaml | gzip -c9 | base64)",
     "network.encoding": "gzip+base64",
     "local-hostname": "${MASTERKUBE}",
     "instance-id": "$(uuidgen)"
@@ -431,9 +431,9 @@ runcmd:
 EOF
 
 
-gzip -c9 <./config/metadata.json | $BASE64 | tee >config/metadata.base64
-gzip -c9 <./config/userdata.yaml | $BASE64 | tee >config/userdata.base64
-gzip -c9 <./config/vendordata.yaml | $BASE64 | tee >config/vendordata.base64
+gzip -c9 <./config/metadata.json | base64 | tee >config/metadata.base64
+gzip -c9 <./config/userdata.yaml | base64 | tee >config/userdata.base64
+gzip -c9 <./config/vendordata.yaml | base64 | tee >config/vendordata.base64
 
 echo "Clone ${TARGET_IMAGE} to ${MASTERKUBE}"
 
@@ -600,15 +600,9 @@ kubectl create configmap config-cluster-autoscaler --kubeconfig=./cluster/config
 	--from-file ./config/kubernetes-vmware-autoscaler.json
 
 # Update /etc/hosts
-if [ "${OSDISTRO}" == "Linux" ]; then
-    sudo sed -i -e "/${MASTERKUBE}.${DOMAIN_NAME}/d" -e "/masterkube-vmware-dashboard.${DOMAIN_NAME}/d" /etc/hosts
-    sed -i -E "s/https:\/\/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:([0-9]+)/https:\/\/${MASTERKUBE}.${DOMAIN_NAME}:\1/g" cluster/config
-else
-    sudo sed -i'' -e "/${MASTERKUBE}.${DOMAIN_NAME}/d" -e "/masterkube-vmware-dashboard.${DOMAIN_NAME}/d" /etc/hosts
-    sed -i'' -E "s/https:\/\/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:([0-9]+)/https:\/\/${MASTERKUBE}.${DOMAIN_NAME}:\1/g" cluster/config
-fi
-
+sudo sed -i -E "/${MASTERKUBE}.${DOMAIN_NAME}/d" -E "/masterkube-vmware-dashboard.${DOMAIN_NAME}/d" /etc/hosts
 sudo bash -c "echo '${IPADDR} ${MASTERKUBE}.${DOMAIN_NAME}' >> /etc/hosts"
+sed -i -E "s/https:\/\/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:([0-9]+)/https:\/\/${MASTERKUBE}.${DOMAIN_NAME}:\1/g" cluster/config
 
 # Create Pods
 create-metallb.sh
