@@ -479,7 +479,7 @@ ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh --cni=fla
 
 echo "create cluster done"
 
-scp ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ./cluster
+scp -r ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ./cluster
 
 MASTER_IP=$(cat ./cluster/manager-ip)
 TOKEN=$(cat ./cluster/token)
