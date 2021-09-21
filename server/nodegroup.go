@@ -32,6 +32,15 @@ const (
 // KubernetesLabel labels
 type KubernetesLabel map[string]string
 
+type ServerNodeState int
+
+const (
+	ServerNodeStateNotRunning ServerNodeState = 0
+	ServerNodeStateDeleted    ServerNodeState = 1
+	ServerNodeStateCreating   ServerNodeState = 2
+	ServerNodeStateRunning    ServerNodeState = 3
+)
+
 // AutoScalerServerNodeGroup Group all AutoScaler VM created inside a NodeGroup
 // Each node have name like <node group name>-vm-<vm index>
 type AutoScalerServerNodeGroup struct {
@@ -47,9 +56,22 @@ type AutoScalerServerNodeGroup struct {
 	SystemLabels         KubernetesLabel                  `json:"systemLabels"`
 	AutoProvision        bool                             `json:"auto-provision"`
 	LastCreatedNodeIndex int                              `json:"node-index"`
+	RunningNode          map[int]ServerNodeState          `json:"node-map"`
 	pendingNodes         map[string]*AutoScalerServerNode
 	pendingNodesWG       sync.WaitGroup
 	configuration        *types.AutoScalerServerConfig
+}
+
+func (g *AutoScalerServerNodeGroup) findNextNodeIndex() int {
+	g.LastCreatedNodeIndex++
+
+	for index := 1; index <= g.MaxNodeSize; index++ {
+		if run, found := g.RunningNode[index]; found == false || run < ServerNodeStateCreating {
+			return index
+		}
+	}
+
+	return g.LastCreatedNodeIndex
 }
 
 func (g *AutoScalerServerNodeGroup) cleanup(c types.ClientGenerator) error {
@@ -120,8 +142,8 @@ func (g *AutoScalerServerNodeGroup) deleteNodes(c types.ClientGenerator, delta i
 	endIndex := startIndex + delta
 	tempNodes := make([]*AutoScalerServerNode, 0, -delta)
 
-	for nodeIndex := startIndex; nodeIndex >= endIndex; nodeIndex-- {
-		nodeName := g.nodeName(nodeIndex)
+	for index := startIndex; index >= endIndex; index-- {
+		nodeName := g.nodeName(index)
 
 		if node := g.Nodes[nodeName]; node != nil {
 			tempNodes = append(tempNodes, node)
@@ -134,6 +156,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodes(c types.ClientGenerator, delta i
 	}
 
 	for _, node := range tempNodes {
+		g.RunningNode[node.NodeIndex] = ServerNodeStateDeleted
 		delete(g.Nodes, node.NodeName)
 	}
 
@@ -145,26 +168,25 @@ func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int)
 
 	tempNodes := make([]*AutoScalerServerNode, 0, delta)
 
-	g.pendingNodesWG.Add(delta)
-
-	for nodeIndex := 0; nodeIndex < delta; nodeIndex++ {
+	for index := 0; index < delta; index++ {
 		if g.Status != NodegroupCreated {
 			glog.Debugf("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s -> g.status != nodegroupCreated", g.NodeGroupIdentifier)
 			break
 		}
 
-		g.LastCreatedNodeIndex++
-
-		nodeName := g.nodeName(g.LastCreatedNodeIndex)
+		nodeIndex := g.findNextNodeIndex()
+		nodeName := g.nodeName(nodeIndex)
 
 		// Clone the vsphere config to allow increment IP address
-		if vsphereConfig, err := g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Clone(g.LastCreatedNodeIndex); err == nil {
+		if vsphereConfig, err := g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Clone(nodeIndex); err == nil {
+
+			g.RunningNode[nodeIndex] = ServerNodeStateCreating
 
 			node := &AutoScalerServerNode{
 				ProviderID:       g.providerIDForNode(nodeName),
 				NodeGroupID:      g.NodeGroupIdentifier,
 				NodeName:         nodeName,
-				NodeIndex:        g.LastCreatedNodeIndex,
+				NodeIndex:        nodeIndex,
 				Memory:           g.Machine.Memory,
 				CPU:              g.Machine.Vcpu,
 				Disk:             g.Machine.Disk,
@@ -185,39 +207,85 @@ func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int)
 		}
 	}
 
-	for _, node := range tempNodes {
+	createNode := func(node *AutoScalerServerNode) error {
+		var err error
+
+		if err = node.launchVM(c, g.NodeLabels, g.SystemLabels); err != nil {
+			glog.Errorf(constantes.ErrUnableToLaunchVM, node.NodeName, err)
+
+			if status, _ := node.statusVM(); status != AutoScalerServerNodeStateNotCreated {
+				if e := node.deleteVM(c); e != nil {
+					glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, e)
+				}
+			} else {
+				glog.Warningf(constantes.WarnFailedVMNotDeleted, node.NodeName, status)
+			}
+			g.RunningNode[node.NodeIndex] = ServerNodeStateDeleted
+		} else {
+			g.Nodes[node.NodeName] = node
+			g.RunningNode[node.NodeIndex] = ServerNodeStateRunning
+		}
+
+		delete(g.pendingNodes, node.NodeName)
+
+		return err
+	}
+
+	// Do sync if one node only
+	if len(tempNodes) == 1 {
+		return createNode(tempNodes[0])
+	}
+
+	g.pendingNodesWG.Add(delta)
+
+	createNodeAsync := func(currentNode *AutoScalerServerNode, err chan error) {
+		e := createNode(currentNode)
+		g.pendingNodesWG.Done()
+		err <- e
+	}
+
+	ch := make([]chan error, len(tempNodes))
+
+	glog.Infof("Launch node group %s of %d VM", g.NodeGroupIdentifier, delta)
+
+	for index, node := range tempNodes {
 		if g.Status != NodegroupCreated {
 			glog.Debugf("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s -> g.status != nodegroupCreated", g.NodeGroupIdentifier)
 			break
 		}
 
-		if err := node.launchVM(c, g.NodeLabels, g.SystemLabels); err != nil {
-			glog.Errorf(constantes.ErrUnableToLaunchVM, node.NodeName, err)
+		ch[index] = make(chan error)
 
-			for _, node := range tempNodes {
-				delete(g.pendingNodes, node.NodeName)
-
-				if status, _ := node.statusVM(); status != AutoScalerServerNodeStateNotCreated {
-					if e := node.deleteVM(c); e != nil {
-						glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, e)
-					}
-				} else {
-					glog.Warningf(constantes.WarnFailedVMNotDeleted, node.NodeName, status)
-				}
-
-				g.pendingNodesWG.Done()
-			}
-
-			return err
-		}
-
-		delete(g.pendingNodes, node.NodeName)
-
-		g.Nodes[node.NodeName] = node
-		g.pendingNodesWG.Done()
+		go createNodeAsync(node, ch[index])
 	}
 
-	return nil
+	g.pendingNodesWG.Wait()
+
+	var result error = nil
+	var successful = 0
+
+	for _, chError := range ch {
+		if chError != nil {
+			var err = <-chError
+
+			if err == nil {
+				successful++
+			}
+		}
+	}
+
+	if g.Status != NodegroupCreated {
+		result = fmt.Errorf(constantes.ErrUnableToLaunchNodeGroupNotCreated, g.NodeGroupIdentifier)
+
+		glog.Errorf("Launched node group %s of %d VM got an error because was destroyed", g.NodeGroupIdentifier, delta)
+	} else if successful == 0 {
+		result = fmt.Errorf(constantes.ErrUnableToLaunchNodeGroup, g.NodeGroupIdentifier)
+		glog.Infof("Launched node group %s of %d VM failed", g.NodeGroupIdentifier, delta)
+	} else {
+		glog.Infof("Launched node group %s of %d/%d VM successful", g.NodeGroupIdentifier, successful, delta)
+	}
+
+	return result
 }
 
 func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenerator, scaleDownDisabled bool) error {
@@ -234,6 +302,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 
 	g.Nodes = make(map[string]*AutoScalerServerNode)
 	g.pendingNodes = make(map[string]*AutoScalerServerNode)
+	g.RunningNode = make(map[int]ServerNodeState)
 	g.LastCreatedNodeIndex = 0
 
 	for _, nodeInfo := range nodeInfos.Items {
@@ -300,9 +369,10 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 						}
 					}
 
-					lastNodeIndex++
-
 					g.Nodes[nodeID] = node
+					g.RunningNode[lastNodeIndex] = ServerNodeStateRunning
+
+					lastNodeIndex++
 
 					_, _ = node.statusVM()
 				}
@@ -324,6 +394,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodeByName(c types.ClientGenerator, no
 			glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, err)
 		}
 
+		g.RunningNode[node.NodeIndex] = ServerNodeStateDeleted
 		delete(g.Nodes, nodeName)
 
 		return err

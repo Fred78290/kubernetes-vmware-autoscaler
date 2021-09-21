@@ -19,15 +19,18 @@
             "metadata": {
                 "labels": {
                     "k8s-app": "vsphere-autoscaler"
-                },
-                "annotations": {
-                    "scheduler.alpha.kubernetes.io/critical-pod": ""
                 }
             },
             "spec": {
                 "nodeSelector": {
                     "master": "true"
                 },
+                "tolerations": [
+                    {
+                        "key": "node-role.kubernetes.io/master",
+                        "effect": "NoSchedule"
+                    }
+                ],
                 "initContainers": [
                     {
                         "image": "busybox",

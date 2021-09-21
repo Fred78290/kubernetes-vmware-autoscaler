@@ -93,6 +93,7 @@
             ],
             "resources": [
                 "pods",
+                "namespaces",
                 "services",
                 "replicationcontrollers",
                 "persistentvolumeclaims",
