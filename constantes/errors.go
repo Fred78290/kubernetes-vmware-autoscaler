@@ -44,7 +44,7 @@ const (
 	ErrUnableToLaunchNodeGroupNotCreated = "Unable to launch group: %s, reason: node group is not created"
 
 	// ErrUnableToLaunchNodeGroup error msg
-	ErrUnableToLaunchNodeGroup = "unable to launch group: %s, fail to launch VM, reason: %v"
+	ErrUnableToLaunchNodeGroup = "unable to launch group: %s, fail to launch some VMs"
 
 	// ErrUnableToDeleteNodeGroup error msg
 	ErrUnableToDeleteNodeGroup = "can't delete node group: %s, reason: %v"
