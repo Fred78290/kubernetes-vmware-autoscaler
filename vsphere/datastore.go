@@ -175,7 +175,7 @@ func (ds *Datastore) output(ctx *context.Context) *flags.OutputFlag {
 }
 
 // CreateVirtualMachine create a new virtual machine
-func (ds *Datastore) CreateVirtualMachine(ctx *context.Context, name, templateName, vmFolder, resourceName string, template bool, linkedClone bool, network *Network, customization string) (*VirtualMachine, error) {
+func (ds *Datastore) CreateVirtualMachine(ctx *context.Context, name, templateName, vmFolder, resourceName string, template bool, linkedClone bool, network *Network, customization string, nodeIndex int) (*VirtualMachine, error) {
 	var templateVM *object.VirtualMachine
 	var folder *object.Folder
 	var resourcePool *object.ResourcePool
@@ -199,7 +199,7 @@ func (ds *Datastore) CreateVirtualMachine(ctx *context.Context, name, templateNa
 				if network != nil {
 					if devices, err := templateVM.Device(ctx); err == nil {
 						for _, inf := range network.Interfaces {
-							if inf.NeedToReconfigure() {
+							if inf.NeedToReconfigure(nodeIndex) {
 								// In case we dont find the preconfigured net card, we add it
 								inf.Existing = false
 
@@ -211,7 +211,7 @@ func (ds *Datastore) CreateVirtualMachine(ctx *context.Context, name, templateNa
 										if match, err := inf.MatchInterface(ctx, ds.Datacenter, ethernet.GetVirtualEthernetCard()); match && err == nil {
 
 											// Change the mac address
-											if inf.ChangeAddress(ethernet.GetVirtualEthernetCard()) {
+											if inf.ChangeAddress(ethernet.GetVirtualEthernetCard(), nodeIndex) {
 												configSpecs = append(configSpecs, &types.VirtualDeviceConfigSpec{
 													Operation: types.VirtualDeviceConfigSpecOperationEdit,
 													Device:    device,
