@@ -141,7 +141,7 @@ func Test_createVM(t *testing.T) {
 	if testFeature("Test_createVM") {
 		config := loadFromJson(confName)
 
-		_, err := config.Create(config.New.Name, config.SSH.GetUserName(), config.SSH.GetAuthKeys(), config.CloudInit, config.New.Network, config.New.Annotation, config.New.Memory, config.New.CPUS, config.New.Disk)
+		_, err := config.Create(config.New.Name, config.SSH.GetUserName(), config.SSH.GetAuthKeys(), config.CloudInit, config.New.Network, config.New.Annotation, config.New.Memory, config.New.CPUS, config.New.Disk, 0)
 
 		if assert.NoError(t, err, "Can't create VM") {
 			t.Logf("VM created")

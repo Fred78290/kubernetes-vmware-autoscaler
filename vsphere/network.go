@@ -95,17 +95,17 @@ func ToCIDR(address, netmask string) string {
 }
 
 // GetCloudInitNetwork create cloud-init object
-func (net *Network) GetCloudInitNetwork() *NetworkConfig {
+func (net *Network) GetCloudInitNetwork(nodeIndex int) *NetworkConfig {
 
 	declare := &NetworkDeclare{
 		Version:   2,
 		Ethernets: make(map[string]*NetworkAdapter, len(net.Interfaces)),
 	}
 
-	for _, n := range net.Interfaces {
+	for netIndex, n := range net.Interfaces {
 		if len(n.NicName) > 0 {
 			var ethernet *NetworkAdapter
-			var macAddress = n.GetMacAddress()
+			var macAddress = n.GetMacAddress(nodeIndex << netIndex)
 
 			if n.DHCP || len(n.IPAddress) == 0 {
 				ethernet = &NetworkAdapter{
@@ -165,14 +165,14 @@ func (net *Network) GetDeclaredExistingInterfaces() []*NetworkInterface {
 }
 
 // Devices return all devices
-func (net *Network) Devices(ctx *context.Context, devices object.VirtualDeviceList, dc *Datacenter) (object.VirtualDeviceList, error) {
+func (net *Network) Devices(ctx *context.Context, devices object.VirtualDeviceList, dc *Datacenter, nodeIndex int) (object.VirtualDeviceList, error) {
 	var err error
 	var device types.BaseVirtualDevice
 
-	for _, n := range net.Interfaces {
+	for netIndex, n := range net.Interfaces {
 		if !n.Existing {
-			if device, err = n.Device(ctx, dc); err == nil {
-				devices = append(devices, n.SetMacAddress(device))
+			if device, err = n.Device(ctx, dc, nodeIndex<<netIndex); err == nil {
+				devices = append(devices, n.SetMacAddress(nodeIndex<<netIndex, device))
 			} else {
 				break
 			}
@@ -182,14 +182,25 @@ func (net *Network) Devices(ctx *context.Context, devices object.VirtualDeviceLi
 	return devices, err
 }
 
-func generateMacAddress() string {
-	buf := make([]byte, 3)
+var macAddreses = make(map[int]string)
 
-	if _, err := rand.Read(buf); err != nil {
-		return ""
+func generateMacAddress(nodeIndex int) string {
+	var address string
+	var found bool
+
+	if address, found = macAddreses[nodeIndex]; found == false {
+		buf := make([]byte, 3)
+
+		if _, err := rand.Read(buf); err != nil {
+			return ""
+		}
+
+		address = fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[0], buf[1], buf[2])
+
+		macAddreses[nodeIndex] = address
 	}
 
-	return fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[0], buf[1], buf[2])
+	return address
 }
 
 // See func (p DistributedVirtualPortgroup) EthernetCardBackingInfo(ctx context.Context) (types.BaseVirtualDeviceBackingInfo, error)
@@ -275,11 +286,11 @@ func (net *NetworkInterface) MatchInterface(ctx *context.Context, dc *Datacenter
 }
 
 // GetMacAddress return a macaddress
-func (net *NetworkInterface) GetMacAddress() string {
+func (net *NetworkInterface) GetMacAddress(nodeIndex int) string {
 	address := net.MacAddress
 
 	if strings.ToLower(address) == "generate" {
-		address = generateMacAddress()
+		address = generateMacAddress(nodeIndex)
 	} else if strings.ToLower(address) == "ignore" {
 		address = ""
 	}
@@ -290,8 +301,8 @@ func (net *NetworkInterface) GetMacAddress() string {
 }
 
 // SetMacAddress put mac address in the device
-func (net *NetworkInterface) SetMacAddress(device types.BaseVirtualDevice) types.BaseVirtualDevice {
-	adress := net.GetMacAddress()
+func (net *NetworkInterface) SetMacAddress(nodeIndex int, device types.BaseVirtualDevice) types.BaseVirtualDevice {
+	adress := net.GetMacAddress(nodeIndex)
 
 	if len(adress) != 0 {
 		card := device.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
@@ -317,7 +328,7 @@ func (net *NetworkInterface) Reference(ctx *context.Context, dc *Datacenter) (ob
 }
 
 // Device return a device
-func (net *NetworkInterface) Device(ctx *context.Context, dc *Datacenter) (types.BaseVirtualDevice, error) {
+func (net *NetworkInterface) Device(ctx *context.Context, dc *Datacenter, nodeIndex int) (types.BaseVirtualDevice, error) {
 	var backing types.BaseVirtualDeviceBackingInfo
 
 	network, err := net.Reference(ctx, dc)
@@ -363,7 +374,7 @@ func (net *NetworkInterface) Device(ctx *context.Context, dc *Datacenter) (types
 		Connected:         true,
 	}
 
-	macAddress := net.GetMacAddress()
+	macAddress := net.GetMacAddress(nodeIndex)
 
 	if len(macAddress) != 0 {
 		card := device.(types.BaseVirtualEthernetCard).GetVirtualEthernetCard()
@@ -391,8 +402,8 @@ func (net *NetworkInterface) Change(device types.BaseVirtualDevice, update types
 }
 
 // ChangeAddress just the mac adress
-func (net *NetworkInterface) ChangeAddress(card *types.VirtualEthernetCard) bool {
-	macAddress := net.GetMacAddress()
+func (net *NetworkInterface) ChangeAddress(card *types.VirtualEthernetCard, nodeIndex int) bool {
+	macAddress := net.GetMacAddress(nodeIndex)
 
 	if len(macAddress) != 0 {
 		card.Backing = net.networkBacking
@@ -406,6 +417,6 @@ func (net *NetworkInterface) ChangeAddress(card *types.VirtualEthernetCard) bool
 }
 
 // NeedToReconfigure tell that we must set the mac address
-func (net *NetworkInterface) NeedToReconfigure() bool {
-	return len(net.GetMacAddress()) != 0 && net.Existing
+func (net *NetworkInterface) NeedToReconfigure(nodeIndex int) bool {
+	return len(net.GetMacAddress(nodeIndex)) != 0 && net.Existing
 }
