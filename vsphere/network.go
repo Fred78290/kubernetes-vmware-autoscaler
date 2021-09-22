@@ -102,10 +102,10 @@ func (net *Network) GetCloudInitNetwork(nodeIndex int) *NetworkConfig {
 		Ethernets: make(map[string]*NetworkAdapter, len(net.Interfaces)),
 	}
 
-	for netIndex, n := range net.Interfaces {
+	for _, n := range net.Interfaces {
 		if len(n.NicName) > 0 {
 			var ethernet *NetworkAdapter
-			var macAddress = n.GetMacAddress(nodeIndex << netIndex)
+			var macAddress = n.GetMacAddress(nodeIndex)
 
 			if n.DHCP || len(n.IPAddress) == 0 {
 				ethernet = &NetworkAdapter{
@@ -169,10 +169,10 @@ func (net *Network) Devices(ctx *context.Context, devices object.VirtualDeviceLi
 	var err error
 	var device types.BaseVirtualDevice
 
-	for netIndex, n := range net.Interfaces {
+	for _, n := range net.Interfaces {
 		if !n.Existing {
-			if device, err = n.Device(ctx, dc, nodeIndex<<netIndex); err == nil {
-				devices = append(devices, n.SetMacAddress(nodeIndex<<netIndex, device))
+			if device, err = n.Device(ctx, dc, nodeIndex); err == nil {
+				devices = append(devices, n.SetMacAddress(nodeIndex, device))
 			} else {
 				break
 			}
@@ -182,13 +182,13 @@ func (net *Network) Devices(ctx *context.Context, devices object.VirtualDeviceLi
 	return devices, err
 }
 
-var macAddreses = make(map[int]string)
+var macAddreses = make(map[string]string)
 
-func generateMacAddress(nodeIndex int) string {
+func generateMacAddress(netName string) string {
 	var address string
 	var found bool
 
-	if address, found = macAddreses[nodeIndex]; found == false {
+	if address, found = macAddreses[netName]; !found {
 		buf := make([]byte, 3)
 
 		if _, err := rand.Read(buf); err != nil {
@@ -197,7 +197,7 @@ func generateMacAddress(nodeIndex int) string {
 
 		address = fmt.Sprintf("00:16:3e:%02x:%02x:%02x", buf[0], buf[1], buf[2])
 
-		macAddreses[nodeIndex] = address
+		macAddreses[netName] = address
 	}
 
 	return address
@@ -290,7 +290,7 @@ func (net *NetworkInterface) GetMacAddress(nodeIndex int) string {
 	address := net.MacAddress
 
 	if strings.ToLower(address) == "generate" {
-		address = generateMacAddress(nodeIndex)
+		address = generateMacAddress(fmt.Sprintf("%s[%d]", net.NicName, nodeIndex))
 	} else if strings.ToLower(address) == "ignore" {
 		address = ""
 	}
