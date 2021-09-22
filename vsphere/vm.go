@@ -181,11 +181,11 @@ func (vm *VirtualMachine) VimClient() *vim25.Client {
 	return vm.Datastore.VimClient()
 }
 
-func (vm *VirtualMachine) addNetwork(ctx *context.Context, network *Network, devices object.VirtualDeviceList) (object.VirtualDeviceList, error) {
+func (vm *VirtualMachine) addNetwork(ctx *context.Context, network *Network, devices object.VirtualDeviceList, nodeIndex int) (object.VirtualDeviceList, error) {
 	var err error
 
 	if network != nil && len(network.Interfaces) > 0 {
-		devices, err = network.Devices(ctx, devices, vm.Datastore.Datacenter)
+		devices, err = network.Devices(ctx, devices, vm.Datastore.Datacenter, nodeIndex)
 	}
 
 	return devices, err
@@ -229,7 +229,7 @@ func (vm *VirtualMachine) addHardDrive(ctx *context.Context, virtualMachine *obj
 }
 
 // Configure set characteristic of VM a virtual machine
-func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory int, cpus int, disk int) error {
+func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory, cpus, disk, nodeIndex int) error {
 	var devices object.VirtualDeviceList
 	var err error
 	var task *object.Task
@@ -248,7 +248,7 @@ func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey stri
 
 		err = fmt.Errorf(constantes.ErrUnableToAddHardDrive, vm.Name, err)
 
-	} else if devices, err = vm.addNetwork(ctx, network, devices); err != nil {
+	} else if devices, err = vm.addNetwork(ctx, network, devices, nodeIndex); err != nil {
 
 		err = fmt.Errorf(constantes.ErrUnableToAddNetworkCard, vm.Name, err)
 
@@ -256,7 +256,7 @@ func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey stri
 
 		err = fmt.Errorf(constantes.ErrUnableToCreateDeviceChangeOp, vm.Name, err)
 
-	} else if vmConfigSpec.ExtraConfig, err = vm.cloudInit(ctx, vm.Name, userName, authKey, cloudInit, network); err != nil {
+	} else if vmConfigSpec.ExtraConfig, err = vm.cloudInit(ctx, vm.Name, userName, authKey, cloudInit, network, nodeIndex); err != nil {
 
 		err = fmt.Errorf(constantes.ErrCloudInitFailCreation, vm.Name, err)
 
@@ -511,7 +511,7 @@ func (vm *VirtualMachine) SetGuestInfo(ctx *context.Context, guestInfos *GuestIn
 	return err
 }
 
-func (vm *VirtualMachine) cloudInit(ctx *context.Context, hostName string, userName, authKey string, cloudInit interface{}, network *Network) ([]types.BaseOptionValue, error) {
+func (vm *VirtualMachine) cloudInit(ctx *context.Context, hostName string, userName, authKey string, cloudInit interface{}, network *Network, nodeIndex int) ([]types.BaseOptionValue, error) {
 	var metadata, userdata, vendordata, netconfig string
 	var err error
 	var guestInfos *GuestInfos
@@ -520,7 +520,7 @@ func (vm *VirtualMachine) cloudInit(ctx *context.Context, hostName string, userN
 
 	// Only DHCP supported
 	if network != nil && len(network.Interfaces) > 0 {
-		if netconfig, err = encodeObject("networkconfig", network.GetCloudInitNetwork()); err != nil {
+		if netconfig, err = encodeObject("networkconfig", network.GetCloudInitNetwork(nodeIndex)); err != nil {
 			err = fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "networkconfig", err)
 		} else if metadata, err = encodeMetadata(map[string]string{
 			"network":          netconfig,

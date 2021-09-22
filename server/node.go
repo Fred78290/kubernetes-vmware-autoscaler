@@ -144,7 +144,7 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 
 		err = fmt.Errorf(constantes.ErrVMAlreadyCreated, vm.NodeName)
 
-	} else if _, err = vsphere.Create(vm.NodeName, userInfo.GetUserName(), userInfo.GetAuthKeys(), vm.serverConfig.CloudInit, network, "", vm.Memory, vm.CPU, vm.Disk); err != nil {
+	} else if _, err = vsphere.Create(vm.NodeName, userInfo.GetUserName(), userInfo.GetAuthKeys(), vm.serverConfig.CloudInit, network, "", vm.Memory, vm.CPU, vm.Disk, vm.NodeIndex); err != nil {
 
 		err = fmt.Errorf(constantes.ErrUnableToLaunchVM, vm.NodeName, err)
 
