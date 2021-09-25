@@ -194,7 +194,6 @@ func (vm *VirtualMachine) collectNetworkInfos(ctx *context.Context, network *Net
 					card := ethernet.GetVirtualEthernetCard()
 					if match, err := inf.MatchInterface(ctx, vm.Datastore.Datacenter, card); match && err == nil {
 						inf.AttachMacAddress(card.MacAddress, nodeIndex)
-						return nil
 					}
 				}
 			}
