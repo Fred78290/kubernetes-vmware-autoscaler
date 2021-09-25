@@ -382,3 +382,22 @@ func (conf *Configuration) Status(name string) (*Status, error) {
 
 	return conf.StatusWithContext(ctx, name)
 }
+
+func (conf *Configuration) RetrieveNetworkInfosWithContext(ctx *context.Context, name string, nodeIndex int) error {
+	vm, err := conf.VirtualMachineWithContext(ctx, name)
+
+	if err != nil {
+		return err
+	}
+
+	conf.Network.UpdateMacAddressTable(nodeIndex)
+
+	return vm.collectNetworkInfos(ctx, conf.Network, nodeIndex)
+}
+
+func (conf *Configuration) RetrieveNetworkInfos(name string, nodeIndex int) error {
+	ctx := context.NewContext(conf.Timeout)
+	defer ctx.Cancel()
+
+	return conf.RetrieveNetworkInfosWithContext(ctx, name, nodeIndex)
+}

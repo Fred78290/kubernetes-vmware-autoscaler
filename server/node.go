@@ -400,3 +400,7 @@ func (vm *AutoScalerServerNode) GetVSphere() *vsphere.Configuration {
 func (vm *AutoScalerServerNode) setServerConfiguration(config *types.AutoScalerServerConfig) {
 	vm.serverConfig = config
 }
+
+func (vm *AutoScalerServerNode) retrieveNetworkInfos() error {
+	return vm.VSphereConfig.RetrieveNetworkInfos(vm.NodeName, vm.NodeIndex)
+}

@@ -182,7 +182,17 @@ func (net *Network) Devices(ctx *context.Context, devices object.VirtualDeviceLi
 	return devices, err
 }
 
+func (net *Network) UpdateMacAddressTable(nodeIndex int) {
+	for _, inf := range net.Interfaces {
+		inf.updateMacAddressTable(nodeIndex)
+	}
+}
+
 var macAddreses = make(map[string]string)
+
+func attachMacAddress(netName, address string) {
+	macAddreses[netName] = address
+}
 
 func generateMacAddress(netName string) string {
 	var address string
@@ -285,12 +295,28 @@ func (net *NetworkInterface) MatchInterface(ctx *context.Context, dc *Datacenter
 	return equal, nil
 }
 
+func (net *NetworkInterface) netName(nodeIndex int) string {
+	return fmt.Sprintf("%s[%d]", net.NicName, nodeIndex)
+}
+
+func (net *NetworkInterface) updateMacAddressTable(nodeIndex int) {
+	address := net.MacAddress
+
+	if len(address) > 0 && strings.ToLower(address) != "generate" && strings.ToLower(address) != "ignore" {
+		attachMacAddress(net.netName(nodeIndex), address)
+	}
+}
+
+func (net *NetworkInterface) AttachMacAddress(address string, nodeIndex int) {
+	attachMacAddress(net.netName(nodeIndex), address)
+}
+
 // GetMacAddress return a macaddress
 func (net *NetworkInterface) GetMacAddress(nodeIndex int) string {
 	address := net.MacAddress
 
 	if strings.ToLower(address) == "generate" {
-		address = generateMacAddress(fmt.Sprintf("%s[%d]", net.NicName, nodeIndex))
+		address = generateMacAddress(net.netName(nodeIndex))
 	} else if strings.ToLower(address) == "ignore" {
 		address = ""
 	}
