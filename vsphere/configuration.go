@@ -390,8 +390,6 @@ func (conf *Configuration) RetrieveNetworkInfosWithContext(ctx *context.Context,
 		return err
 	}
 
-	conf.Network.UpdateMacAddressTable(nodeIndex)
-
 	return vm.collectNetworkInfos(ctx, conf.Network, nodeIndex)
 }
 

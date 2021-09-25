@@ -398,6 +398,7 @@ func (vm *AutoScalerServerNode) GetVSphere() *vsphere.Configuration {
 }
 
 func (vm *AutoScalerServerNode) setServerConfiguration(config *types.AutoScalerServerConfig) {
+	vm.VSphereConfig.Network.UpdateMacAddressTable(vm.NodeIndex)
 	vm.serverConfig = config
 }
 
