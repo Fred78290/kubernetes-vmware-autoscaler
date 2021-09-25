@@ -420,9 +420,9 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 						if err != nil {
 							glog.Errorf(constantes.ErrLabelNodeReturnError, nodeInfo.Name, err)
 						}
-					} else {
-						node.retrieveNetworkInfos()
 					}
+
+					node.retrieveNetworkInfos()
 
 					g.Nodes[nodeID] = node
 					g.RunningNode[lastNodeIndex] = ServerNodeStateRunning
