@@ -41,7 +41,7 @@ const (
 	ErrUnableToCreateNodeGroup = "can't create node group: %s, reason: %v"
 
 	// ErrUnableToLaunchNodeGroupNotCreated error msg
-	ErrUnableToLaunchNodeGroupNotCreated = "Unable to launch group: %s, reason: node group is not created"
+	ErrUnableToLaunchNodeGroupNotCreated = "unable to launch group: %s, reason: node group is not created"
 
 	// ErrUnableToLaunchNodeGroup error msg
 	ErrUnableToLaunchNodeGroup = "unable to launch group: %s, fail to launch some VMs"
@@ -81,6 +81,9 @@ const (
 
 	// ErrUnableToLaunchVM error msg
 	ErrUnableToLaunchVM = "unable to launch the VM owned by node: %s, reason: %v"
+
+	// ErrUnableToLaunchVMNodeGroupNotReady error msg
+	ErrUnableToLaunchVMNodeGroupNotReady = "unable to launch the VM owned by node: %s, reason: launch group is not ready"
 
 	// ErrUnableToDeleteVM error msg
 	ErrUnableToDeleteVM = "unable to delete the VM owned by node: %s, reason: %v"
