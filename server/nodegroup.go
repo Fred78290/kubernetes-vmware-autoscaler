@@ -396,7 +396,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 							NodeIndex:        lastNodeIndex,
 							State:            AutoScalerServerNodeStateRunning,
 							AutoProvisionned: nodeInfo.Annotations[constantes.AnnotationNodeAutoProvisionned] == "true",
-							VSphereConfig:    g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier),
+							VSphereConfig:    g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Copy(),
 							Addresses: []string{
 								runningIP,
 							},
