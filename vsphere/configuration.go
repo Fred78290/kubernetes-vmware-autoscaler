@@ -73,14 +73,18 @@ func (conf *Configuration) getURL() (string, error) {
 	return u.String(), err
 }
 
-// Clone duplicate the conf, change ip address in network config if needed
-func (conf *Configuration) Clone(nodeIndex int) (*Configuration, error) {
-
+// Create a shadow copy
+func (conf *Configuration) Copy() *Configuration {
 	var dup Configuration
 
-	if err := Copy(&dup, conf); err != nil {
-		return nil, err
-	}
+	Copy(&dup, conf)
+
+	return &dup
+}
+
+// Clone duplicate the conf, change ip address in network config if needed
+func (conf *Configuration) Clone(nodeIndex int) (*Configuration, error) {
+	dup := conf.Copy()
 
 	if dup.Network != nil {
 		for _, inf := range dup.Network.Interfaces {
@@ -94,7 +98,7 @@ func (conf *Configuration) Clone(nodeIndex int) (*Configuration, error) {
 		}
 	}
 
-	return &dup, nil
+	return dup, nil
 }
 
 // GetClient create a new govomi client
@@ -381,4 +385,21 @@ func (conf *Configuration) Status(name string) (*Status, error) {
 	defer ctx.Cancel()
 
 	return conf.StatusWithContext(ctx, name)
+}
+
+func (conf *Configuration) RetrieveNetworkInfosWithContext(ctx *context.Context, name string, nodeIndex int) error {
+	vm, err := conf.VirtualMachineWithContext(ctx, name)
+
+	if err != nil {
+		return err
+	}
+
+	return vm.collectNetworkInfos(ctx, conf.Network, nodeIndex)
+}
+
+func (conf *Configuration) RetrieveNetworkInfos(name string, nodeIndex int) error {
+	ctx := context.NewContext(conf.Timeout)
+	defer ctx.Cancel()
+
+	return conf.RetrieveNetworkInfosWithContext(ctx, name, nodeIndex)
 }

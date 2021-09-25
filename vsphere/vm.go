@@ -181,6 +181,28 @@ func (vm *VirtualMachine) VimClient() *vim25.Client {
 	return vm.Datastore.VimClient()
 }
 
+func (vm *VirtualMachine) collectNetworkInfos(ctx *context.Context, network *Network, nodeIndex int) error {
+	virtualMachine := vm.VirtualMachine(ctx)
+	devices, err := virtualMachine.Device(ctx)
+
+	if err == nil {
+		for _, device := range devices {
+			// It's an ether device?
+			if ethernet, ok := device.(types.BaseVirtualEthernetCard); ok {
+				// Match my network?
+				for _, inf := range network.Interfaces {
+					card := ethernet.GetVirtualEthernetCard()
+					if match, err := inf.MatchInterface(ctx, vm.Datastore.Datacenter, card); match && err == nil {
+						inf.AttachMacAddress(card.MacAddress, nodeIndex)
+					}
+				}
+			}
+		}
+	}
+
+	return err
+}
+
 func (vm *VirtualMachine) addNetwork(ctx *context.Context, network *Network, devices object.VirtualDeviceList, nodeIndex int) (object.VirtualDeviceList, error) {
 	var err error
 

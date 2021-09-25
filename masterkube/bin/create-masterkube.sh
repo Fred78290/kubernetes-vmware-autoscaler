@@ -514,6 +514,7 @@ AUTOSCALER_CONFIG=$(cat <<EOF
     "secret": "${SCHEME}",
     "minNode": ${MINNODES},
     "maxNode": ${MAXNODES},
+    "maxNode-per-cycle": 2,
     "nodePrice": 0.0,
     "podPrice": 0.0,
     "image": "${TARGET_IMAGE}",

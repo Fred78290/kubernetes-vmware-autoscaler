@@ -136,21 +136,22 @@ func (ssh *AutoScalerServerSSH) GetAuthKeys() string {
 
 // AutoScalerServerConfig is contains configuration
 type AutoScalerServerConfig struct {
-	Network            string                            `default:"tcp" json:"network"`         // Mandatory, Network to listen (see grpc doc) to listen
-	Listen             string                            `default:"0.0.0.0:5200" json:"listen"` // Mandatory, Address to listen
-	ProviderID         string                            `json:"secret"`                        // Mandatory, secret Identifier, client must match this
-	MinNode            int                               `json:"minNode"`                       // Mandatory, Min AutoScaler VM
-	MaxNode            int                               `json:"maxNode"`                       // Mandatory, Max AutoScaler VM
-	NodePrice          float64                           `json:"nodePrice"`                     // Optional, The VM price
-	PodPrice           float64                           `json:"podPrice"`                      // Optional, The pod price
-	KubeAdm            KubeJoinConfig                    `json:"kubeadm"`
-	DefaultMachineType string                            `default:"{\"standard\": {}}" json:"default-machine"`
-	Machines           map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
-	CloudInit          interface{}                       `json:"cloud-init"`                            // Optional, The cloud init conf file
-	Optionals          *AutoScalerServerOptionals        `json:"optionals"`
-	ResourceLimiter    *ResourceLimiter                  `json:"limits"`
-	SSH                *AutoScalerServerSSH              `json:"ssh-infos"`
-	VMwareInfos        map[string]*vsphere.Configuration `json:"vmware"`
+	Network                string                            `default:"tcp" json:"network"`         // Mandatory, Network to listen (see grpc doc) to listen
+	Listen                 string                            `default:"0.0.0.0:5200" json:"listen"` // Mandatory, Address to listen
+	ProviderID             string                            `json:"secret"`                        // Mandatory, secret Identifier, client must match this
+	MinNode                int                               `json:"minNode"`                       // Mandatory, Min AutoScaler VM
+	MaxNode                int                               `json:"maxNode"`                       // Mandatory, Max AutoScaler VM
+	MaxCreatedNodePerCycle int                               `json:"maxNode-per-cycle" default:"2"`
+	NodePrice              float64                           `json:"nodePrice"` // Optional, The VM price
+	PodPrice               float64                           `json:"podPrice"`  // Optional, The pod price
+	KubeAdm                KubeJoinConfig                    `json:"kubeadm"`
+	DefaultMachineType     string                            `default:"{\"standard\": {}}" json:"default-machine"`
+	Machines               map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
+	CloudInit              interface{}                       `json:"cloud-init"`                            // Optional, The cloud init conf file
+	Optionals              *AutoScalerServerOptionals        `json:"optionals"`
+	ResourceLimiter        *ResourceLimiter                  `json:"limits"`
+	SSH                    *AutoScalerServerSSH              `json:"ssh-infos"`
+	VMwareInfos            map[string]*vsphere.Configuration `json:"vmware"`
 }
 
 // GetVSphereConfiguration returns the vsphere named conf or default
