@@ -66,7 +66,7 @@ func (g *AutoScalerServerNodeGroup) findNextNodeIndex() int {
 	g.LastCreatedNodeIndex++
 
 	for index := 1; index <= g.MaxNodeSize; index++ {
-		if run, found := g.RunningNode[index]; found == false || run < ServerNodeStateCreating {
+		if run, found := g.RunningNode[index]; !found || run < ServerNodeStateCreating {
 			return index
 		}
 	}
@@ -210,6 +210,13 @@ func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int)
 	createNode := func(node *AutoScalerServerNode) error {
 		var err error
 
+		defer g.pendingNodesWG.Done()
+
+		if g.Status != NodegroupCreated {
+			glog.Debugf("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s -> g.status != nodegroupCreated", g.NodeGroupIdentifier)
+			return fmt.Errorf(constantes.ErrUnableToLaunchVMNodeGroupNotReady, node.NodeName)
+		}
+
 		if err = node.launchVM(c, g.NodeLabels, g.SystemLabels); err != nil {
 			glog.Errorf(constantes.ErrUnableToLaunchVM, node.NodeName, err)
 
@@ -231,48 +238,94 @@ func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int)
 		return err
 	}
 
-	// Do sync if one node only
-	if len(tempNodes) == 1 {
-		return createNode(tempNodes[0])
-	}
+	var result error = nil
+	var successful int
 
 	g.pendingNodesWG.Add(delta)
 
-	createNodeAsync := func(currentNode *AutoScalerServerNode, err chan error) {
-		e := createNode(currentNode)
-		g.pendingNodesWG.Done()
-		err <- e
-	}
+	// Do sync if one node only
+	if len(tempNodes) == 1 {
+		if err := createNode(tempNodes[0]); err == nil {
+			successful++
+		}
+	} else {
+		var maxCreatedNodePerCycle int
 
-	ch := make([]chan error, len(tempNodes))
-
-	glog.Infof("Launch node group %s of %d VM", g.NodeGroupIdentifier, delta)
-
-	for index, node := range tempNodes {
-		if g.Status != NodegroupCreated {
-			glog.Debugf("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s -> g.status != nodegroupCreated", g.NodeGroupIdentifier)
-			break
+		if g.configuration.MaxCreatedNodePerCycle <= 0 {
+			maxCreatedNodePerCycle = len(tempNodes)
+		} else {
+			maxCreatedNodePerCycle = g.configuration.MaxCreatedNodePerCycle
 		}
 
-		ch[index] = make(chan error)
+		glog.Debugf("Launch node group %s of %d VM by %d nodes per cycle", g.NodeGroupIdentifier, delta, maxCreatedNodePerCycle)
 
-		go createNodeAsync(node, ch[index])
-	}
+		createNodeAsync := func(currentNode *AutoScalerServerNode, wg *sync.WaitGroup, err chan error) {
+			e := createNode(currentNode)
+			wg.Done()
+			err <- e
+		}
 
-	g.pendingNodesWG.Wait()
+		totalLoop := len(tempNodes) / maxCreatedNodePerCycle
 
-	var result error = nil
-	var successful = 0
+		if len(tempNodes)%maxCreatedNodePerCycle > 0 {
+			totalLoop++
+		}
 
-	for _, chError := range ch {
-		if chError != nil {
-			var err = <-chError
+		currentNodeIndex := 0
 
-			if err == nil {
-				successful++
+		for numberOfCycle := 0; numberOfCycle < totalLoop; numberOfCycle++ {
+			// WaitGroup per segment
+			numberOfNodeInCycle := utils.MinInt(maxCreatedNodePerCycle, len(tempNodes)-currentNodeIndex)
+
+			glog.Debugf("Launched cycle: %d, node per cycle is: %d", numberOfCycle, numberOfNodeInCycle)
+
+			if numberOfNodeInCycle > 1 {
+				ch := make([]chan error, numberOfNodeInCycle)
+				wg := sync.WaitGroup{}
+
+				for nodeInCycle := 0; nodeInCycle < numberOfNodeInCycle; nodeInCycle++ {
+					node := tempNodes[currentNodeIndex]
+					cherr := make(chan error)
+					ch[nodeInCycle] = cherr
+
+					currentNodeIndex++
+
+					wg.Add(1)
+
+					go createNodeAsync(node, &wg, cherr)
+				}
+
+				// Wait this segment to launch
+				glog.Debugf("Wait cycle to finish: %d", numberOfCycle)
+
+				wg.Wait()
+
+				glog.Debugf("Launched cycle: %d, collect result", numberOfCycle)
+
+				for _, chError := range ch {
+					if chError != nil {
+						var err = <-chError
+
+						if err == nil {
+							successful++
+						}
+					}
+				}
+
+				glog.Debugf("Finished cycle: %d", numberOfCycle)
+			} else if numberOfNodeInCycle > 0 {
+				node := tempNodes[currentNodeIndex]
+				currentNodeIndex++
+				if err := createNode(node); err == nil {
+					successful++
+				}
+			} else {
+				break
 			}
 		}
 	}
+
+	g.pendingNodesWG.Wait()
 
 	if g.Status != NodegroupCreated {
 		result = fmt.Errorf(constantes.ErrUnableToLaunchNodeGroupNotCreated, g.NodeGroupIdentifier)

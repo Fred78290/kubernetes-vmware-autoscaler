@@ -82,6 +82,9 @@ const (
 	// ErrUnableToLaunchVM error msg
 	ErrUnableToLaunchVM = "unable to launch the VM owned by node: %s, reason: %v"
 
+	// ErrUnableToLaunchVMNodeGroupNotReady error msg
+	ErrUnableToLaunchVMNodeGroupNotReady = "unable to launch the VM owned by node: %s, reason: launch group is not ready"
+
 	// ErrUnableToDeleteVM error msg
 	ErrUnableToDeleteVM = "unable to delete the VM owned by node: %s, reason: %v"
 
