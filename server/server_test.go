@@ -34,12 +34,6 @@ func newTestServer(addNodeGroup, addTestNode bool) (*AutoScalerServerApp, *AutoS
 			},
 			Groups:        map[string]*AutoScalerServerNodeGroup{},
 			Configuration: config,
-			KubeAdmConfiguration: &apigrpc.KubeAdmConfig{
-				KubeAdmAddress:        config.KubeAdm.Address,
-				KubeAdmToken:          config.KubeAdm.Token,
-				KubeAdmCACert:         config.KubeAdm.CACert,
-				KubeAdmExtraArguments: config.KubeAdm.ExtraArguments,
-			},
 		}
 
 		if addNodeGroup {

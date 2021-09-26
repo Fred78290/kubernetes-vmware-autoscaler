@@ -401,6 +401,9 @@ spec:
       nodeSelector:
         kubernetes.io/os: linux
         master: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
       serviceAccountName: ingress-nginx
       terminationGracePeriodSeconds: 300
       volumes:

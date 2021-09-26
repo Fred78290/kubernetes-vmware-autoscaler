@@ -3,6 +3,8 @@
     "secret": "vmware",
     "timeout": 300,
     "config": {
+        "update-etc-hosts": ${HA_CLUSTER},
+        "cluster-hostname": "${MASTERKUBE}.${DOMAIN_NAME}",
         "kubeAdmAddress": "$MASTER_IP",
         "kubeAdmToken": "$TOKEN",
         "kubeAdmCACert": "sha256:$CACERT",
