@@ -55,6 +55,7 @@ func (s *AutoScalerServerApp) newNodeGroup(nodeGroupID string, minNodeSize, maxN
 
 	nodeGroup := &AutoScalerServerNodeGroup{
 		ServiceIdentifier:   s.Configuration.ProviderID,
+		NodeNamePrefix:      s.Configuration.NodeNamePrefix,
 		NodeGroupIdentifier: nodeGroupID,
 		Machine:             machine,
 		Status:              NodegroupNotCreated,

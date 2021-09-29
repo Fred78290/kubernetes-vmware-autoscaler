@@ -47,6 +47,7 @@ type AutoScalerServerNodeGroup struct {
 	sync.Mutex
 	NodeGroupIdentifier  string                           `json:"identifier"`
 	ServiceIdentifier    string                           `json:"service"`
+	NodeNamePrefix       string                           `json:"node-name-prefix" default:"autoscaled"`
 	Machine              *types.MachineCharacteristic     `json:"machine"`
 	Status               NodeGroupState                   `json:"status"`
 	MinNodeSize          int                              `json:"minSize"`
@@ -475,7 +476,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodeGroup(c types.ClientGenerator) err
 }
 
 func (g *AutoScalerServerNodeGroup) nodeName(vmIndex int) string {
-	return fmt.Sprintf("%s-vm-%02d", g.NodeGroupIdentifier, vmIndex)
+	return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.NodeNamePrefix, vmIndex)
 }
 
 func (g *AutoScalerServerNodeGroup) providerID() string {

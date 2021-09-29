@@ -101,6 +101,7 @@ func newTestNodeGroup() (*types.AutoScalerServerConfig, *AutoScalerServerNodeGro
 		ng := &AutoScalerServerNodeGroup{
 			ServiceIdentifier:   testProviderID,
 			NodeGroupIdentifier: testGroupID,
+			NodeNamePrefix:      "autoscaled",
 			Machine: &types.MachineCharacteristic{
 				Memory: 4096,
 				Vcpu:   4,

@@ -142,14 +142,15 @@ type AutoScalerServerConfig struct {
 	UseExternalEtdc          bool                              `json:"use-external-etcd"`
 	ExtDestinationEtcdSslDir string                            `json:"src-etcd-ssl-dir"`
 	ExtSourceEtcdSslDir      string                            `json:"dst-etcd-ssl-dir"`
-	Network                  string                            `default:"tcp" json:"network"`         // Mandatory, Network to listen (see grpc doc) to listen
-	Listen                   string                            `default:"0.0.0.0:5200" json:"listen"` // Mandatory, Address to listen
-	ProviderID               string                            `json:"secret"`                        // Mandatory, secret Identifier, client must match this
-	MinNode                  int                               `json:"minNode"`                       // Mandatory, Min AutoScaler VM
-	MaxNode                  int                               `json:"maxNode"`                       // Mandatory, Max AutoScaler VM
-	MaxCreatedNodePerCycle   int                               `json:"maxNode-per-cycle" default:"2"`
-	NodePrice                float64                           `json:"nodePrice"` // Optional, The VM price
-	PodPrice                 float64                           `json:"podPrice"`  // Optional, The pod price
+	Network                  string                            `default:"tcp" json:"network"`                 // Mandatory, Network to listen (see grpc doc) to listen
+	Listen                   string                            `default:"0.0.0.0:5200" json:"listen"`         // Mandatory, Address to listen
+	ProviderID               string                            `json:"secret"`                                // Mandatory, secret Identifier, client must match this
+	MinNode                  int                               `json:"minNode"`                               // Mandatory, Min AutoScaler VM
+	MaxNode                  int                               `json:"maxNode"`                               // Mandatory, Max AutoScaler VM
+	MaxCreatedNodePerCycle   int                               `json:"maxNode-per-cycle" default:"2"`         // Optional, the max number VM to create in //
+	NodeNamePrefix           string                            `json:"node-name-prefix" default:"autoscaled"` // Optional, the created node name prefix
+	NodePrice                float64                           `json:"nodePrice"`                             // Optional, The VM price
+	PodPrice                 float64                           `json:"podPrice"`                              // Optional, The pod price
 	KubeAdm                  KubeJoinConfig                    `json:"kubeadm"`
 	DefaultMachineType       string                            `default:"{\"standard\": {}}" json:"default-machine"`
 	Machines                 map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
