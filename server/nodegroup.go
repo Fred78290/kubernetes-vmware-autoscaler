@@ -366,7 +366,8 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 		if len(providerID) > 0 {
 			out, _ = utils.NodeGroupIDFromProviderID(g.ServiceIdentifier, providerID)
 
-			if out == g.NodeGroupIdentifier {
+			// Ignore nodes not handled by autoscaler
+			if out == g.NodeGroupIdentifier && nodeInfo.Annotations[constantes.AnnotationNodeAutoProvisionned] == "true" {
 				glog.Infof("Discover node:%s matching nodegroup:%s", providerID, g.NodeGroupIdentifier)
 
 				if nodeID, err = utils.NodeNameFromProviderID(g.ServiceIdentifier, providerID); err == nil {
