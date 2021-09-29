@@ -68,32 +68,6 @@ func (vm *AutoScalerServerNode) waitReady(c types.ClientGenerator) error {
 	return c.WaitNodeToBeReady(vm.NodeName, 60)
 }
 
-func (vm *AutoScalerServerNode) updateHostsIfNeeded() error {
-	var err error
-
-	if vm.serverConfig.KubeAdm.UpdateEtcHosts && len(vm.serverConfig.KubeAdm.ClusterName) > 0 {
-		isAddress := func(str string) bool {
-			for _, c := range str {
-				if c >= '0' && c <= '9' || c == '.' {
-					continue
-				}
-
-				return false
-			}
-
-			return true
-		}
-
-		address := strings.Split(vm.serverConfig.KubeAdm.Address, ":")[0]
-
-		if isAddress(address) {
-			_, err = utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], fmt.Sprintf("sh -c 'echo %s	%s >> /etc/hosts'", address, vm.serverConfig.KubeAdm.ClusterName))
-		}
-	}
-
-	return err
-}
-
 func (vm *AutoScalerServerNode) recopyEtcdSslFilesIfNeeded() error {
 	var err error
 
@@ -218,10 +192,6 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 	} else if status != AutoScalerServerNodeStateRunning {
 
 		err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
-
-	} else if err = vm.updateHostsIfNeeded(); err != nil {
-
-		err = fmt.Errorf(constantes.ErrUpdateEtcHostsFailed, vm.NodeName, err)
 
 	} else if err = vm.recopyEtcdSslFilesIfNeeded(); err != nil {
 

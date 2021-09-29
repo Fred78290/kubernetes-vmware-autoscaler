@@ -84,8 +84,6 @@ type MachineCharacteristic struct {
 
 // KubeJoinConfig give element to join kube master
 type KubeJoinConfig struct {
-	UpdateEtcHosts bool     `json:"update-etc-hosts,omitempty"`
-	ClusterName    string   `json:"cluster-hostname,omitempty"`
 	Address        string   `json:"address,omitempty"`
 	Token          string   `json:"token,omitempty"`
 	CACert         string   `json:"ca,omitempty"`

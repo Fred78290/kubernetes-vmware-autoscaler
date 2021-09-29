@@ -130,9 +130,6 @@ const (
 	// ErrDeleteVMFailed error msg
 	ErrDeleteVMFailed = "could not delete VM: %s, reason: %v"
 
-	// ErrUpdateEtcHostsFailed msg
-	ErrUpdateEtcHostsFailed = "could update /etc/hosts on VM: %s, reason: %v"
-
 	// ErrUpdateEtcdSslFailed msg
 	ErrUpdateEtcdSslFailed = "could install etcd ssl on VM: %s, reason: %v"
 
