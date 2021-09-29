@@ -59,6 +59,7 @@ export METALLB_IP_RANGE=10.0.0.100-10.0.0.127
 export REGISTRY=fred78290
 export LAUNCH_CA=YES
 export PUBLIC_IP=DHCP
+export SCALEDNODES_DHCP=false
 export RESUME=NO
 
 if [ -z "$(command -v cfssl)" ]; then
@@ -83,6 +84,19 @@ SCP_OPTIONS="${SSH_OPTIONS} -r"
 
 # import govc hidden definitions
 source ${CURDIR}/govc.defs
+
+function wait_jobs_finish() {
+    while :
+    do
+        if test "$(jobs | wc -l)" -eq 0; then
+            break
+        fi
+
+    wait -n
+    done
+
+    wait
+}
 
 function echo_blue_dot() {
 	echo -n -e "\e[90m\e[39m\e[1m\e[34m.\e[0m\e[39m"
@@ -172,7 +186,6 @@ while true; do
         ;;
     -u|--use-keepalived)
         USE_KEEPALIVED=YES
-        CONTROLNODES=3
         shift 1
         ;;
     --node-group)
@@ -312,6 +325,10 @@ while true; do
         ;;
     esac
 done
+
+if [ $USE_KEEPALIVED = "YES" ] && [ HA_CLUSTER = "false" ]; then
+    USE_KEEPALIVED=NO
+fi
 
 if [ -z $KUBERNETES_PASSWORD ]; then
     if [ -f ~/.kubernetes_pwd ]; then
@@ -462,8 +479,8 @@ export WORKERNODES=$WORKERNODES
 export MINNODES=$MINNODES
 export MAXNODES=$MAXNODES
 export MAXTOTALNODES=$MAXTOTALNODES
-export CORESTOTAL=$CORESTOTAL
-export MEMORYTOTAL=$MEMORYTOTAL
+export CORESTOTAL="$CORESTOTAL"
+export MEMORYTOTAL="$MEMORYTOTAL"
 export MAXAUTOPROVISIONNEDNODEGROUPCOUNT=$MAXAUTOPROVISIONNEDNODEGROUPCOUNT
 export SCALEDOWNENABLED=$SCALEDOWNENABLED
 export SCALEDOWNDELAYAFTERADD=$SCALEDOWNDELAYAFTERADD
@@ -486,9 +503,19 @@ export VC_NETWORK_PUBLIC=$VC_NETWORK_PUBLIC
 export REGISTRY=$REGISTRY
 export LAUNCH_CA=$LAUNCH_CA
 export CLUSTER_LB=$CLUSTER_LB
+export USE_KEEPALIVED=$USE_KEEPALIVED
 EOF
 
 echo "${KUBERNETES_PASSWORD}" >./config/kubernetes-password.txt
+
+# Due to my vsphere center the folder name refer more path, so I need to precise the path instead
+FOLDER_OPTIONS=
+if [ "${GOVC_FOLDER}" ]; then
+    if [ ! $(govc folder.info ${GOVC_FOLDER} | grep -m 1 Path | wc -l) -eq 1 ]; then
+        FOLDER_OPTIONS="-folder=/${GOVC_DATACENTER}/vm/${GOVC_FOLDER}"
+    fi
+fi
+
 
 # Cloud init vendor-data
 cat >./config/vendordata.yaml <<EOF
@@ -529,9 +556,15 @@ fi
 
 TOTALNODES=$((WORKERNODES + $CONTROLNODES))
 
-for INDEX in $(seq $FIRSTNODE $TOTALNODES)
-do
-    NODEINDEX=$INDEX
+function create_vm() {
+    local INDEX=$1
+    local PUBLIC_NODE_IP=$2
+    local NODE_IP=$3
+
+    local NODEINDEX=$INDEX
+    local MASTERKUBE_NODE=
+    local IPADDR=
+    local VMHOST=
 
     if [ $NODEINDEX = 0 ]; then
         MASTERKUBE_NODE="${MASTERKUBE}"
@@ -544,7 +577,7 @@ do
 
     if [ -z "$(govc vm.info ${MASTERKUBE_NODE} 2>&1)" ]; then
 
-        if [ "$PUBLIC_IP" = "DHCP" ]; then
+        if [ "$PUBLIC_NODE_IP" = "DHCP" ]; then
             cat >./config/network-$INDEX.yaml <<EOF
 network:
   version: 2
@@ -573,7 +606,6 @@ network:
       addresses:
       - $NODE_IP/$NET_MASK_CIDR
 EOF
-            PUBLIC_NODE_IP=$(nextip $PUBLIC_NODE_IP)
         fi
 
         # Cloud init meta-data
@@ -586,7 +618,7 @@ EOF
         }
 EOF
 
-        # Cloud init user-data
+    # Cloud init user-data
         cat > ./config/userdata-${INDEX}.yaml <<EOF
 #cloud-config
 runcmd:
@@ -602,19 +634,11 @@ EOF
         echo_blue_bold "MASTERKUBE_NODE=${MASTERKUBE_NODE}"
         echo_line
 
-        # Due to my vsphere center the folder name refer more path, so I need to precise the path instead
-        FOLDER_OPTIONS=
-        if [ "${GOVC_FOLDER}" ]; then
-            if [ ! $(govc folder.info ${GOVC_FOLDER} | grep -m 1 Path | wc -l) -eq 1 ]; then
-                FOLDER_OPTIONS="-folder=/${GOVC_DATACENTER}/vm/${GOVC_FOLDER}"
-            fi
-        fi
-
         # Clone my template
         if [ $INDEX = 0 ]; then
-            govc vm.clone -link=false -on=false ${FOLDER_OPTIONS} -c=1 -m=1024 -vm=${TARGET_IMAGE} ${MASTERKUBE_NODE}
+            govc vm.clone -link=false -on=false ${FOLDER_OPTIONS} -c=1 -m=1024 -vm=${TARGET_IMAGE} ${MASTERKUBE_NODE} > /dev/null
         else
-            govc vm.clone -link=false -on=false ${FOLDER_OPTIONS} -c=2 -m=4096 -vm=${TARGET_IMAGE} ${MASTERKUBE_NODE}
+            govc vm.clone -link=false -on=false ${FOLDER_OPTIONS} -c=2 -m=4096 -vm=${TARGET_IMAGE} ${MASTERKUBE_NODE} > /dev/null
         fi
 
         echo_title "Set cloud-init settings for ${MASTERKUBE_NODE}"
@@ -649,10 +673,22 @@ EOF
         echo_title "Already running ${MASTERKUBE_NODE} instance"
     fi
 
+    echo_separator
+}
+
+for INDEX in $(seq $FIRSTNODE $TOTALNODES)
+do
+    create_vm $INDEX $PUBLIC_NODE_IP $NODE_IP &
+
     IPADDRS+=($NODE_IP)
     NODE_IP=$(nextip $NODE_IP)
-    echo_separator
+
+    if [ "$PUBLIC_IP" != "DHCP" ]; then
+        PUBLIC_NODE_IP=$(nextip $PUBLIC_NODE_IP)
+    fi
 done
+
+wait_jobs_finish
 
 CLUSTER_NODES=
 
@@ -693,45 +729,47 @@ if [ $HA_CLUSTER = "true" ]; then
         fi
     done
 
-    echo_title "Created keepalived cluster: ${CLUSTER_NODES}"
+    if [ $USE_KEEPALIVED = "YES" ]; then
+        echo_title "Created keepalived cluster: ${CLUSTER_NODES}"
 
-    for INDEX in $(seq 1 $CONTROLNODES)
-    do
-        if [ ! -f ./config/keepalived-0${INDEX}-prepared ]; then
-            IPADDR="${IPADDRS[$INDEX]}"
+        for INDEX in $(seq 1 $CONTROLNODES)
+        do
+            if [ ! -f ./config/keepalived-0${INDEX}-prepared ]; then
+                IPADDR="${IPADDRS[$INDEX]}"
 
-            echo_title "Start keepalived node: ${IPADDR}"
+                echo_title "Start keepalived node: ${IPADDR}"
 
-            case "$INDEX" in
-                1)
-                    KEEPALIVED_PEER1=${IPADDRS[2]}
-                    KEEPALIVED_PEER2=${IPADDRS[3]}
-                    KEEPALIVED_STATUS=MASTER
-                    ;;
-                2)
-                    KEEPALIVED_PEER1=${IPADDRS[1]}
-                    KEEPALIVED_PEER2=${IPADDRS[3]}
-                    KEEPALIVED_STATUS=BACKUP
-                    ;;
-                3)
-                    KEEPALIVED_PEER1=${IPADDRS[1]}
-                    KEEPALIVED_PEER2=${IPADDRS[2]}
-                    KEEPALIVED_STATUS=BACKUP
-                    ;;
-            esac
+                case "$INDEX" in
+                    1)
+                        KEEPALIVED_PEER1=${IPADDRS[2]}
+                        KEEPALIVED_PEER2=${IPADDRS[3]}
+                        KEEPALIVED_STATUS=MASTER
+                        ;;
+                    2)
+                        KEEPALIVED_PEER1=${IPADDRS[1]}
+                        KEEPALIVED_PEER2=${IPADDRS[3]}
+                        KEEPALIVED_STATUS=BACKUP
+                        ;;
+                    3)
+                        KEEPALIVED_PEER1=${IPADDRS[1]}
+                        KEEPALIVED_PEER2=${IPADDRS[2]}
+                        KEEPALIVED_STATUS=BACKUP
+                        ;;
+                esac
 
-            ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo /usr/local/bin/install-keepalived.sh \
-                "${IPADDRS[0]}" \
-                "$KUBERNETES_PASSWORD" \
-                "$((80-INDEX))" \
-                ${IPADDRS[$INDEX]} \
-                ${KEEPALIVED_PEER1} \
-                ${KEEPALIVED_PEER2} \
-                ${KEEPALIVED_STATUS}
+                ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo /usr/local/bin/install-keepalived.sh \
+                    "${IPADDRS[0]}" \
+                    "$KUBERNETES_PASSWORD" \
+                    "$((80-INDEX))" \
+                    ${IPADDRS[$INDEX]} \
+                    ${KEEPALIVED_PEER1} \
+                    ${KEEPALIVED_PEER2} \
+                    ${KEEPALIVED_STATUS}
 
-            touch ./config/keepalived-0${INDEX}-prepared
-        fi
-    done
+                touch ./config/keepalived-0${INDEX}-prepared
+            fi
+        done
+    fi
 else
     IPADDR="${IPADDRS[0]}"
     CLUSTER_NODES="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDR}"
@@ -900,6 +938,7 @@ AUTOSCALER_CONFIG=$(cat <<EOF
     "minNode": ${MINNODES},
     "maxNode": ${MAXNODES},
     "maxNode-per-cycle": 2,
+    "node-name-prefix": "autoscaled",
     "nodePrice": 0.0,
     "podPrice": 0.0,
     "image": "${TARGET_IMAGE}",
@@ -923,7 +962,10 @@ AUTOSCALER_CONFIG=$(cat <<EOF
     "machines": ${MACHINE_DEFS},
     "cloud-init": {
         "package_update": false,
-        "package_upgrade": false
+        "package_upgrade": false,
+        "runcmd": [
+            "echo '${IPADDRS[0]} ${MASTERKUBE} ${MASTERKUBE}.${DOMAIN_NAME}' >> /etc/hosts"
+        ]
     },
     "ssh-infos" : {
         "user": "${KUBERNETES_USER}",
@@ -968,9 +1010,9 @@ AUTOSCALER_CONFIG=$(cat <<EOF
                         "adapter": "vmxnet3",
                         "mac-address": "generate",
                         "nic": "eth1",
-                        "dhcp": false,
-                        "address": "${NET_IP}",
-                        "gateway4": "${NET_GATEWAY}",
+                        "dhcp": ${SCALEDNODES_DHCP},
+                        "address": "${NODE_IP}",
+                        "gateway": "${NET_GATEWAY}",
                         "netmask": "${NET_MASK}"
                     }
                 ]

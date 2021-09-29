@@ -12,7 +12,10 @@ if [ -f /etc/keepalived/check_apiserver.sh ]; then
     exit 0
 fi
 
+echo "net.ipv4.ip_nonlocal_bind = 1" >> /etc/sysctl.conf
+
 apt install keepalived -y
+sysctl -p
 
 cat > /etc/keepalived/check_apiserver.sh <<EOF
 #!/bin/sh
@@ -35,24 +38,26 @@ cat > /etc/keepalived/keepalived.conf <<EOF
 ! Configuration File for keepalived
 global_defs {
     router_id LVS_DEVEL
+    vrrp_skip_check_adv_addr
+    vrrp_garp_interval 0
+    vrrp_gna_interval 0
 }
+
 vrrp_script check_apiserver {
-  script "/etc/keepalived/check_apiserver.sh"
-  interval 3
-  weight -2
-  fall 10
-  rise 2
+    script "/etc/keepalived/check_apiserver.sh"
+    interval 3
+    weight -2
+    fall 10
+    rise 2
 }
 
 vrrp_instance VI_1 {
     state $KEEPALIVED_STATUS
-    lvs_sync_daemon_interface eth1
     interface eth1
     virtual_router_id 151
     priority $KEEPALIVED_PRIORITY
     advert_int 1
-    mcast_src_ip $KEEPALIVED_MCAST
-    nopreempt
+    unicast_src_ip $KEEPALIVED_MCAST
     authentication {
         auth_type PASS
         auth_pass $KEEPALIVED_PASSWORD

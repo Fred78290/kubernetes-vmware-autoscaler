@@ -39,15 +39,9 @@ if [ "$FORCE" = "YES" ]; then
             govc vm.destroy $MASTERKUBE_NODE
         fi
 
-        sudo $SED -i "/${$MASTERKUBE_NODE}/d" /etc/hosts
+        sudo $SED -i "/${MASTERKUBE_NODE}/d" /etc/hosts
     done
 elif [ -f ./cluster/config ]; then
-    if [ ! -z "$(govc vm.info $MASTERKUBE 2>&1)" ]; then
-        echo "Delete VM: $MASTERKUBE"
-        govc vm.power -persist-session=false -s $MASTERKUBE
-        govc vm.destroy $MASTERKUBE
-    fi
-
     for vm in $(kubectl get node -o json --kubeconfig ./cluster/config | jq '.items| .[] | .metadata.labels["kubernetes.io/hostname"]')
     do
         vm=$(echo -n $vm | tr -d '"')
@@ -56,8 +50,14 @@ elif [ -f ./cluster/config ]; then
             govc vm.power -persist-session=false -s $vm
             govc vm.destroy $vm
         fi
-        sudo $SED -i "/${$vm}/d" /etc/hosts
+        sudo $SED -i "/${vm}/d" /etc/hosts
     done
+
+    if [ ! -z "$(govc vm.info $MASTERKUBE 2>&1)" ]; then
+        echo "Delete VM: $MASTERKUBE"
+        govc vm.power -persist-session=false -s $MASTERKUBE
+        govc vm.destroy $MASTERKUBE
+    fi
 fi
 
 ./bin/kubeconfig-delete.sh $MASTERKUBE &> /dev/null
