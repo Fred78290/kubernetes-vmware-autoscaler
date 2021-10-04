@@ -110,7 +110,7 @@ const (
 	ErrCloudInitWriteError = "can't write cloud-init, reason: %v"
 
 	// ErrGetVMInfoFailed error msg
-	ErrGetVMInfoFailed = "can't get the VM info from AutoScaler for VM: %s, reason: %v"
+	ErrGetVMInfoFailed = "can't get the info for VM: %s, reason: %v"
 
 	// ErrAutoScalerInfoNotFound error msg
 	ErrAutoScalerInfoNotFound = "can't find the VM info from AutoScaler for VM: %s"
