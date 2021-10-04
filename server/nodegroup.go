@@ -432,7 +432,11 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 					lastNodeIndex++
 
 					_, _ = node.statusVM()
+				} else {
+					glog.Errorf(constantes.ErrGetVMInfoFailed, nodeInfo.Name, err)
 				}
+			} else {
+				glog.Infof("Ignore kubernetes node %s not handled by me", nodeInfo.Name)
 			}
 		}
 	}
