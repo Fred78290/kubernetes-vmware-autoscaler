@@ -61,11 +61,8 @@ export LAUNCH_CA=YES
 export PUBLIC_IP=DHCP
 export SCALEDNODES_DHCP=false
 export RESUME=NO
-
-if [ -z "$(command -v cfssl)" ]; then
-    echo_red "Missing required command cfssl"
-    exit 1
-fi
+export EXTERNAL_ETCD=false
+export SILENT="&> /dev/null"
 
 #export GOVC_DATACENTER=
 #export GOVC_DATASTORE=
@@ -84,6 +81,14 @@ SCP_OPTIONS="${SSH_OPTIONS} -r"
 
 # import govc hidden definitions
 source ${CURDIR}/govc.defs
+
+function verbose() {
+    if [ $VERBOSE = "YES" ]; then
+        eval "$1"
+    else
+        eval "$1 &> /dev/null"
+    fi
+}
 
 function wait_jobs_finish() {
     while :
@@ -139,13 +144,70 @@ function echo_line() {
 	echo_grey "============================================================================================================================="
 }
 
-nextip()
+function nextip()
 {
     IP=$1
     IP_HEX=$(printf '%.2X%.2X%.2X%.2X\n' `echo $IP | sed -e 's/\./ /g'`)
     NEXT_IP_HEX=$(printf %.8X `echo $(( 0x$IP_HEX + 1 ))`)
     NEXT_IP=$(printf '%d.%d.%d.%d\n' `echo $NEXT_IP_HEX | sed -r 's/(..)/0x\1 /g'`)
     echo "$NEXT_IP"
+}
+
+function usage() {
+cat <<EOF
+$0 create a kubernetes simple cluster or HA cluster with 3 control planes
+Options are:
+--help | -h                                    # Display usage
+--verbose | -v                                 # Verbose
+--resume | -r                                  # Allow resume interrupted creation of cluster kubernetes
+
+### Design the kubernetes cluster
+
+--ha-cluster | -c                              # Allow to create an HA cluster, default $HA_CLUSTER
+--worker-nodes=<value>                         # Specify the number of worker node created in HA cluster, default $WORKERNODES
+
+### Flags in ha mode only
+--create-external-etcd | -e                    # Allow to create an external HA etcd cluster, default $EXTERNAL_ETCD
+--use-keepalived | -u                          # Allow to use keepalived as load balancer else NGINX is used
+
+--default-machine | -d=<value>                 # Override machine type used for auto scaling, default $DEFAULT_MACHINE
+--ssh-private-key | -s=<value>                 # Override ssh key is used, default $SSH_PRIVATE_KEY
+--transport | -t=<value>                       # Override the transport to be used between autoscaler and vmware-autoscaler, default $TRANSPORT
+--node-group=<value>                           # Override the node group name, default $NODEGROUP_NAME
+--cni-version | -n=<value>                     # Override CNI plugin version, default: $CNI_VERSION
+--kubernetes-version | -k=<value>              # Override the kubernetes version, default $KUBERNETES_VERSION
+
+### Flags to set the template vm
+
+--target-image=<value>                         # Override the prefix template VM image used for created VM, default $ROOT_IMG_NAME
+--seed-image=<value>                           # Override the seed image name used to create template, default $SEED_IMAGE
+--seed-user=<value>                            # Override the seed user in template, default $SEED_USER
+--password | -p=<value>                        # Override the password to ssh the cluster VM, default random word
+
+### Flags to configure network in vsphere
+
+--public-address=<value>                       # The public address to expose kubernetes endpoint, default $PUBLIC_IP
+--vm-private-network=<value>                   # Override the name of the private network in vsphere, default $VC_NETWORK_PRIVATE
+--vm-public-network=<value>                    # Override the name of the public network in vsphere, default $VC_NETWORK_PUBLIC
+--net-address=<value>                          # Override the IP of the kubernetes control plane node, default $NET_IP
+--net-gateway=<value>                          # Override the IP gateway, default $NET_GATEWAY
+--net-dns=<value>                              # Override the IP DNS, default $NET_DNS
+--net-domain=<value>                           # Override the domain name, default $NET_DOMAIN
+
+### Flags for autoscaler
+
+--max-nodes-total=<value>                      # autoscaler flag, default: $MAXTOTALNODES
+--cores-total=<value>                          # autoscaler flag, default: $CORESTOTAL
+--memory-total=<value>                         # autoscaler flag, default: $MEMORYTOTAL
+--max-autoprovisioned-node-group-count=<value> # autoscaler flag, default: $MAXAUTOPROVISIONNEDNODEGROUPCOUNT
+--scale-down-enabled=<value>                   # autoscaler flag, default: $SCALEDOWNENABLED
+--scale-down-delay-after-add=<value>           # autoscaler flag, default: $SCALEDOWNDELAYAFTERADD
+--scale-down-delay-after-delete=<value>        # autoscaler flag, default: $SCALEDOWNDELAYAFTERDELETE
+--scale-down-delay-after-failure=<value>       # autoscaler flag, default: $SCALEDOWNDELAYAFTERFAILURE
+--scale-down-unneeded-time=<value>             # autoscaler flag, default: $SCALEDOWNUNEEDEDTIME
+--scale-down-unready-time=<value>              # autoscaler flag, default: $SCALEDOWNUNREADYTIME
+--unremovable-node-recheck-timeout=<value>     # autoscaler flag, default: $UNREMOVABLENODERECHECKTIMEOUT
+EOF
 }
 
 if [ "$OSDISTRO" == "Linux" ]; then
@@ -163,13 +225,21 @@ else
     fi
 fi
 
-TEMP=$(getopt -o ucrk:n:p:s:t: --long use-keepalived,worker-nodes:,ha-cluster,public-address:,resume,node-group:,target-image:,seed-image:,seed-user:,vm-public-network:,vm-private-network:,net-address:,net-gateway:,net-dns:,net-domain:,transport:,ssh-private-key:,cni-version:,password:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
+TEMP=$(getopt -o vheucrk:n:p:s:t: --long verbose,help,create-external-etcd,use-keepalived,worker-nodes:,ha-cluster,public-address:,resume,node-group:,target-image:,seed-image:,seed-user:,vm-public-network:,vm-private-network:,net-address:,net-gateway:,net-dns:,net-domain:,transport:,ssh-private-key:,cni-version:,password:,kubernetes-version:,max-nodes-total:,cores-total:,memory-total:,max-autoprovisioned-node-group-count:,scale-down-enabled:,scale-down-delay-after-add:,scale-down-delay-after-delete:,scale-down-delay-after-failure:,scale-down-unneeded-time:,scale-down-unready-time:,unremovable-node-recheck-timeout: -n "$0" -- "$@")
 
 eval set -- "$TEMP"
 
 # extract options and their arguments into variables.
 while true; do
     case "$1" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    -v|--verbose)
+        SILENT=
+        shift 1
+        ;;
     --public-address)
         PUBLIC_IP="$2"
         shift 2
@@ -181,6 +251,9 @@ while true; do
     -c|--ha-cluster)
         HA_CLUSTER=true
         CONTROLNODES=3
+        shift 1
+        ;;
+    -e|--create-external-etcd)
         EXTERNAL_ETCD=true
         shift 1
         ;;
@@ -326,10 +399,38 @@ while true; do
     esac
 done
 
-if [ $USE_KEEPALIVED = "YES" ] && [ HA_CLUSTER = "false" ]; then
-    USE_KEEPALIVED=NO
+export SSH_KEY_FNAME="$(basename $SSH_PRIVATE_KEY)"
+export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
+
+# Check if we can resume the creation process
+if [ ! -f ./config/buildenv ] && [ "$RESUME" = "YES" ]; then
+    echo_red "Unable to resume, building env is not found"
+    exit -1
 fi
 
+# Check if ssh private key exists
+if [ ! -f $SSH_PRIVATE_KEY ]; then
+    echo_red "The private ssh key: $SSH_PRIVATE_KEY is not found"
+    exit -1
+fi
+
+# Check if ssh public key exists
+if [ ! -f $SSH_PUBLIC_KEY ]; then
+    echo_red "The private ssh key: $SSH_PRIVATE_KEY is not found"
+    exit -1
+fi
+
+# Check variables coherence
+if [ "$HA_CLUSTER" = "true" ]; then
+    if [ $USE_KEEPALIVED = "YES" ]; then
+        FIRSTNODE=1
+    fi
+else
+    USE_KEEPALIVED=NO
+    EXTERNAL_ETCD=false
+fi
+
+# Check if passord is defined
 if [ -z $KUBERNETES_PASSWORD ]; then
     if [ -f ~/.kubernetes_pwd ]; then
         KUBERNETES_PASSWORD=$(cat ~/.kubernetes_pwd)
@@ -339,8 +440,6 @@ if [ -z $KUBERNETES_PASSWORD ]; then
     fi
 fi
 
-export SSH_KEY_FNAME="$(basename $SSH_PRIVATE_KEY)"
-export SSH_PUBLIC_KEY="${SSH_PRIVATE_KEY}.pub"
 export SSH_KEY=$(cat "${SSH_PUBLIC_KEY}")
 
 # GRPC network endpoint
@@ -372,7 +471,7 @@ else
     CONNECTTO="unix:/var/run/cluster-autoscaler/vmware.sock"
 fi
 
-echo_grey "Transport set to:${TRANSPORT}, listen endpoint at ${LISTEN}"
+eval echo_grey "Transport set to:${TRANSPORT}, listen endpoint at ${LISTEN}" $SILENT
 
 # Sample machine definition
 MACHINE_DEFS=$(
@@ -416,15 +515,27 @@ export PATH=$PWD/bin:$PATH
 
 # If CERT doesn't exist, create one autosigned
 if [ ! -f ./etc/ssl/privkey.pem ]; then
+    echo_title "Create certificat, please fill value"
+
     mkdir -p ./etc/ssl/
     openssl genrsa 2048 >./etc/ssl/privkey.pem
     openssl req -new -x509 -nodes -sha1 -days 3650 -key ./etc/ssl/privkey.pem >./etc/ssl/cert.pem
     cat ./etc/ssl/cert.pem ./etc/ssl/privkey.pem >./etc/ssl/fullchain.pem
     chmod 644 ./etc/ssl/*
+
+    echo_separator
 fi
 
 # Extract the domain name from CERT
 export DOMAIN_NAME=$(openssl x509 -noout -subject -in ./etc/ssl/cert.pem | awk -F= '{print $NF}' | sed -e 's/^[ \t]*//' | sed 's/\*\.//g')
+
+# Delete previous exixting version
+if [ "$RESUME" = "NO" ]; then
+    echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
+    delete-masterkube-ha.sh
+else
+    echo_title "Resume custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
+fi
 
 # If the VM template doesn't exists, build it from scrash
 if [ -z "$(govc vm.info ${TARGET_IMAGE} 2>&1)" ]; then
@@ -442,19 +553,8 @@ if [ -z "$(govc vm.info ${TARGET_IMAGE} 2>&1)" ]; then
         --second-network="${VC_NETWORK_PRIVATE}"
 fi
 
-# Delete previous exixting version
 if [ "$RESUME" = "NO" ]; then
-    echo_title "Launch custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
-    delete-masterkube-ha.sh
-else
-    echo_title "Resume custom ${MASTERKUBE} instance with ${TARGET_IMAGE}"
-fi
-
-if [ $HA_CLUSTER = "true" ] && [ $USE_KEEPALIVED = "YES" ]; then
-    FIRSTNODE=1
-fi
-
-cat > ./config/buildenv <<EOF
+    cat > ./config/buildenv <<EOF
 export PUBLIC_IP="$PUBLIC_IP"
 export SCHEME="$SCHEME"
 export NODEGROUP_NAME="$NODEGROUP_NAME"
@@ -504,7 +604,12 @@ export REGISTRY=$REGISTRY
 export LAUNCH_CA=$LAUNCH_CA
 export CLUSTER_LB=$CLUSTER_LB
 export USE_KEEPALIVED=$USE_KEEPALIVED
+export EXTERNAL_ETCD=$EXTERNAL_ETCD
+export FIRSTNODE=$FIRSTNODE
 EOF
+else
+    source ./config/buildenv
+fi
 
 echo "${KUBERNETES_PASSWORD}" >./config/kubernetes-password.txt
 
@@ -539,6 +644,8 @@ NODE_IP=$NET_IP
 
 if [ "$PUBLIC_IP" != "DHCP" ]; then
     IFS=/ read PUBLIC_NODE_IP PUBLIC_MASK_CIDR <<< $PUBLIC_IP
+else
+    PUBLIC_NODE_IP=DHCP
 fi
 
 # No external elb, use keep alived
@@ -554,7 +661,12 @@ if [[ $FIRSTNODE > 0 ]]; then
     fi
 fi
 
-TOTALNODES=$((WORKERNODES + $CONTROLNODES))
+if [ $HA_CLUSTER = "true" ]; then
+    TOTALNODES=$((WORKERNODES + $CONTROLNODES))
+else
+    CONTROLNODES=0
+    TOTALNODES=$WORKERNODES
+fi
 
 function create_vm() {
     local INDEX=$1
@@ -599,7 +711,7 @@ network:
       addresses:
       - $PUBLIC_NODE_IP/$PUBLIC_MASK_CIDR
       nameservers:
-        search: [$NET_DOMAIN]
+#       search: [$NET_DOMAIN] GENERATE WRONG /etc/resolv.conv in pods
         addresses: [$NET_DNS]
     eth1:
       gateway4: $NET_GATEWAY
@@ -634,8 +746,8 @@ EOF
         echo_blue_bold "MASTERKUBE_NODE=${MASTERKUBE_NODE}"
         echo_line
 
-        # Clone my template
-        if [ $INDEX = 0 ]; then
+        # Clone my template, node 0 is ELB on HA mode
+        if [ $INDEX = 0 ] && [ $HA_CLUSTER = "true" ]; then
             govc vm.clone -link=false -on=false ${FOLDER_OPTIONS} -c=1 -m=1024 -vm=${TARGET_IMAGE} ${MASTERKUBE_NODE} > /dev/null
         else
             govc vm.clone -link=false -on=false ${FOLDER_OPTIONS} -c=2 -m=4096 -vm=${TARGET_IMAGE} ${MASTERKUBE_NODE} > /dev/null
@@ -644,17 +756,17 @@ EOF
         echo_title "Set cloud-init settings for ${MASTERKUBE_NODE}"
 
         # Inject cloud-init elements
-        govc vm.change -vm "${MASTERKUBE_NODE}" \
+        eval govc vm.change -vm "${MASTERKUBE_NODE}" \
             -e guestinfo.metadata="$(cat config/metadata-${INDEX}.base64)" \
             -e guestinfo.metadata.encoding="gzip+base64" \
             -e guestinfo.userdata="$(cat config/userdata-${INDEX}.base64)" \
             -e guestinfo.userdata.encoding="gzip+base64" \
             -e guestinfo.vendordata="$(cat config/vendordata.base64)" \
-            -e guestinfo.vendordata.encoding="gzip+base64"
+            -e guestinfo.vendordata.encoding="gzip+base64" $SILENT
 
         echo_title "Power On ${MASTERKUBE_NODE}"
 
-        govc vm.power -on "${MASTERKUBE_NODE}"
+        eval govc vm.power -on "${MASTERKUBE_NODE}" $SILENT
 
         echo_title "Wait for IP from ${MASTERKUBE_NODE}"
 
@@ -662,9 +774,9 @@ EOF
         VMHOST=$(govc vm.info "${MASTERKUBE_NODE}" | grep 'Host:' | awk '{print $2}')
 
         echo_title "Prepare ${MASTERKUBE_NODE} instance"
-        govc host.autostart.add -host="${VMHOST}" "${MASTERKUBE_NODE}"
-        scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~
-        ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin
+        eval govc host.autostart.add -host="${VMHOST}" "${MASTERKUBE_NODE}" $SILENT
+        eval scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~ $SILENT
+        eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin $SILENT
 
         # Update /etc/hosts
         sudo $SED -i -e "/${MASTERKUBE_NODE}/d" /etc/hosts
@@ -673,7 +785,7 @@ EOF
         echo_title "Already running ${MASTERKUBE_NODE} instance"
     fi
 
-    echo_separator
+    #echo_separator
 }
 
 for INDEX in $(seq $FIRSTNODE $TOTALNODES)
@@ -692,7 +804,7 @@ wait_jobs_finish
 
 CLUSTER_NODES=
 
-if [ $HA_CLUSTER = "true" ]; then
+if [ "$HA_CLUSTER" = "true" ]; then
     for INDEX in $(seq 1 $CONTROLNODES)
     do
         MASTERKUBE_NODE="${NODEGROUP_NAME}-master-0${INDEX}"
@@ -708,28 +820,30 @@ if [ $HA_CLUSTER = "true" ]; then
 
     echo "export CLUSTER_NODES=$CLUSTER_NODES" >> ./config/buildenv
 
-    echo_title "Created etcd cluster: ${CLUSTER_NODES}"
+    if [ "$EXTERNAL_ETCD" = "true" ]; then
+        echo_title "Created etcd cluster: ${CLUSTER_NODES}"
 
-    prepare-etcd.sh --cluster-nodes="${CLUSTER_NODES}"
+        prepare-etcd.sh --cluster-nodes="${CLUSTER_NODES}"
 
-    for INDEX in $(seq 1 $CONTROLNODES)
-    do
-        if [ ! -f ./config/etdc-0${INDEX}-prepared ]; then
-            IPADDR="${IPADDRS[$INDEX]}"
+        for INDEX in $(seq 1 $CONTROLNODES)
+        do
+            if [ ! -f ./config/etdc-0${INDEX}-prepared ]; then
+                IPADDR="${IPADDRS[$INDEX]}"
 
-            echo_title "Start etcd node: ${IPADDR}"
-            
-            scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~
-            scp ${SCP_OPTIONS} cluster ${KUBERNETES_USER}@${IPADDR}:~
-            ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin
+                echo_title "Start etcd node: ${IPADDR}"
+                
+                eval scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~ $SILENT
+                eval scp ${SCP_OPTIONS} cluster ${KUBERNETES_USER}@${IPADDR}:~ $SILENT
+                eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin $SILENT
 
-            ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-etcd.sh --user=${KUBERNETES_USER} --cluster-nodes="${CLUSTER_NODES}" --node-index="$INDEX"
+                eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-etcd.sh --user=${KUBERNETES_USER} --cluster-nodes="${CLUSTER_NODES}" --node-index="$INDEX" $SILENT
 
-            touch ./config/etdc-0${INDEX}-prepared
-        fi
-    done
+                touch ./config/etdc-0${INDEX}-prepared
+            fi
+        done
+    fi
 
-    if [ $USE_KEEPALIVED = "YES" ]; then
+    if [ "$USE_KEEPALIVED" = "YES" ]; then
         echo_title "Created keepalived cluster: ${CLUSTER_NODES}"
 
         for INDEX in $(seq 1 $CONTROLNODES)
@@ -757,14 +871,14 @@ if [ $HA_CLUSTER = "true" ]; then
                         ;;
                 esac
 
-                ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo /usr/local/bin/install-keepalived.sh \
+                eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo /usr/local/bin/install-keepalived.sh \
                     "${IPADDRS[0]}" \
                     "$KUBERNETES_PASSWORD" \
                     "$((80-INDEX))" \
                     ${IPADDRS[$INDEX]} \
                     ${KEEPALIVED_PEER1} \
                     ${KEEPALIVED_PEER2} \
-                    ${KEEPALIVED_STATUS}
+                    ${KEEPALIVED_STATUS} $SILENT
 
                 touch ./config/keepalived-0${INDEX}-prepared
             fi
@@ -792,43 +906,50 @@ do
     if [ -f ./config/kubeadm-0${INDEX}-prepared ]; then
         echo_title "Already prepared VM $MASTERKUBE_NODE"
     else
-        echo_title "Prepare VM $MASTERKUBE_NODE"
-
         PROVIDERID="${SCHEME}://${NODEGROUP_NAME}/object?type=node&name=${MASTERKUBE_NODE}"
         IPADDR="${IPADDRS[$INDEX]}"
 
-        scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~
-        ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin
+        echo_title "Prepare VM ${MASTERKUBE_NODE} with IP:${IPADDR}"
+
+        eval scp ${SCP_OPTIONS} bin ${KUBERNETES_USER}@${IPADDR}:~ $SILENT
+        eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo cp /home/${KUBERNETES_USER}/bin/* /usr/local/bin $SILENT
 
         if [ $INDEX = 0 ]; then
-            if [ $HA_CLUSTER = "true" ]; then
+            if [ "$HA_CLUSTER" = "true" ]; then
                 echo_blue_bold "Start load balancer ${MASTERKUBE_NODE} instance"
 
-                ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-load-balancer.sh \
+                eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo install-load-balancer.sh \
                     --cluster-nodes="${CLUSTER_NODES}" \
                     --control-plane-endpoint=${MASTERKUBE}.${DOMAIN_NAME} \
-                    --listen-ip=$NET_IP
+                    --listen-ip=$NET_IP $SILENT
             else
                 echo_blue_bold "Start kubernetes ${MASTERKUBE_NODE} single instance master node, kubernetes version=${KUBERNETES_VERSION}, providerID=${PROVIDERID}"
 
-                ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh \
+                eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh \
+                    --cert-extra-sans="${MASTERKUBE}.${DOMAIN_NAME},masterkube-vmware.${DOMAIN_NAME},masterkube-vmware-dashboard.${DOMAIN_NAME}" \
                     --node-group=${NODEGROUP_NAME} \
+                    --node-index=${NODEINDEX} \
                     --cni=flannel \
                     --net-if=$NET_IF \
                     --kubernetes-version="${KUBERNETES_VERSION}" \
-                    --provider-id="'${PROVIDERID}'" \
-                    --cert-extra-sans="${MASTERKUBE}.${DOMAIN_NAME},masterkube-vmware.${DOMAIN_NAME},masterkube-vmware-dashboard.${DOMAIN_NAME}"
+                    --provider-id="'${PROVIDERID}'" $SILENT
 
-                scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ./cluster
+                eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ./cluster $SILENT
             fi
         else
-            NODEINDEX=$((INDEX-1))
+            if [ "$HA_CLUSTER" = "true" ]; then
+                NODEINDEX=$((INDEX-1))
+            else
+                NODEINDEX=$INDEX
+            fi
 
             if [ $NODEINDEX = 0 ]; then
                 echo_blue_bold "Start kubernetes ${MASTERKUBE_NODE} instance master node number ${INDEX}, kubernetes version=${KUBERNETES_VERSION}, providerID=${PROVIDERID}"
 
                 ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo create-cluster.sh \
+                    --use-external-etcd=${EXTERNAL_ETCD} \
                     --node-group=${NODEGROUP_NAME} \
+                    --node-index=${NODEINDEX} \
                     --load-balancer-ip=${IPADDRS[0]} \
                     --cluster-nodes="${CLUSTER_NODES}" \
                     --control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[1]}" \
@@ -836,9 +957,9 @@ do
                     --cni=flannel \
                     --net-if=$NET_IF \
                     --kubernetes-version="${KUBERNETES_VERSION}" \
-                    --provider-id="'${PROVIDERID}'"
+                    --provider-id="'${PROVIDERID}'" $SILENT
 
-                scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ./cluster
+                eval scp ${SCP_OPTIONS} ${KUBERNETES_USER}@${IPADDR}:/etc/cluster/* ./cluster $SILENT
 
                 echo_blue_dot_title "Wait for ELB start on IP: ${IPADDRS[0]}"
 
@@ -851,50 +972,31 @@ do
                 echo
 
                 echo -n ${IPADDRS[0]}:6443 > ./cluster/manager-ip
-            else
-            
-                if [[ $INDEX > $CONTROLNODES ]]; then
+            elif [[ $INDEX > $CONTROLNODES ]] || [ "$HA_CLUSTER" = "false" ]; then
                     echo_blue_bold "Join node ${MASTERKUBE_NODE} instance worker node, kubernetes version=${KUBERNETES_VERSION}, providerID=${PROVIDERID}"
 
-                    scp ${SCP_OPTIONS} ./cluster ${KUBERNETES_USER}@${IPADDR}:~
+                    eval scp ${SCP_OPTIONS} ./cluster ${KUBERNETES_USER}@${IPADDR}:~ $SILENT
 
-                    ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
+                    eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
+                        --use-external-etcd=${EXTERNAL_ETCD} \
                         --node-group=${NODEGROUP_NAME} \
+                        --node-index=${NODEINDEX} \
                         --control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
                         --cluster-nodes="${CLUSTER_NODES}" \
-                        --provider-id="'${PROVIDERID}'"
-                else
-                    echo_blue_bold "Join node ${MASTERKUBE_NODE} instance master node, kubernetes version=${KUBERNETES_VERSION}, providerID=${PROVIDERID}"
+                        --provider-id="'${PROVIDERID}'" $SILENT
+            else
+                echo_blue_bold "Join node ${MASTERKUBE_NODE} instance master node, kubernetes version=${KUBERNETES_VERSION}, providerID=${PROVIDERID}"
 
-                    scp ${SCP_OPTIONS} ./cluster ${KUBERNETES_USER}@${IPADDR}:~
+                eval scp ${SCP_OPTIONS} ./cluster ${KUBERNETES_USER}@${IPADDR}:~ $SILENT
 
-                    ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
-                        --node-group=${NODEGROUP_NAME} \
-                        --control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
-                        --cluster-nodes="${CLUSTER_NODES}" \
-                        --ha-cluster=true \
-                        --provider-id="'${PROVIDERID}'"
-                fi
-
-                kubectl annotate node ${MASTERKUBE_NODE} \
-                    "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" \
-                    "cluster.autoscaler.nodegroup/node-index=${NODEINDEX}" \
-                    "cluster.autoscaler.nodegroup/autoprovision=false" \
-                    "cluster-autoscaler.kubernetes.io/scale-down-disabled=true" \
-                    --overwrite --kubeconfig=./cluster/config
-
-                if [[ $INDEX > $CONTROLNODES ]]; then
-                    kubectl label nodes ${MASTERKUBE_NODE} \
-                        "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" \
-                        "node-role.kubernetes.io/worker=" \
-                        "worker=true" \
-                        --overwrite --kubeconfig=./cluster/config
-                else
-                    kubectl label nodes ${MASTERKUBE_NODE} \
-                        "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" \
-                        "master=true" \
-                        --overwrite --kubeconfig=./cluster/config
-                fi
+                eval ssh ${SSH_OPTIONS} ${KUBERNETES_USER}@${IPADDR} sudo join-cluster.sh \
+                    --use-external-etcd=${EXTERNAL_ETCD} \
+                    --node-group=${NODEGROUP_NAME} \
+                    --node-index=${NODEINDEX} \
+                    --control-plane-endpoint="${MASTERKUBE}.${DOMAIN_NAME}:${IPADDRS[0]}" \
+                    --cluster-nodes="${CLUSTER_NODES}" \
+                    --ha-cluster=true \
+                    --provider-id="'${PROVIDERID}'" $SILENT
             fi
         fi
 
@@ -927,9 +1029,16 @@ else
     INSECURE=false
 fi
 
+# For vmware autoscaler
+if [ "$EXTERNAL_ETCD" = "true" ]; then
+    export EXTERNAL_ETCD_ARGS="--use-external-etcd"
+else
+    export EXTERNAL_ETCD_ARGS="--no-use-external-etcd"
+fi
+
 AUTOSCALER_CONFIG=$(cat <<EOF
 {
-    "use-external-etcd": $HA_CLUSTER,
+    "use-external-etcd": $EXTERNAL_ETCD,
     "src-etcd-ssl-dir": "/etc/etcd/ssl",
     "dst-etcd-ssl-dir": "/etc/etcd/ssl",
     "network": "${TRANSPORT}",
@@ -1053,6 +1162,11 @@ kubectl create configmap masterkube-config --kubeconfig=./cluster/config -n kube
     --from-file ./cluster/dashboard-token \
     --from-file ./cluster/token
 
-kubectl create secret generic etcd-ssl --kubeconfig=./cluster/config -n kube-system \
-    --from-file ./cluster/etcd/ssl
+if [ "$EXTERNAL_ETCD" = "true" ]; then
+    kubectl create secret generic etcd-ssl --kubeconfig=./cluster/config -n kube-system \
+        --from-file ./cluster/etcd/ssl
+else
+    kubectl create secret generic etcd-ssl --kubeconfig=./cluster/config -n kube-system
+fi
+
 popd

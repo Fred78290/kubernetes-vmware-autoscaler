@@ -23,16 +23,22 @@ CLUSTER_DNS="10.96.0.10"
 POD_NETWORK_CIDR="10.244.0.0/16"
 SERVICE_NETWORK_CIDR="10.96.0.0/12"
 LOAD_BALANCER_IP=
+EXTERNAL_ETCD=false
+NODEINDEX=0
 
-TEMP=$(getopt -o h:c:k:n:p:x: --long load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,net-if:,provider-id:,cert-extra-sans:,cni:,kubernetes-version: -n "$0" -- "$@")
+TEMP=$(getopt -o i:g:h:c:k:n:p:x: --long node-index:,use-external-etcd:,load-balancer-ip:,node-group:,cluster-nodes:,control-plane-endpoint:,ha-cluster:,net-if:,provider-id:,cert-extra-sans:,cni:,kubernetes-version: -n "$0" -- "$@")
 
 eval set -- "${TEMP}"
 
 # extract options and their arguments into variables.
 while true; do
     case "$1" in
-    --node-group)
+    -g | --node-group)
         NODEGROUP_NAME="$2"
+        shift 2
+        ;;
+    -i | --node-index)
+        NODEINDEX="$2"
         shift 2
         ;;
     -c | --cni)
@@ -73,6 +79,11 @@ while true; do
         shift 2
         ;;
 
+    --use-external-etcd)
+        EXTERNAL_ETCD=$2
+        shift 2
+        ;;
+
     --)
         shift
         break
@@ -90,7 +101,7 @@ ifconfig $NET_IF &> /dev/null || NET_IF=$(ip route get 1|awk '{print $5;exit}')
 APISERVER_ADVERTISE_ADDRESS=$(ip addr show $NET_IF | grep "inet\s" | tr '/' ' ' | awk '{print $2}')
 APISERVER_ADVERTISE_ADDRESS=$(echo $APISERVER_ADVERTISE_ADDRESS | awk '{print $1}')
 
-if [ -z $LOAD_BALANCER_IP ]; then
+if [ -z "$LOAD_BALANCER_IP" ]; then
     LOAD_BALANCER_IP=$APISERVER_ADVERTISE_ADDRESS
 fi
 
@@ -114,7 +125,7 @@ if [ "x$CONTROL_PLANE_ENDPOINT" != "x" ]; then
     echo "$CONTROL_PLANE_ENDPOINT_ADDR   $CONTROL_PLANE_ENDPOINT_HOST" >> /etc/hosts
 fi
 
-if [ $HA_CLUSTER = true ]; then
+if [ "$HA_CLUSTER" = "true" ]; then
     for CLUSTER_NODE in $(echo -n $CLUSTER_NODES | tr ',' ' ')
     do
         IFS=: read HOST IP <<< $CLUSTER_NODE
@@ -160,7 +171,7 @@ case "$CNI" in
         exit -1
 esac
 
-if [ $HA_CLUSTER = true ]; then
+if [ "$HA_CLUSTER" = "true" ]; then
     K8_OPTIONS="--ignore-preflight-errors=All --config=kubeadm-config.yaml"
 
 cat > kubeadm-config.yaml <<EOF
@@ -183,6 +194,8 @@ nodeRegistration:
   taints:
   - effect: NoSchedule
     key: node-role.kubernetes.io/master
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/control-plane
   kubeletExtraArgs:
     network-plugin: cni
     container-runtime: remote
@@ -259,7 +272,9 @@ EOF
 EOF
     done
 
-    cat >> kubeadm-config.yaml <<EOF
+    # External ETCD
+    if [ "$EXTERNAL_ETCD" = "true" ]; then
+        cat >> kubeadm-config.yaml <<EOF
 etcd:
   external:
     caFile: /etc/etcd/ssl/ca.pem
@@ -268,11 +283,12 @@ etcd:
     endpoints:
 EOF
 
-    for CLUSTER_NODE in $(echo -n $CLUSTER_NODES | tr ',' ' ')
-    do
-        IFS=: read HOST IP <<< $CLUSTER_NODE
-        echo "    - https://${HOST}:2379" >> kubeadm-config.yaml
-    done
+        for CLUSTER_NODE in $(echo -n $CLUSTER_NODES | tr ',' ' ')
+        do
+            IFS=: read HOST IP <<< $CLUSTER_NODE
+            echo "    - https://${HOST}:2379" >> kubeadm-config.yaml
+        done
+    fi
 
 fi
 
@@ -306,17 +322,20 @@ if [ ! -f /etc/kubernetes/kubelet.conf ]; then
 
     cp /etc/kubernetes/admin.conf $CLUSTER_DIR/config
 
-    if [ $HA_CLUSTER = true ]; then
-        mkdir -p $CLUSTER_DIR/kubernetes/pki/01/etcd
+    if [ "$HA_CLUSTER" = "true" ]; then
+        mkdir -p $CLUSTER_DIR/kubernetes/pki/etcd
 
-        cp /etc/kubernetes/pki/ca.crt $CLUSTER_DIR/kubernetes/pki/01
-        cp /etc/kubernetes/pki/ca.key $CLUSTER_DIR/kubernetes/pki/01
-        cp /etc/kubernetes/pki/sa.key $CLUSTER_DIR/kubernetes/pki/01
-        cp /etc/kubernetes/pki/sa.pub $CLUSTER_DIR/kubernetes/pki/01
-        cp /etc/kubernetes/pki/front-proxy-ca.crt $CLUSTER_DIR/kubernetes/pki/01
-        cp /etc/kubernetes/pki/front-proxy-ca.key $CLUSTER_DIR/kubernetes/pki/01
-#        cp /etc/kubernetes/pki/etcd/ca.crt $CLUSTER_DIR/kubernetes/pki/etcd/ca.crt
-#        cp /etc/kubernetes/pki/etcd/ca.key $CLUSTER_DIR/kubernetes/pki/etcd/ca.key
+        cp /etc/kubernetes/pki/ca.crt $CLUSTER_DIR/kubernetes/pki
+        cp /etc/kubernetes/pki/ca.key $CLUSTER_DIR/kubernetes/pki
+        cp /etc/kubernetes/pki/sa.key $CLUSTER_DIR/kubernetes/pki
+        cp /etc/kubernetes/pki/sa.pub $CLUSTER_DIR/kubernetes/pki
+        cp /etc/kubernetes/pki/front-proxy-ca.crt $CLUSTER_DIR/kubernetes/pki
+        cp /etc/kubernetes/pki/front-proxy-ca.key $CLUSTER_DIR/kubernetes/pki
+
+        if [ "$EXTERNAL_ETCD" != "true" ]; then
+            cp /etc/kubernetes/pki/etcd/ca.crt $CLUSTER_DIR/kubernetes/pki/etcd/ca.crt
+            cp /etc/kubernetes/pki/etcd/ca.key $CLUSTER_DIR/kubernetes/pki/etcd/ca.key
+        fi
     fi
 
     chmod -R uog+r $CLUSTER_DIR/*
@@ -328,10 +347,19 @@ EOF
 
     kubectl patch node ${HOSTNAME} --patch-file patch.yaml
 
-    if [ $HA_CLUSTER = false ]; then
+    if [ "$HA_CLUSTER" = "false" ]; then
         echo "Allow master to host pod"
         kubectl taint nodes ${HOSTNAME} node-role.kubernetes.io/master- 2>&1
     fi
+
+    kubectl label nodes ${HOSTNAME} "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" "master=true"
+
+    kubectl annotate node ${HOSTNAME} \
+        "cluster.autoscaler.nodegroup/name=${NODEGROUP_NAME}" \
+        "cluster.autoscaler.nodegroup/node-index=${NODEINDEX}" \
+        "cluster.autoscaler.nodegroup/autoprovision=false" \
+        "cluster-autoscaler.kubernetes.io/scale-down-disabled=true" \
+        --overwrite
 
     if [ "$CNI" = "calico" ]; then
 

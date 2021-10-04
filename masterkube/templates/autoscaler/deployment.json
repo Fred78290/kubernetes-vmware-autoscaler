@@ -69,7 +69,7 @@
                         },
                         "command": [
                             "/usr/local/bin/vsphere-autoscaler",
-                            "--use-external-etcd=$HA_CLUSTER",
+                            "$EXTERNAL_ETCD_ARGS",
                             "--src-etcd-ssl-dir=/etc/etcd/ssl",
                             "--dst-etcd-ssl-dir=/etc/etcd/ssl",
                             "--config=/etc/cluster/kubernetes-vmware-autoscaler.json",

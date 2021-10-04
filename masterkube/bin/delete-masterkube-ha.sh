@@ -9,9 +9,13 @@ FORCE=$1
 # import govc hidden definitions
 source ${CURDIR}/govc.defs
 
-echo "Delete masterkube previous instance"
+echo "Delete masterkube ${MASTERKUBE} previous instance"
 
 pushd $CURDIR/../
+
+if [ -f ./cluster/buildenv ]; then
+    source ./cluster/buildenv
+fi
 
 if [ "$(uname -s)" == "Linux" ]; then
     SED=sed
@@ -60,7 +64,11 @@ elif [ -f ./cluster/config ]; then
     fi
 fi
 
-./bin/kubeconfig-delete.sh $MASTERKUBE &> /dev/null
+if [ "$HA_CLUSTER" = "true" ]; then
+    ./bin/kubeconfig-delete.sh $MASTERKUBE $NODEGROUP_NAME &> /dev/null
+else
+    ./bin/kubeconfig-delete.sh $MASTERKUBE &> /dev/null
+fi
 
 if [ -f config/vmware-autoscaler.pid ]; then
     kill $(cat config/vmware-autoscaler.pid)
@@ -70,5 +78,6 @@ find cluster ! -name '*.md' -type f -exec rm -f "{}" "+"
 find config ! -name '*.md' -type f -exec rm -f "{}" "+"
 
 sudo $SED -i "/${MASTERKUBE}/d" /etc/hosts
+sudo $SED -i "/masterkube-vmware/d" /etc/hosts
 
 popd
