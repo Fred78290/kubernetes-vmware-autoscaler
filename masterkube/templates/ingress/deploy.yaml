@@ -404,6 +404,8 @@ spec:
       tolerations:
         - key: node-role.kubernetes.io/master
           effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
       serviceAccountName: ingress-nginx
       terminationGracePeriodSeconds: 300
       volumes:
@@ -625,6 +627,11 @@ spec:
                   fieldPath: metadata.namespace
       restartPolicy: OnFailure
       serviceAccountName: ingress-nginx-admission
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
       securityContext:
         runAsNonRoot: true
         runAsUser: 2000
@@ -675,6 +682,11 @@ spec:
                   fieldPath: metadata.namespace
       restartPolicy: OnFailure
       serviceAccountName: ingress-nginx-admission
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
       securityContext:
         runAsNonRoot: true
         runAsUser: 2000
@@ -721,6 +733,8 @@ spec:
         master: 'true'
       tolerations:
         - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
           effect: NoSchedule
       terminationGracePeriodSeconds: 60
       containers:
