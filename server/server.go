@@ -21,13 +21,12 @@ import (
 
 // AutoScalerServerApp declare AutoScaler grpc server
 type AutoScalerServerApp struct {
-	ResourceLimiter      *types.ResourceLimiter                `json:"limits"`
-	Groups               map[string]*AutoScalerServerNodeGroup `json:"groups"`
-	Configuration        *types.AutoScalerServerConfig         `json:"config"`
-	KubeAdmConfiguration *apigrpc.KubeAdmConfig                `json:"kubeadm"`
-	NodesDefinition      []*apigrpc.NodeGroupDef               `json:"nodedefs"`
-	AutoProvision        bool                                  `json:"auto"`
-	kubeClient           types.ClientGenerator
+	ResourceLimiter *types.ResourceLimiter                `json:"limits"`
+	Groups          map[string]*AutoScalerServerNodeGroup `json:"groups"`
+	Configuration   *types.AutoScalerServerConfig         `json:"config"`
+	NodesDefinition []*apigrpc.NodeGroupDef               `json:"nodedefs"`
+	AutoProvision   bool                                  `json:"auto"`
+	kubeClient      types.ClientGenerator
 }
 
 //var phAutoScalerServer *AutoScalerServerApp
@@ -56,6 +55,7 @@ func (s *AutoScalerServerApp) newNodeGroup(nodeGroupID string, minNodeSize, maxN
 
 	nodeGroup := &AutoScalerServerNodeGroup{
 		ServiceIdentifier:   s.Configuration.ProviderID,
+		NodeNamePrefix:      s.Configuration.NodeNamePrefix,
 		NodeGroupIdentifier: nodeGroupID,
 		Machine:             machine,
 		Status:              NodegroupNotCreated,
@@ -196,10 +196,6 @@ func (s *AutoScalerServerApp) Connect(ctx context.Context, request *apigrpc.Conn
 
 	s.NodesDefinition = request.GetNodes()
 	s.AutoProvision = request.GetAutoProvisionned()
-
-	if request.GetKubeAdmConfiguration() != nil {
-		s.KubeAdmConfiguration = request.GetKubeAdmConfiguration()
-	}
 
 	if s.AutoProvision {
 		if err := s.doAutoProvision(); err != nil {
@@ -1325,20 +1321,16 @@ func StartServer(p types.ClientGenerator, c *types.Config) {
 		}
 	}
 
-	kubeAdmConfig := &apigrpc.KubeAdmConfig{
-		KubeAdmAddress:        config.KubeAdm.Address,
-		KubeAdmToken:          config.KubeAdm.Token,
-		KubeAdmCACert:         config.KubeAdm.CACert,
-		KubeAdmExtraArguments: config.KubeAdm.ExtraArguments,
-	}
+	config.UseExternalEtdc = c.UseExternalEtdc
+	config.ExtDestinationEtcdSslDir = c.ExtDestinationEtcdSslDir
+	config.ExtSourceEtcdSslDir = c.ExtSourceEtcdSslDir
 
 	if !phSaveState || !utils.FileExists(phSavedState) {
 		autoScalerServer = &AutoScalerServerApp{
-			kubeClient:           p,
-			ResourceLimiter:      c.GetResourceLimiter(),
-			Configuration:        &config,
-			Groups:               make(map[string]*AutoScalerServerNodeGroup),
-			KubeAdmConfiguration: kubeAdmConfig,
+			kubeClient:      p,
+			ResourceLimiter: c.GetResourceLimiter(),
+			Configuration:   &config,
+			Groups:          make(map[string]*AutoScalerServerNodeGroup),
 		}
 
 		if phSaveState {
