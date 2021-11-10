@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -67,6 +68,22 @@ func (vm *AutoScalerServerNode) waitReady(c types.ClientGenerator) error {
 	return c.WaitNodeToBeReady(vm.NodeName, 60)
 }
 
+func (vm *AutoScalerServerNode) recopyEtcdSslFilesIfNeeded() error {
+	var err error
+
+	if vm.serverConfig.UseExternalEtdc {
+		if err = utils.Scp(vm.serverConfig.SSH, vm.Addresses[0], vm.serverConfig.ExtSourceEtcdSslDir, "."); err == nil {
+			if _, err = utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], fmt.Sprintf("mkdir -p %s", filepath.Dir(vm.serverConfig.ExtDestinationEtcdSslDir))); err == nil {
+				if _, err = utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], fmt.Sprintf("mv %s %s", filepath.Base(vm.serverConfig.ExtSourceEtcdSslDir), vm.serverConfig.ExtDestinationEtcdSslDir)); err == nil {
+					_, err = utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], fmt.Sprintf("chown -R root:root %s", vm.serverConfig.ExtDestinationEtcdSslDir))
+				}
+			}
+		}
+	}
+
+	return err
+}
+
 func (vm *AutoScalerServerNode) kubeAdmJoin() error {
 	kubeAdm := vm.serverConfig.KubeAdm
 
@@ -85,8 +102,10 @@ func (vm *AutoScalerServerNode) kubeAdmJoin() error {
 		args = append(args, kubeAdm.ExtraArguments...)
 	}
 
-	if _, err := utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], strings.Join(args, " ")); err != nil {
-		return err
+	command := strings.Join(args, " ")
+
+	if out, err := utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], command); err != nil {
+		return fmt.Errorf("unable to execute command: %s, output: %s, reason:%v", command, out, err)
 	}
 
 	return nil
@@ -175,6 +194,10 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 	} else if status != AutoScalerServerNodeStateRunning {
 
 		err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
+
+	} else if err = vm.recopyEtcdSslFilesIfNeeded(); err != nil {
+
+		err = fmt.Errorf(constantes.ErrUpdateEtcdSslFailed, vm.NodeName, err)
 
 	} else if err = vm.kubeAdmJoin(); err != nil {
 
