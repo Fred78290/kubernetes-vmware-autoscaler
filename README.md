@@ -6,30 +6,39 @@
 
 Kubernetes autoscaler for vsphere/esxi
 
-### Releases ###
+### Supported releases ###
 
-* 1.15.11 (unmaintened)
-    - This version is supported kubernetes v1.15
-* 1.16.9 (unmaintened)
-    - This version is supported kubernetes v1.16
-* 1.17.5 (unmaintened)
-    - This version is supported kubernetes v1.17
-* 1.18.2 (unmaintened)
-    - This version is supported kubernetes v1.18
-* 1.19.0 (unmaintened)
-    - This version is supported kubernetes v1.19
 * 1.20.5
     - This version is supported kubernetes v1.20
 * 1.21.0
     - This version is supported kubernetes v1.21
+* 1.22.0
+    - This version is supported kubernetes v1.22
+
+### Unmaintened releases
+
+* 1.15.11
+    - This version is supported kubernetes v1.15
+* 1.16.9
+    - This version is supported kubernetes v1.16
+* 1.17.5
+    - This version is supported kubernetes v1.17
+* 1.18.2
+    - This version is supported kubernetes v1.18
+* 1.19.0
+    - This version is supported kubernetes v1.19
 
 ## How it works
 
-This tool will drive vSphere to deploy VM at the demand. The cluster autoscaler deployment use an enhanced version of cluster-autoscaler. https://github.com/Fred78290/autoscaler. This version use grpc to communicate with the cloud provider hosted outside the pod. A docker image is available here https://hub.docker.com/r/fred78290/cluster-autoscaler
+This tool will drive vSphere to deploy VM at the demand. The cluster autoscaler deployment use my enhanced version of [cluster-autoscaler](https://github.com/Fred78290/autoscaler).
+
+This version use grpc to communicate with the cloud provider hosted outside the pod. A docker image is available here [cluster-autoscaler](https://hub.docker.com/r/fred78290/cluster-autoscaler)
 
 A sample of the cluster-autoscaler deployment is available at [examples/cluster-autoscaler.yaml](./examples/cluster-autoscaler.yaml). You must fill value between <>
 
-Before you must deploy your kubernetes cluster on vSphere. You can do it from scrash or you can use the script [masterkube/bin/create-masterkube.sh](./masterkube/bin/create-masterkube.sh) to create a simple VM hosting the kubernetes master node.
+### Before you must create a kubernetes cluster on vSphere
+
+You can do it from scrash or you can use script from projetct [autoscaled-masterkube-vmware](https://github.com/Fred78290/autoscaled-masterkube-vmware)  to create a kubernetes cluster in single control plane or in HA mode with 3 control planes.
 
 ## Commandline arguments
 

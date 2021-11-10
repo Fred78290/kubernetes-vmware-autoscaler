@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"os/exec"
 	"strings"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
@@ -39,6 +40,35 @@ func AuthMethodFromPrivateKey(key string) ssh.AuthMethod {
 	}
 
 	return nil
+}
+
+// Shell execute local command ignore output
+func Shell(args ...string) error {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	cmd := exec.Command(args[0], args[1:]...)
+
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("%s, %s", err.Error(), strings.TrimSpace(stderr.String()))
+	}
+
+	return nil
+}
+
+// Scp copy file
+func Scp(connect *types.AutoScalerServerSSH, host, src, dst string) error {
+	return Shell("scp",
+		"-i", connect.GetAuthKeys(),
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-p",
+		"-r",
+		src,
+		fmt.Sprintf("%s@%s:%s", connect.GetUserName(), host, dst))
 }
 
 // Sudo exec ssh command as sudo
@@ -87,16 +117,26 @@ func Sudo(connect *types.AutoScalerServerSSH, host string, command ...string) (s
 	}
 
 	var stdout bytes.Buffer
+	var out []byte
 
 	for _, cmd := range command {
 		glog.Debugf("Shell:%s", cmd)
 
-		if out, err := session.CombinedOutput(fmt.Sprintf("sudo %s", cmd)); err != nil {
-			return "", err
+		if out, err = session.CombinedOutput(fmt.Sprintf("sudo %s", cmd)); err != nil {
+			if out != nil {
+				stdout.Write(out)
+			} else {
+				stdout.Write([]byte(fmt.Sprintf("An error occured during su command: %s, error:%v", cmd, err)))
+			}
+			break
 		} else {
 			stdout.Write(out)
 		}
 	}
 
-	return strings.TrimSpace(stdout.String()), nil
+	if glog.GetLevel() == glog.DebugLevel && err != nil {
+		glog.Debugf("sudo command:%s, output:%, error:%v", strings.Join(command, ","), stdout.String(), err)
+	}
+
+	return strings.TrimSpace(stdout.String()), err
 }
