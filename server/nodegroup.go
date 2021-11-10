@@ -47,6 +47,7 @@ type AutoScalerServerNodeGroup struct {
 	sync.Mutex
 	NodeGroupIdentifier  string                           `json:"identifier"`
 	ServiceIdentifier    string                           `json:"service"`
+	NodeNamePrefix       string                           `json:"node-name-prefix" default:"autoscaled"`
 	Machine              *types.MachineCharacteristic     `json:"machine"`
 	Status               NodeGroupState                   `json:"status"`
 	MinNodeSize          int                              `json:"minSize"`
@@ -128,7 +129,9 @@ func (g *AutoScalerServerNodeGroup) refresh() {
 	glog.Debugf("AutoScalerServerNodeGroup::refresh, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	for _, node := range g.Nodes {
-		_, _ = node.statusVM()
+		if _, err := node.statusVM(); err != nil {
+			glog.Infof("status VM return an error: %v", err)
+		}
 	}
 }
 
@@ -365,7 +368,8 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 		if len(providerID) > 0 {
 			out, _ = utils.NodeGroupIDFromProviderID(g.ServiceIdentifier, providerID)
 
-			if out == g.NodeGroupIdentifier {
+			// Ignore nodes not handled by autoscaler
+			if out == g.NodeGroupIdentifier && nodeInfo.Annotations[constantes.AnnotationNodeAutoProvisionned] == "true" {
 				glog.Infof("Discover node:%s matching nodegroup:%s", providerID, g.NodeGroupIdentifier)
 
 				if nodeID, err = utils.NodeNameFromProviderID(g.ServiceIdentifier, providerID); err == nil {
@@ -430,7 +434,11 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 					lastNodeIndex++
 
 					_, _ = node.statusVM()
+				} else {
+					glog.Errorf(constantes.ErrGetVMInfoFailed, nodeInfo.Name, err)
 				}
+			} else {
+				glog.Infof("Ignore kubernetes node %s not handled by me", nodeInfo.Name)
 			}
 		}
 	}
@@ -475,7 +483,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodeGroup(c types.ClientGenerator) err
 }
 
 func (g *AutoScalerServerNodeGroup) nodeName(vmIndex int) string {
-	return fmt.Sprintf("%s-vm-%02d", g.NodeGroupIdentifier, vmIndex)
+	return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.NodeNamePrefix, vmIndex)
 }
 
 func (g *AutoScalerServerNodeGroup) providerID() string {
