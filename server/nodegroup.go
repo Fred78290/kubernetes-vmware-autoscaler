@@ -129,7 +129,9 @@ func (g *AutoScalerServerNodeGroup) refresh() {
 	glog.Debugf("AutoScalerServerNodeGroup::refresh, nodeGroupID:%s", g.NodeGroupIdentifier)
 
 	for _, node := range g.Nodes {
-		_, _ = node.statusVM()
+		if _, err := node.statusVM(); err != nil {
+			glog.Infof("status VM return an error: %v", err)
+		}
 	}
 }
 
