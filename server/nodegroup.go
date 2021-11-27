@@ -401,7 +401,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 							NodeName:         nodeID,
 							NodeIndex:        lastNodeIndex,
 							State:            AutoScalerServerNodeStateRunning,
-							AutoProvisionned: nodeInfo.Annotations[constantes.AnnotationNodeAutoProvisionned] == "true",
+							AutoProvisionned: autoProvisionned,
 							VSphereConfig:    g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Copy(),
 							Addresses: []string{
 								runningIP,
@@ -410,8 +410,8 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 						}
 
 						err = client.AnnoteNode(nodeInfo.Name, map[string]string{
-							constantes.AnnotationScaleDownDisabled:    strconv.FormatBool(scaleDownDisabled && !node.AutoProvisionned),
-							constantes.AnnotationNodeAutoProvisionned: strconv.FormatBool(node.AutoProvisionned),
+							constantes.AnnotationScaleDownDisabled:    strconv.FormatBool(!autoProvisionned),
+							constantes.AnnotationNodeAutoProvisionned: strconv.FormatBool(autoProvisionned),
 							constantes.AnnotationNodeIndex:            strconv.Itoa(node.NodeIndex),
 						})
 
