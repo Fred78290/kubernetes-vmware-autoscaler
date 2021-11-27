@@ -344,7 +344,7 @@ func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int)
 	return result
 }
 
-func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenerator, scaleDownDisabled bool) error {
+func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenerator, includeExistingNode bool) error {
 	var lastNodeIndex = 0
 	var nodeInfos *apiv1.NodeList
 	var out string
