@@ -47,7 +47,7 @@ type AutoScalerServerNodeGroup struct {
 	sync.Mutex
 	NodeGroupIdentifier  string                           `json:"identifier"`
 	ServiceIdentifier    string                           `json:"service"`
-	NodeNamePrefix       string                           `json:"node-name-prefix" default:"autoscaled"`
+	NodeNamePrefix       string                           `default:"autoscaled" json:"node-name-prefix"`
 	Machine              *types.MachineCharacteristic     `json:"machine"`
 	Status               NodeGroupState                   `json:"status"`
 	MinNodeSize          int                              `json:"minSize"`

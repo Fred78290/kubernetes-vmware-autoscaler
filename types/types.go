@@ -148,7 +148,7 @@ type AutoScalerServerConfig struct {
 	MinNode                  int                               `json:"minNode"`                               // Mandatory, Min AutoScaler VM
 	MaxNode                  int                               `json:"maxNode"`                               // Mandatory, Max AutoScaler VM
 	MaxCreatedNodePerCycle   int                               `json:"maxNode-per-cycle" default:"2"`         // Optional, the max number VM to create in //
-	NodeNamePrefix           string                            `json:"node-name-prefix" default:"autoscaled"` // Optional, the created node name prefix
+	NodeNamePrefix           string                            `default:"autoscaled" json:"node-name-prefix"` // Optional, the created node name prefix
 	NodePrice                float64                           `json:"nodePrice"`                             // Optional, The VM price
 	PodPrice                 float64                           `json:"podPrice"`                              // Optional, The pod price
 	KubeAdm                  KubeJoinConfig                    `json:"kubeadm"`
