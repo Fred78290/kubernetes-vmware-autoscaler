@@ -344,7 +344,7 @@ func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int)
 	return result
 }
 
-func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenerator, scaleDownDisabled bool) error {
+func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenerator, includeExistingNode bool) error {
 	var lastNodeIndex = 0
 	var nodeInfos *apiv1.NodeList
 	var out string
@@ -368,8 +368,10 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 		if len(providerID) > 0 {
 			out, _ = utils.NodeGroupIDFromProviderID(g.ServiceIdentifier, providerID)
 
-			// Ignore nodes not handled by autoscaler
-			if out == g.NodeGroupIdentifier && nodeInfo.Annotations[constantes.AnnotationNodeAutoProvisionned] == "true" {
+			autoProvisionned, _ := strconv.ParseBool(nodeInfo.Annotations[constantes.AnnotationNodeAutoProvisionned])
+
+			// Ignore nodes not handled by autoscaler if option includeExistingNode == false
+			if out == g.NodeGroupIdentifier && (autoProvisionned || includeExistingNode) {
 				glog.Infof("Discover node:%s matching nodegroup:%s", providerID, g.NodeGroupIdentifier)
 
 				if nodeID, err = utils.NodeNameFromProviderID(g.ServiceIdentifier, providerID); err == nil {
@@ -399,7 +401,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 							NodeName:         nodeID,
 							NodeIndex:        lastNodeIndex,
 							State:            AutoScalerServerNodeStateRunning,
-							AutoProvisionned: nodeInfo.Annotations[constantes.AnnotationNodeAutoProvisionned] == "true",
+							AutoProvisionned: autoProvisionned,
 							VSphereConfig:    g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Copy(),
 							Addresses: []string{
 								runningIP,
@@ -408,8 +410,8 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 						}
 
 						err = client.AnnoteNode(nodeInfo.Name, map[string]string{
-							constantes.AnnotationScaleDownDisabled:    strconv.FormatBool(scaleDownDisabled && !node.AutoProvisionned),
-							constantes.AnnotationNodeAutoProvisionned: strconv.FormatBool(node.AutoProvisionned),
+							constantes.AnnotationScaleDownDisabled:    strconv.FormatBool(!autoProvisionned),
+							constantes.AnnotationNodeAutoProvisionned: strconv.FormatBool(autoProvisionned),
 							constantes.AnnotationNodeIndex:            strconv.Itoa(node.NodeIndex),
 						})
 
