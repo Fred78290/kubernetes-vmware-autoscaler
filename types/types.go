@@ -152,7 +152,7 @@ type AutoScalerServerConfig struct {
 	NodePrice                float64                           `json:"nodePrice"`                             // Optional, The VM price
 	PodPrice                 float64                           `json:"podPrice"`                              // Optional, The pod price
 	KubeAdm                  KubeJoinConfig                    `json:"kubeadm"`
-	DefaultMachineType       string                            `default:"{\"standard\": {}}" json:"default-machine"`
+	DefaultMachineType       string                            `default:"standard" json:"default-machine"`
 	Machines                 map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
 	CloudInit                interface{}                       `json:"cloud-init"`                            // Optional, The cloud init conf file
 	Optionals                *AutoScalerServerOptionals        `json:"optionals"`
