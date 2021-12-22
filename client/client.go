@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/api/types/v1alpha1"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
@@ -21,8 +22,11 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -41,6 +45,7 @@ type SingletonClientGenerator struct {
 	DeletionTimeout time.Duration
 	MaxGracePeriod  time.Duration
 	kubeClient      kubernetes.Interface
+	restClient      *rest.RESTClient
 	kubeOnce        sync.Once
 }
 
@@ -104,7 +109,44 @@ func newKubeClient(kubeConfig, apiServerURL string, requestTimeout time.Duration
 
 	glog.Infof("Created Kubernetes client %s", config.Host)
 
-	return client, nil
+	return client, err
+}
+
+func newRestClient(kubeConfig, apiServerURL string, requestTimeout time.Duration) (*rest.RESTClient, error) {
+	glog.Infof("Instantiating new REST client")
+
+	config, err := getRestConfig(kubeConfig, apiServerURL)
+	if err != nil {
+		return nil, err
+	}
+
+	config.Timeout = requestTimeout * time.Second
+
+	config.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+		return instrumented_http.NewTransport(rt, &instrumented_http.Callbacks{
+			PathProcessor: func(path string) string {
+				parts := strings.Split(path, "/")
+				return parts[len(parts)-1]
+			},
+		})
+	}
+
+	v1alpha1.AddToScheme(scheme.Scheme)
+
+	crdConfig := *config
+	crdConfig.APIPath = "/apis"
+	crdConfig.NegotiatedSerializer = serializer.NewCodecFactory(scheme.Scheme)
+	crdConfig.UserAgent = rest.DefaultKubernetesUserAgent()
+	crdConfig.ContentConfig.GroupVersion = &schema.GroupVersion{
+		Group:   v1alpha1.GroupName,
+		Version: v1alpha1.GroupVersion,
+	}
+
+	restClient, err := rest.UnversionedRESTClientFor(&crdConfig)
+
+	glog.Infof("Created REST client %s", config.Host)
+
+	return restClient, err
 }
 
 func (p *SingletonClientGenerator) newRequestContext() *context.Context {
@@ -118,6 +160,15 @@ func (p *SingletonClientGenerator) KubeClient() (kubernetes.Interface, error) {
 		p.kubeClient, err = newKubeClient(p.KubeConfig, p.APIServerURL, p.RequestTimeout)
 	})
 	return p.kubeClient, err
+}
+
+// KubeClient generates a kube client if it was not created before
+func (p *SingletonClientGenerator) RestClient() (*rest.RESTClient, error) {
+	var err error
+	p.kubeOnce.Do(func() {
+		p.restClient, err = newRestClient(p.KubeConfig, p.APIServerURL, p.RequestTimeout)
+	})
+	return p.restClient, err
 }
 
 func (p *SingletonClientGenerator) WaitNodeToBeReady(nodeName string, timeToWaitInSeconds int) error {
