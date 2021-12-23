@@ -8,8 +8,13 @@ import (
 
 const GroupName = "nodescaler.aldunelabs.com"
 const GroupVersion = "v1alpha1"
+const CRDPlural = "scalenode"
+const FullCRDName = CRDPlural + "." + GroupName
 
-var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: GroupVersion}
+var SchemeGroupVersion = schema.GroupVersion{
+	Group:   GroupName,
+	Version: GroupVersion,
+}
 
 var (
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
@@ -23,5 +28,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
+
 	return nil
 }

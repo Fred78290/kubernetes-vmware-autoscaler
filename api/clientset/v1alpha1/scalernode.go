@@ -27,6 +27,14 @@ type scalerNodeClient struct {
 
 const ressourceName = "scalednode"
 
+func NewScalerNodeInterface(client rest.Interface, requestTimeout time.Duration, namespace string) ScalerNodeInterface {
+	return &scalerNodeClient{
+		restClient:     client,
+		requestTimeout: requestTimeout,
+		ns:             namespace,
+	}
+}
+
 func (c *scalerNodeClient) newRequestContext() *context.Context {
 	return context.NewContext(time.Duration(c.requestTimeout.Seconds()))
 }

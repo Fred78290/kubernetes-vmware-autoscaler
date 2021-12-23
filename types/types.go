@@ -14,6 +14,7 @@ import (
 
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -40,6 +41,7 @@ type Config struct {
 	MinMemory                int64
 	MaxCpus                  int64
 	MaxMemory                int64
+	Namespace                string
 }
 
 func (c *Config) GetResourceLimiter() *ResourceLimiter {
@@ -67,6 +69,9 @@ type ClientGenerator interface {
 	AnnoteNode(nodeName string, annotations map[string]string) error
 	LabelNode(nodeName string, labels map[string]string) error
 	WaitNodeToBeReady(nodeName string, timeToWaitInSeconds int) error
+
+	CreateCRD() error
+	WatchResources() cache.Store
 }
 
 // ResourceLimiter define limit, not really used
@@ -195,6 +200,7 @@ func NewConfig() *Config {
 		MaxMemory:                1024 * 24,
 		LogFormat:                "text",
 		LogLevel:                 glog.InfoLevel.String(),
+		Namespace:                "kube-system",
 	}
 }
 
@@ -228,6 +234,7 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.Flag("request-timeout", "Request timeout when calling Kubernetes APIs. 0s means no timeout").Default(DefaultMaxRequestTimeout.String()).DurationVar(&cfg.RequestTimeout)
 	app.Flag("deletion-timeout", "Deletion timeout when delete node. 0s means no timeout").Default(DefaultMaxDeletionPeriod.String()).DurationVar(&cfg.DeletionTimeout)
 	app.Flag("max-grace-period", "Maximum time evicted pods will be given to terminate gracefully.").Default(DefaultMaxGracePeriod.String()).DurationVar(&cfg.MaxGracePeriod)
+	app.Flag("namespace", "Namespace of crd").Default(cfg.Namespace).StringVar(&cfg.Namespace)
 
 	app.Flag("min-cpus", "Limits: minimum cpu (default: 1)").Default(strconv.FormatInt(cfg.MinCpus, 10)).Int64Var(&cfg.MinCpus)
 	app.Flag("min-memory", "Limits: minimum memory in MB (default: 1G)").Default(strconv.FormatInt(cfg.MinMemory, 10)).Int64Var(&cfg.MinMemory)

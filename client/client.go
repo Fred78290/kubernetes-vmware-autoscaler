@@ -4,16 +4,21 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	client_v1alpha1 "github.com/Fred78290/kubernetes-vmware-autoscaler/api/clientset/v1alpha1"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/api/types/v1alpha1"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
+
+	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextension "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
 	"github.com/linki/instrumented_http"
 	glog "github.com/sirupsen/logrus"
@@ -22,12 +27,15 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -39,14 +47,16 @@ const (
 
 // SingletonClientGenerator provides clients
 type SingletonClientGenerator struct {
-	KubeConfig      string
-	APIServerURL    string
-	RequestTimeout  time.Duration
-	DeletionTimeout time.Duration
-	MaxGracePeriod  time.Duration
-	kubeClient      kubernetes.Interface
-	restClient      *rest.RESTClient
-	kubeOnce        sync.Once
+	KubeConfig         string
+	APIServerURL       string
+	Namespace          string
+	RequestTimeout     time.Duration
+	DeletionTimeout    time.Duration
+	MaxGracePeriod     time.Duration
+	kubeClient         kubernetes.Interface
+	restClient         rest.Interface
+	apiExtensionClient apiextension.Interface
+	kubeOnce           sync.Once
 }
 
 // getRestConfig returns the rest clients config to get automatically
@@ -149,8 +159,119 @@ func newRestClient(kubeConfig, apiServerURL string, requestTimeout time.Duration
 	return restClient, err
 }
 
+func newApiExtensionClient(kubeConfig, apiServerURL string, requestTimeout time.Duration) (*apiextension.Clientset, error) {
+	glog.Infof("Instantiating new REST client")
+
+	config, err := getRestConfig(kubeConfig, apiServerURL)
+	if err != nil {
+		return nil, err
+	}
+
+	config.Timeout = requestTimeout * time.Second
+
+	config.WrapTransport = func(rt http.RoundTripper) http.RoundTripper {
+		return instrumented_http.NewTransport(rt, &instrumented_http.Callbacks{
+			PathProcessor: func(path string) string {
+				parts := strings.Split(path, "/")
+				return parts[len(parts)-1]
+			},
+		})
+	}
+
+	apiExtensionClient, err := apiextension.NewForConfig(config)
+
+	v1alpha1.AddToScheme(scheme.Scheme)
+
+	glog.Infof("Created REST client %s", config.Host)
+
+	return apiExtensionClient, err
+}
+
 func (p *SingletonClientGenerator) newRequestContext() *context.Context {
 	return context.NewContext(time.Duration(p.RequestTimeout.Seconds()))
+}
+
+func (c *SingletonClientGenerator) ScalerNodes(namespace string) client_v1alpha1.ScalerNodeInterface {
+	client, _ := c.RestClient()
+
+	return client_v1alpha1.NewScalerNodeInterface(client, c.RequestTimeout, namespace)
+}
+
+func (p *SingletonClientGenerator) WatchResources() cache.Store {
+
+	clientSet := p.ScalerNodes(p.Namespace)
+
+	scalerNodeStore, scalerNodeController := cache.NewInformer(
+		&cache.ListWatch{
+			ListFunc: func(lo metav1.ListOptions) (result runtime.Object, err error) {
+				return clientSet.List(lo)
+			},
+			WatchFunc: func(lo metav1.ListOptions) (watch.Interface, error) {
+				return clientSet.Watch(lo)
+			},
+		},
+		&v1alpha1.ScaledNode{},
+		1*time.Minute,
+		cache.ResourceEventHandlerFuncs{},
+	)
+
+	go scalerNodeController.Run(wait.NeverStop)
+
+	return scalerNodeStore
+}
+
+func (p *SingletonClientGenerator) CreateCRD() error {
+
+	clientset, err := p.ApiExtentionClient()
+
+	if err != nil {
+		return err
+	}
+
+	ctx := p.newRequestContext()
+	defer ctx.Cancel()
+
+	crd := &apiextensionv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{Name: v1alpha1.FullCRDName},
+		Spec: apiextensionv1.CustomResourceDefinitionSpec{
+			Group: v1alpha1.GroupName,
+			Scope: apiextensionv1.NamespaceScoped,
+			Versions: []apiextensionv1.CustomResourceDefinitionVersion{
+				{
+					Name:    v1alpha1.GroupVersion,
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionv1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionv1.JSONSchemaProps{
+								"spec": {
+									Type: "object",
+									Properties: map[string]apiextensionv1.JSONSchemaProps{
+										"nodeName": {
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Names: apiextensionv1.CustomResourceDefinitionNames{
+				Plural: v1alpha1.CRDPlural,
+				Kind:   reflect.TypeOf(v1alpha1.ScaledNode{}).Name(),
+			},
+		},
+	}
+
+	_, err = clientset.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{})
+
+	if err != nil && apierrors.IsAlreadyExists(err) {
+		return nil
+	}
+
+	return err
 }
 
 // KubeClient generates a kube client if it was not created before
@@ -162,13 +283,22 @@ func (p *SingletonClientGenerator) KubeClient() (kubernetes.Interface, error) {
 	return p.kubeClient, err
 }
 
-// KubeClient generates a kube client if it was not created before
-func (p *SingletonClientGenerator) RestClient() (*rest.RESTClient, error) {
+// KubeClient generates a rest client if it was not created before
+func (p *SingletonClientGenerator) RestClient() (rest.Interface, error) {
 	var err error
 	p.kubeOnce.Do(func() {
 		p.restClient, err = newRestClient(p.KubeConfig, p.APIServerURL, p.RequestTimeout)
 	})
 	return p.restClient, err
+}
+
+// KubeClient generates an api extension client if it was not created before
+func (p *SingletonClientGenerator) ApiExtentionClient() (apiextension.Interface, error) {
+	var err error
+	p.kubeOnce.Do(func() {
+		p.apiExtensionClient, err = newApiExtensionClient(p.KubeConfig, p.APIServerURL, p.RequestTimeout)
+	})
+	return p.apiExtensionClient, err
 }
 
 func (p *SingletonClientGenerator) WaitNodeToBeReady(nodeName string, timeToWaitInSeconds int) error {
@@ -590,9 +720,10 @@ func (p *SingletonClientGenerator) LabelNode(nodeName string, labels map[string]
 	})
 }
 
-func NewClientGenerator(cfg *types.Config) *SingletonClientGenerator {
+func NewClientGenerator(cfg *types.Config) types.ClientGenerator {
 	return &SingletonClientGenerator{
 		KubeConfig:      cfg.KubeConfig,
+		Namespace:       cfg.Namespace,
 		APIServerURL:    cfg.APIServerURL,
 		RequestTimeout:  cfg.RequestTimeout,
 		DeletionTimeout: cfg.DeletionTimeout,

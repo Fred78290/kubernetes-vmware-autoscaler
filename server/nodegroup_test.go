@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 )
 
 type mockupClientGenerator struct {
@@ -59,6 +60,14 @@ func (m mockupClientGenerator) LabelNode(nodeName string, labels map[string]stri
 }
 
 func (m mockupClientGenerator) WaitNodeToBeReady(nodeName string, timeToWaitInSeconds int) error {
+	return nil
+}
+
+func (m mockupClientGenerator) CreateCRD() error {
+	return nil
+}
+
+func (m mockupClientGenerator) WatchResources() cache.Store {
 	return nil
 }
 

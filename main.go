@@ -58,6 +58,12 @@ func main() {
 			glog.Fatalf("Can't validate config, reason:%s", err)
 		}
 
+		if err := generator.CreateCRD(); err != nil {
+			glog.Fatalf("Can't create CRD, reason:%s", err)
+		}
+
+		generator.WatchResources()
+
 		server.StartServer(generator, cfg)
 	}
 }
