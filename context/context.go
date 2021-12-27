@@ -11,6 +11,10 @@ type Context struct {
 	cancel context.CancelFunc
 }
 
+func TODO() context.Context {
+	return context.TODO()
+}
+
 func Background() context.Context {
 	return context.Background()
 }

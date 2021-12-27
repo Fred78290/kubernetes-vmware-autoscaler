@@ -115,6 +115,9 @@ const (
 	// ErrAutoScalerInfoNotFound error msg
 	ErrAutoScalerInfoNotFound = "can't find the VM info from AutoScaler for VM: %s"
 
+	// ErrManagedInfoNotFound error msg
+	ErrManagedNodeNotFound = "can't find the VM info from AutoScaler for UID: %s"
+
 	// ErrKubeAdmJoinFailed error msg
 	ErrKubeAdmJoinFailed = "unable to join the master kubernetes node for VM: %s, reason: %v"
 

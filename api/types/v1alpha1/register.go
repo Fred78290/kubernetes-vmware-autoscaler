@@ -6,9 +6,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-const GroupName = "nodescaler.aldunelabs.com"
+const GroupName = "nodemanager.aldunelabs.com"
 const GroupVersion = "v1alpha1"
-const CRDPlural = "scalenode"
+const CRDSingular = "managednode"
+const CRDPlural = "managednodes"
+const CRDShortName = "mn"
 const FullCRDName = CRDPlural + "." + GroupName
 
 var SchemeGroupVersion = schema.GroupVersion{
@@ -23,8 +25,8 @@ var (
 
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&ScaledNode{},
-		&ScaledNodeList{},
+		&ManagedNode{},
+		&ManagedNodeList{},
 	)
 
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)

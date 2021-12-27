@@ -62,8 +62,6 @@ func main() {
 			glog.Fatalf("Can't create CRD, reason:%s", err)
 		}
 
-		generator.WatchResources()
-
 		server.StartServer(generator, cfg)
 	}
 }

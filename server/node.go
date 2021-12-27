@@ -11,6 +11,7 @@ import (
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/vsphere"
 	glog "github.com/sirupsen/logrus"
+	uid "k8s.io/apimachinery/pkg/types"
 )
 
 // AutoScalerServerNodeState VM state
@@ -48,12 +49,14 @@ type AutoScalerServerNode struct {
 	NodeGroupID      string                    `json:"group"`
 	NodeName         string                    `json:"name"`
 	NodeIndex        int                       `json:"index"`
+	UID              uid.UID                   `json:"crd-uid"`
 	Memory           int                       `json:"memory"`
 	CPU              int                       `json:"cpu"`
 	Disk             int                       `json:"disk"`
 	Addresses        []string                  `json:"addresses"`
 	State            AutoScalerServerNodeState `json:"state"`
 	AutoProvisionned bool                      `json:"auto"`
+	ManagedNode      bool                      `json:"managed"`
 	VSphereConfig    *vsphere.Configuration    `json:"vmware"`
 	serverConfig     *types.AutoScalerServerConfig
 }
@@ -132,6 +135,7 @@ func (vm *AutoScalerServerNode) setNodeLabels(c types.ClientGenerator, nodeLabel
 	annotations := map[string]string{
 		constantes.NodeLabelGroupName:             vm.NodeGroupID,
 		constantes.AnnotationNodeAutoProvisionned: strconv.FormatBool(vm.AutoProvisionned),
+		constantes.AnnotationNodeManaged:          strconv.FormatBool(vm.ManagedNode),
 		constantes.AnnotationNodeIndex:            strconv.Itoa(vm.NodeIndex),
 	}
 

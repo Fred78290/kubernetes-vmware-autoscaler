@@ -5,10 +5,13 @@ import (
 	"io/ioutil"
 	"testing"
 
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/api/clientset/v1alpha1"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/stretchr/testify/assert"
 	apiv1 "k8s.io/api/core/v1"
+	apiextension "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -16,6 +19,14 @@ type mockupClientGenerator struct {
 }
 
 func (m mockupClientGenerator) KubeClient() (kubernetes.Interface, error) {
+	return nil, nil
+}
+
+func (m mockupClientGenerator) RestClient() (rest.Interface, error) {
+	return nil, nil
+}
+
+func (m mockupClientGenerator) ApiExtentionClient() (apiextension.Interface, error) {
 	return nil, nil
 }
 
@@ -67,8 +78,8 @@ func (m mockupClientGenerator) CreateCRD() error {
 	return nil
 }
 
-func (m mockupClientGenerator) WatchResources() cache.Store {
-	return nil
+func (m mockupClientGenerator) WatchResources() (v1alpha1.ManagedNodeInterface, cache.Store) {
+	return nil, nil
 }
 
 func createTestNode(ng *AutoScalerServerNodeGroup) *AutoScalerServerNode {
@@ -84,6 +95,7 @@ func createTestNode(ng *AutoScalerServerNodeGroup) *AutoScalerServerNode {
 		},
 		State:            AutoScalerServerNodeStateNotCreated,
 		AutoProvisionned: true,
+		ManagedNode:      false,
 		VSphereConfig:    ng.configuration.GetVSphereConfiguration(testGroupID),
 		serverConfig:     ng.configuration,
 	}
@@ -108,9 +120,10 @@ func newTestNodeGroup() (*types.AutoScalerServerConfig, *AutoScalerServerNodeGro
 
 	if err == nil {
 		ng := &AutoScalerServerNodeGroup{
-			ServiceIdentifier:   testProviderID,
-			NodeGroupIdentifier: testGroupID,
-			NodeNamePrefix:      "autoscaled",
+			ServiceIdentifier:          testProviderID,
+			NodeGroupIdentifier:        testGroupID,
+			ProvisionnedNodeNamePrefix: "autoscaled",
+			ManagedNodeNamePrefix:      "worker",
 			Machine: &types.MachineCharacteristic{
 				Memory: 4096,
 				Vcpu:   4,

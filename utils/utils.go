@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
 	glog "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
 )
@@ -124,4 +126,8 @@ func MaxInt(x, y int) int {
 		return x
 	}
 	return y
+}
+
+func NewRequestContext(requestTimeout time.Duration) *context.Context {
+	return context.NewContext(time.Duration(requestTimeout.Seconds()))
 }

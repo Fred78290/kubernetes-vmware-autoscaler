@@ -21,6 +21,9 @@ const (
 	// AnnotationNodeAutoProvisionned k8s annotation
 	AnnotationNodeAutoProvisionned = "cluster.autoscaler.nodegroup/autoprovision"
 
+	// AnnotationNodeManaged k8s annotation
+	AnnotationNodeManaged = "cluster.autoscaler.nodegroup/managed"
+
 	// AnnotationScaleDownDisabled k8s annotation
 	AnnotationScaleDownDisabled = "cluster-autoscaler.kubernetes.io/scale-down-disabled"
 )
