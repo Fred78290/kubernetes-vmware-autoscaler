@@ -3,14 +3,16 @@ package server
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 
-	"github.com/Fred78290/kubernetes-vmware-autoscaler/api/types/v1alpha1"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/apis/nodemanager/v1alpha1"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
 	glog "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	uid "k8s.io/apimachinery/pkg/types"
 )
 
@@ -19,16 +21,16 @@ type NodeGroupState int32
 
 const (
 	// NodegroupNotCreated not created state
-	NodegroupNotCreated NodeGroupState = 0
+	NodegroupNotCreated = iota
 
 	// NodegroupCreated create state
-	NodegroupCreated NodeGroupState = 1
+	NodegroupCreated
 
 	// NodegroupDeleting deleting status
-	NodegroupDeleting NodeGroupState = 2
+	NodegroupDeleting
 
 	// NodegroupDeleted deleted status
-	NodegroupDeleted NodeGroupState = 3
+	NodegroupDeleted
 )
 
 // KubernetesLabel labels
@@ -37,10 +39,10 @@ type KubernetesLabel map[string]string
 type ServerNodeState int
 
 const (
-	ServerNodeStateNotRunning ServerNodeState = 0
-	ServerNodeStateDeleted    ServerNodeState = 1
-	ServerNodeStateCreating   ServerNodeState = 2
-	ServerNodeStateRunning    ServerNodeState = 3
+	ServerNodeStateNotRunning = iota
+	ServerNodeStateDeleted
+	ServerNodeStateCreating
+	ServerNodeStateRunning
 )
 
 // AutoScalerServerNodeGroup Group all AutoScaler VM created inside a NodeGroup
@@ -50,7 +52,8 @@ type AutoScalerServerNodeGroup struct {
 	NodeGroupIdentifier        string                           `json:"identifier"`
 	ServiceIdentifier          string                           `json:"service"`
 	ProvisionnedNodeNamePrefix string                           `default:"autoscaled" json:"node-name-prefix"`
-	ManagedNodeNamePrefix      string                           `default:"autoscaled" json:"managed-name-prefix"`
+	ManagedNodeNamePrefix      string                           `default:"worker" json:"managed-name-prefix"`
+	ControlPlaneNamePrefix     string                           `default:"master" json:"controlplane-name-prefix"`
 	Machine                    *types.MachineCharacteristic     `json:"machine"`
 	Status                     NodeGroupState                   `json:"status"`
 	MinNodeSize                int                              `json:"minSize"`
@@ -63,10 +66,29 @@ type AutoScalerServerNodeGroup struct {
 	RunningNode                map[int]ServerNodeState          `json:"running-nodes-state"`
 	pendingNodes               map[string]*AutoScalerServerNode
 	pendingNodesWG             sync.WaitGroup
+	numOfControlPlanes         int
 	numOfExternalNodes         int
 	numOfProvisionnedNodes     int
 	numOfManagedNodes          int
 	configuration              *types.AutoScalerServerConfig
+}
+
+func CreateLabelOrAnnotation(values []string) KubernetesLabel {
+	result := KubernetesLabel{}
+
+	for _, value := range values {
+		if len(value) > 0 {
+			parts := strings.Split(value, "=")
+
+			if len(parts) == 1 {
+				result[parts[0]] = ""
+			} else {
+				result[parts[0]] = parts[1]
+			}
+		}
+	}
+
+	return result
 }
 
 func (g *AutoScalerServerNodeGroup) findNextNodeIndex(managed bool) int {
@@ -94,7 +116,7 @@ func (g *AutoScalerServerNodeGroup) cleanup(c types.ClientGenerator) error {
 	glog.Debugf("AutoScalerServerNodeGroup::cleanup, nodeGroupID:%s, iterate node to delete", g.NodeGroupIdentifier)
 
 	for _, node := range g.Nodes {
-		if node.AutoProvisionned {
+		if node.NodeType == AutoScalerServerNodeAutoscaled {
 			if lastError = node.deleteVM(c); lastError != nil {
 				glog.Errorf(constantes.ErrNodeGroupCleanupFailOnVM, g.NodeGroupIdentifier, node.NodeName, lastError)
 			}
@@ -104,6 +126,7 @@ func (g *AutoScalerServerNodeGroup) cleanup(c types.ClientGenerator) error {
 	g.RunningNode = make(map[int]ServerNodeState)
 	g.Nodes = make(map[string]*AutoScalerServerNode)
 	g.pendingNodes = make(map[string]*AutoScalerServerNode)
+	g.numOfControlPlanes = 0
 	g.numOfExternalNodes = 0
 	g.numOfManagedNodes = 0
 	g.numOfProvisionnedNodes = 0
@@ -130,7 +153,7 @@ func (g *AutoScalerServerNodeGroup) setNodeGroupSize(c types.ClientGenerator, ne
 	if delta < 0 {
 		err = g.deleteNodes(c, delta)
 	} else if delta > 0 {
-		err = g.addNodes(c, delta)
+		_, err = g.addNodes(c, delta)
 	}
 
 	g.Unlock()
@@ -159,7 +182,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodes(c types.ClientGenerator, delta i
 	tempNodes := make([]*AutoScalerServerNode, 0, -delta)
 
 	for index := startIndex; index >= endIndex; index-- {
-		nodeName := g.nodeName(index, false)
+		nodeName := g.nodeName(index, false, false)
 
 		if node := g.Nodes[nodeName]; node != nil {
 			tempNodes = append(tempNodes, node)
@@ -180,42 +203,95 @@ func (g *AutoScalerServerNodeGroup) deleteNodes(c types.ClientGenerator, delta i
 }
 
 func (g *AutoScalerServerNodeGroup) addManagedNode(crd *v1alpha1.ManagedNode) (*AutoScalerServerNode, error) {
+	controlPlane := crd.Spec.ControlPlane
 	nodeIndex := g.findNextNodeIndex(true)
-	nodeName := g.nodeName(nodeIndex, true)
+	nodeName := g.nodeName(nodeIndex, controlPlane, true)
 
 	// Clone the vsphere config to allow increment IP address
 	if vsphereConfig, err := g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Clone(nodeIndex); err == nil {
+		resLimit := g.configuration.ManagedNodeResourceLimiter
+
+		memorySize := utils.MaxInt(utils.MinInt(crd.Spec.MemorySize, resLimit.GetMaxValue(constantes.ResourceNameManagedNodeMemory, types.ManagedNodeMaxMemory)),
+			resLimit.GetMinValue(constantes.ResourceNameManagedNodeMemory, types.ManagedNodeMinMemory))
+
+		vcpus := utils.MaxInt(utils.MinInt(crd.Spec.VCpus, resLimit.GetMaxValue(constantes.ResourceNameManagedNodeCores, types.ManagedNodeMaxCores)),
+			resLimit.GetMinValue(constantes.ResourceNameManagedNodeCores, types.ManagedNodeMinCores))
+
+		diskSize := utils.MaxInt(utils.MinInt(crd.Spec.DiskSize, resLimit.GetMaxValue(constantes.ResourceNameManagedNodeDisk, types.ManagedNodeMaxDiskSize)),
+			resLimit.GetMinValue(constantes.ResourceNameManagedNodeDisk, types.ManagedNodeMinDiskSize))
+
 		node := &AutoScalerServerNode{
 			ProviderID:       g.providerIDForNode(nodeName),
 			NodeGroupID:      g.NodeGroupIdentifier,
 			NodeName:         nodeName,
 			NodeIndex:        nodeIndex,
-			Memory:           utils.MinInt(2048, crd.Spec.MemorySize),
-			CPU:              utils.MaxInt(32, utils.MinInt(1, crd.Spec.VCpus)),
-			Disk:             utils.MinInt(crd.Spec.DiskSize, 10240),
-			AutoProvisionned: false,
+			Memory:           memorySize,
+			CPU:              vcpus,
+			Disk:             diskSize,
+			NodeType:         AutoScalerServerNodeManaged,
+			ControlPlaneNode: controlPlane,
+			AllowDeployment:  crd.Spec.AllowDeployment,
+			ExtraLabels:      CreateLabelOrAnnotation(crd.Spec.Labels),
+			ExtraAnnotations: CreateLabelOrAnnotation(crd.Spec.Annotations),
 			UID:              crd.GetUID(),
-			ManagedNode:      true,
 			VSphereConfig:    vsphereConfig,
 			serverConfig:     g.configuration,
 		}
+
+		// Change network if asked
+		if len(crd.Spec.NetworkManagement) > 0 {
+			for _, network := range crd.Spec.NetworkManagement {
+				if inf := vsphereConfig.FindInterfaceByName(network.NetworkName); inf != nil {
+					inf.DHCP = network.DHCP
+
+					if len(network.IPV4Address) > 0 {
+						inf.IPAddress = network.IPV4Address
+					}
+
+					if len(network.Netmask) > 0 {
+						inf.Netmask = network.Netmask
+					}
+
+					if len(network.Gateway) > 0 {
+						inf.Gateway = network.Gateway
+					}
+
+					if len(network.MacAddress) > 0 {
+						inf.MacAddress = network.MacAddress
+					}
+				}
+			}
+		}
+
+		// Add system labels
+		if controlPlane {
+			node.ExtraLabels[constantes.NodeLabelMasterRole] = ""
+			node.ExtraLabels[constantes.NodeLabelControlPlaneRole] = ""
+			node.ExtraLabels["master"] = "true"
+		} else {
+			node.ExtraLabels[constantes.NodeLabelWorkerRole] = ""
+			node.ExtraLabels["worker"] = "true"
+		}
+
+		node.ExtraLabels[constantes.NodeLabelGroupName] = g.NodeGroupIdentifier
+
 		return node, nil
 	} else {
 		return nil, err
 	}
 }
 
-func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int) error {
+func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int) ([]*AutoScalerServerNode, error) {
 	tempNodes := make([]*AutoScalerServerNode, 0, delta)
 
 	if g.Status != NodegroupCreated {
 		glog.Debugf("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s -> g.status != nodegroupCreated", g.NodeGroupIdentifier)
-		return fmt.Errorf(constantes.ErrNodeGroupNotFound, g.NodeGroupIdentifier)
+		return []*AutoScalerServerNode{}, fmt.Errorf(constantes.ErrNodeGroupNotFound, g.NodeGroupIdentifier)
 	}
 
 	for index := 0; index < delta; index++ {
 		nodeIndex := g.findNextNodeIndex(false)
-		nodeName := g.nodeName(nodeIndex, false)
+		nodeName := g.nodeName(nodeIndex, false, false)
 
 		// Clone the vsphere config to allow increment IP address
 		if vsphereConfig, err := g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Clone(nodeIndex); err == nil {
@@ -230,8 +306,9 @@ func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int)
 				Memory:           g.Machine.Memory,
 				CPU:              g.Machine.Vcpu,
 				Disk:             g.Machine.Disk,
-				AutoProvisionned: true,
-				ManagedNode:      false,
+				NodeType:         AutoScalerServerNodeAutoscaled,
+				ControlPlaneNode: false,
+				AllowDeployment:  true,
 				VSphereConfig:    vsphereConfig,
 				serverConfig:     g.configuration,
 			}
@@ -245,15 +322,17 @@ func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int)
 			g.pendingNodes[node.NodeName] = node
 		} else {
 			g.pendingNodes = nil
-			return err
+			return []*AutoScalerServerNode{}, err
 		}
 	}
 
 	return g.createNodes(c, tempNodes)
 }
 
-func (g *AutoScalerServerNodeGroup) createNodes(c types.ClientGenerator, nodes []*AutoScalerServerNode) error {
+// return the list of successfuly created nodes
+func (g *AutoScalerServerNodeGroup) createNodes(c types.ClientGenerator, nodes []*AutoScalerServerNode) ([]*AutoScalerServerNode, error) {
 	var mu sync.Mutex
+	createdNodes := make([]*AutoScalerServerNode, 0, len(nodes))
 
 	glog.Debugf("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s", g.NodeGroupIdentifier)
 
@@ -288,13 +367,19 @@ func (g *AutoScalerServerNodeGroup) createNodes(c types.ClientGenerator, nodes [
 			mu.Lock()
 			defer mu.Unlock()
 
+			createdNodes = append(createdNodes, node)
+
 			g.Nodes[node.NodeName] = node
 			g.RunningNode[node.NodeIndex] = ServerNodeStateRunning
 
-			if node.AutoProvisionned {
+			if node.NodeType == AutoScalerServerNodeAutoscaled {
 				g.numOfProvisionnedNodes++
-			} else if node.ManagedNode {
+			} else if node.NodeType == AutoScalerServerNodeManaged {
 				g.numOfManagedNodes++
+
+				if node.ControlPlaneNode {
+					g.numOfControlPlanes++
+				}
 			}
 		}
 
@@ -403,7 +488,22 @@ func (g *AutoScalerServerNodeGroup) createNodes(c types.ClientGenerator, nodes [
 		glog.Infof("Launched node group %s of %d/%d VM successful", g.NodeGroupIdentifier, successful, numberOfNodesToCreate)
 	}
 
-	return result
+	return createdNodes, result
+}
+
+func (g *AutoScalerServerNodeGroup) nodeAllowDeployment(nodeInfo *apiv1.Node) bool {
+
+	if nodeInfo.Spec.Taints != nil {
+		for _, taint := range nodeInfo.Spec.Taints {
+			if taint.Key == constantes.NodeLabelMasterRole || taint.Key == constantes.NodeLabelControlPlaneRole {
+				if taint.Effect == apiv1.TaintEffectNoSchedule {
+					return true
+				}
+			}
+		}
+	}
+
+	return true
 }
 
 func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenerator, includeExistingNode bool) error {
@@ -429,12 +529,29 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 	for _, nodeInfo := range nodeInfos.Items {
 		var providerID = utils.GetNodeProviderID(g.ServiceIdentifier, &nodeInfo)
 		var nodeID string
+		var nodeType AutoScalerServerNodeType
+		var UID uid.UID
 
 		if len(providerID) > 0 {
 			out, _ = utils.NodeGroupIDFromProviderID(g.ServiceIdentifier, providerID)
 
 			autoProvisionned, _ := strconv.ParseBool(nodeInfo.Annotations[constantes.AnnotationNodeAutoProvisionned])
 			managedNode, _ := strconv.ParseBool(nodeInfo.Annotations[constantes.AnnotationNodeManaged])
+			controlPlane := false
+
+			if _, found := nodeInfo.Labels[constantes.NodeLabelControlPlaneRole]; found {
+				controlPlane = true
+			} else if _, found := nodeInfo.Labels[constantes.NodeLabelMasterRole]; found {
+				controlPlane = true
+			}
+
+			if autoProvisionned {
+				nodeType = AutoScalerServerNodeAutoscaled
+			} else if managedNode {
+				nodeType = AutoScalerServerNodeManaged
+			} else {
+				nodeType = AutoScalerServerNodeExternal
+			}
 
 			// Ignore nodes not handled by autoscaler if option includeExistingNode == false
 			if out == g.NodeGroupIdentifier && (autoProvisionned || includeExistingNode) {
@@ -460,15 +577,27 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 
 					g.LastCreatedNodeIndex = utils.MaxInt(g.LastCreatedNodeIndex, lastNodeIndex)
 
+					if ownerRef := metav1.GetControllerOf(&nodeInfo); ownerRef != nil {
+						if ownerRef.Kind == v1alpha1.SchemeGroupVersionKind.Kind {
+							UID = ownerRef.UID
+						}
+					}
+
 					if node == nil {
+						nodeInfo.Status.Capacity.Cpu()
 						node = &AutoScalerServerNode{
 							ProviderID:       providerID,
 							NodeGroupID:      g.NodeGroupIdentifier,
 							NodeName:         nodeID,
 							NodeIndex:        lastNodeIndex,
 							State:            AutoScalerServerNodeStateRunning,
-							AutoProvisionned: autoProvisionned,
-							ManagedNode:      managedNode,
+							NodeType:         nodeType,
+							UID:              UID,
+							ControlPlaneNode: controlPlane,
+							AllowDeployment:  g.nodeAllowDeployment(&nodeInfo),
+							CPU:              int(nodeInfo.Status.Capacity.Cpu().Value()),
+							Memory:           int(nodeInfo.Status.Capacity.Memory().Value() / (1024 * 1024)),
+							Disk:             int(nodeInfo.Status.Capacity.Storage().Value() / (1024 * 1024)),
 							VSphereConfig:    g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Copy(),
 							Addresses: []string{
 								runningIP,
@@ -477,9 +606,9 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 						}
 
 						err = client.AnnoteNode(nodeInfo.Name, map[string]string{
-							constantes.AnnotationScaleDownDisabled:    strconv.FormatBool(!autoProvisionned),
+							constantes.AnnotationScaleDownDisabled:    strconv.FormatBool(!autoProvisionned && !managedNode),
 							constantes.AnnotationNodeAutoProvisionned: strconv.FormatBool(autoProvisionned),
-							constantes.AnnotationNodeManaged:          strconv.FormatBool(node.ManagedNode),
+							constantes.AnnotationNodeManaged:          strconv.FormatBool(managedNode),
 							constantes.AnnotationNodeIndex:            strconv.Itoa(node.NodeIndex),
 						})
 
@@ -501,7 +630,16 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 					g.Nodes[nodeID] = node
 					g.RunningNode[lastNodeIndex] = ServerNodeStateRunning
 
-					if autoProvisionned {
+					if controlPlane {
+						if managedNode {
+							g.numOfManagedNodes++
+						} else {
+							g.numOfExternalNodes++
+						}
+
+						g.numOfControlPlanes++
+
+					} else if autoProvisionned {
 						g.numOfProvisionnedNodes++
 					} else if managedNode {
 						g.numOfManagedNodes++
@@ -534,7 +672,7 @@ func (g *AutoScalerServerNodeGroup) deleteNode(c types.ClientGenerator, node *Au
 	g.RunningNode[node.NodeIndex] = ServerNodeStateDeleted
 	delete(g.Nodes, node.NodeName)
 
-	if node.AutoProvisionned {
+	if node.NodeType == AutoScalerServerNodeAutoscaled {
 		g.numOfProvisionnedNodes--
 	} else {
 		g.numOfManagedNodes--
@@ -578,6 +716,14 @@ func (g *AutoScalerServerNodeGroup) getProvisionnedNodePrefix() string {
 	return g.ProvisionnedNodeNamePrefix
 }
 
+func (g *AutoScalerServerNodeGroup) getControlPlanePrefix() string {
+	if len(g.ControlPlaneNamePrefix) == 0 {
+		return "master"
+	}
+
+	return g.ControlPlaneNamePrefix
+}
+
 func (g *AutoScalerServerNodeGroup) getManagedNodePrefix() string {
 	if len(g.ManagedNodeNamePrefix) == 0 {
 		return "worker"
@@ -586,11 +732,13 @@ func (g *AutoScalerServerNodeGroup) getManagedNodePrefix() string {
 	return g.ManagedNodeNamePrefix
 }
 
-func (g *AutoScalerServerNodeGroup) nodeName(vmIndex int, managed bool) string {
-	if managed {
-		return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getManagedNodePrefix(), vmIndex-g.numOfExternalNodes-g.numOfProvisionnedNodes)
+func (g *AutoScalerServerNodeGroup) nodeName(vmIndex int, controlplane, managed bool) string {
+	if controlplane {
+		return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getControlPlanePrefix(), vmIndex-g.numOfExternalNodes-g.numOfProvisionnedNodes+g.numOfControlPlanes+1)
+	} else if managed {
+		return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getManagedNodePrefix(), vmIndex-g.numOfExternalNodes-g.numOfProvisionnedNodes+1)
 	} else {
-		return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getProvisionnedNodePrefix(), vmIndex-g.numOfExternalNodes-g.numOfManagedNodes)
+		return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getProvisionnedNodePrefix(), vmIndex-g.numOfExternalNodes-g.numOfManagedNodes+1)
 	}
 }
 

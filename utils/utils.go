@@ -128,6 +128,22 @@ func MaxInt(x, y int) int {
 	return y
 }
 
+// MinInt64 min(a,b)
+func MinInt64(x, y int64) int64 {
+	if x < y {
+		return x
+	}
+	return y
+}
+
+// MaxInt64 max(a,b)
+func MaxInt64(x, y int64) int64 {
+	if x > y {
+		return x
+	}
+	return y
+}
+
 func NewRequestContext(requestTimeout time.Duration) *context.Context {
 	return context.NewContext(time.Duration(requestTimeout.Seconds()))
 }

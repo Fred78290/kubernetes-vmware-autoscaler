@@ -9,20 +9,24 @@ import (
 	"os"
 	"time"
 
-	client_v1alpha1 "github.com/Fred78290/kubernetes-vmware-autoscaler/api/clientset/v1alpha1"
-	"github.com/Fred78290/kubernetes-vmware-autoscaler/api/types/v1alpha1"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	apigrpc "github.com/Fred78290/kubernetes-vmware-autoscaler/grpc"
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/signals"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
 	glog "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	apiv1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	uid "k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/cache"
 )
+
+type applicationInterface interface {
+	getNodeGroup(nodegroup string) (*AutoScalerServerNodeGroup, error)
+	isNodegroupDiscovered() bool
+	getResourceLimiter() *types.ResourceLimiter
+	syncState()
+	client() types.ClientGenerator
+}
 
 // AutoScalerServerApp declare AutoScaler grpc server
 type AutoScalerServerApp struct {
@@ -42,6 +46,22 @@ var phSaveState bool
 
 func (s *AutoScalerServerApp) generateNodeGroupName() string {
 	return fmt.Sprintf("ng-%d", time.Now().Unix())
+}
+
+func (s *AutoScalerServerApp) isNodegroupDiscovered() bool {
+	return len(s.Groups) > 0
+}
+
+func (s *AutoScalerServerApp) getResourceLimiter() *types.ResourceLimiter {
+	return s.ResourceLimiter
+}
+
+func (s *AutoScalerServerApp) getNodeGroup(nodegroupName string) (*AutoScalerServerNodeGroup, error) {
+	if ng, found := s.Groups[nodegroupName]; found {
+		return ng, nil
+	}
+
+	return nil, fmt.Errorf(constantes.ErrNodeGroupNotFound, nodegroupName)
 }
 
 func (s *AutoScalerServerApp) newNodeGroup(nodeGroupID string, minNodeSize, maxNodeSize int32, machineType string, labels, systemLabels KubernetesLabel, autoProvision bool) (*AutoScalerServerNodeGroup, error) {
@@ -64,6 +84,7 @@ func (s *AutoScalerServerApp) newNodeGroup(nodeGroupID string, minNodeSize, maxN
 		ServiceIdentifier:          s.Configuration.ProviderID,
 		ProvisionnedNodeNamePrefix: s.Configuration.ProvisionnedNodeNamePrefix,
 		ManagedNodeNamePrefix:      s.Configuration.ManagedNodeNamePrefix,
+		ControlPlaneNamePrefix:     s.Configuration.ControlPlaneNamePrefix,
 		NodeGroupIdentifier:        nodeGroupID,
 		Machine:                    machine,
 		Status:                     NodegroupNotCreated,
@@ -116,7 +137,7 @@ func (s *AutoScalerServerApp) createNodeGroup(nodeGroupID string) (*AutoScalerSe
 
 			glog.Infof("Create node group, ID:%s", nodeGroupID)
 
-			if err := nodeGroup.addNodes(s.kubeClient, nodeGroup.MinNodeSize); err != nil {
+			if _, err := nodeGroup.addNodes(s.kubeClient, nodeGroup.MinNodeSize); err != nil {
 				glog.Errorf(err.Error())
 
 				return nodeGroup, err
@@ -179,8 +200,6 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 		}
 	}
 
-	s.watchResources()
-
 	return err
 }
 
@@ -190,13 +209,21 @@ func (s *AutoScalerServerApp) Connect(ctx context.Context, request *apigrpc.Conn
 
 	if request.GetProviderID() != s.Configuration.ProviderID {
 		glog.Errorf(constantes.ErrMismatchingProvider)
+
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
 
 	if request.GetResourceLimiter() != nil {
-		s.ResourceLimiter = &types.ResourceLimiter{
-			MinLimits: request.ResourceLimiter.MinLimits,
-			MaxLimits: request.ResourceLimiter.MaxLimits,
+		if s.ResourceLimiter != nil {
+			s.ResourceLimiter.MergeRequestResourceLimiter(request.GetResourceLimiter())
+		} else {
+			s.ResourceLimiter = &types.ResourceLimiter{
+				MinLimits: request.ResourceLimiter.MinLimits,
+				MaxLimits: request.ResourceLimiter.MaxLimits,
+			}
+
+			s.ResourceLimiter.SetMaxValue(constantes.ResourceNameNodes, s.Configuration.MaxNode)
+			s.ResourceLimiter.SetMinValue(constantes.ResourceNameNodes, s.Configuration.MinNode)
 		}
 	}
 
@@ -561,6 +588,18 @@ func (s *AutoScalerServerApp) Cleanup(ctx context.Context, request *apigrpc.Clou
 	return &apigrpc.CleanupReply{
 		Error: lastError,
 	}, nil
+}
+
+func (s *AutoScalerServerApp) syncState() {
+	for _, ng := range s.Groups {
+		ng.refresh()
+	}
+
+	if phSaveState {
+		if err := s.Save(phSavedState); err != nil {
+			glog.Errorf(constantes.ErrFailedToSaveServerState, err)
+		}
+	}
 }
 
 // Refresh is called before every main loop and can be used to dynamically update cloud provider state.
@@ -1288,147 +1327,33 @@ func (s *AutoScalerServerApp) Load(fileName string) error {
 	return nil
 }
 
-func (s *AutoScalerServerApp) removeDeletedManagedNodes(crds map[uid.UID]*v1alpha1.ManagedNode) {
-	for _, ng := range s.Groups {
-		for _, node := range ng.Nodes {
-			if node.ManagedNode {
-				if _, found := crds[node.UID]; !found {
-					if err := ng.deleteNode(s.kubeClient, node); err != nil {
-						glog.Errorf("unable to delete managed node: %s in group, error: %v", node.NodeName, err)
-					}
-				}
-			}
-		}
-	}
+func (s *AutoScalerServerApp) client() types.ClientGenerator {
+	return s.kubeClient
 }
 
-func (s *AutoScalerServerApp) startManagedNodes(clientSet client_v1alpha1.ManagedNodeInterface, crdUID map[uid.UID]*v1alpha1.ManagedNode, creationNodes map[string][]*AutoScalerServerNode) {
-	for nodeGroupName, nodesList := range creationNodes {
-		if nodeGroup, found := s.Groups[nodeGroupName]; found {
-			nodeGroup.createNodes(s.kubeClient, nodesList)
+func (s *AutoScalerServerApp) startController() error {
+	var err error
 
-			for _, node := range nodesList {
-				crd := crdUID[node.UID]
-				ctx := utils.NewRequestContext(s.requestTimeout)
+	// set up signals so we handle the first shutdown signal gracefully
+	stopCh := signals.SetupSignalHandler()
 
-				defer ctx.Cancel()
+	if _, err = s.kubeClient.KubeClient(); err == nil {
+		if _, err = s.kubeClient.NodeManagerClient(); err == nil {
+			var controller *Controller
 
-				if node.State == AutoScalerServerNodeStateRunning {
-					crd.Status.Code = v1alpha1.StatusManagedNodeCreated
-					crd.Status.Reason = v1alpha1.StatusManagedNodeReason(v1alpha1.StatusManagedNodeCreated)
-					crd.Status.Message = fmt.Sprintf("Node %s creation successful", node.NodeName)
-					crd.Spec.NodeName = node.NodeName
-
-					if _, err := clientSet.Update(ctx, crd, metav1.UpdateOptions{}); err != nil {
-						glog.Errorf("update crd %v failed, reason: %v", crd, err)
-					}
-				} else {
-					crd.Status.Code = v1alpha1.StatusManagedNodeCreationFailed
-					crd.Status.Reason = v1alpha1.StatusManagedNodeReason(v1alpha1.StatusManagedNodeCreationFailed)
-					crd.Status.Message = fmt.Sprintf("Node %s creation failed", node.NodeName)
-				}
-
-				if _, err := clientSet.UpdateStatus(ctx, crd, metav1.UpdateOptions{}); err != nil {
-					glog.Errorf("update crd %v failed, reason: %v", crd, err)
-				}
+			if controller, err = NewController(s, stopCh); err == nil {
+				err = controller.Run()
+			} else {
+				glog.Errorf("Create CRD failed, reason: %v", err)
 			}
+		} else {
+			glog.Errorf("can't get manager node client interface, reason: %v", err)
 		}
-	}
-}
-
-func (s *AutoScalerServerApp) createManagedNodesFromCRD(clientSet client_v1alpha1.ManagedNodeInterface, store cache.Store) (map[uid.UID]*v1alpha1.ManagedNode, map[string][]*AutoScalerServerNode) {
-	managedNodeFromStore := store.List()
-	crdUID := make(map[uid.UID]*v1alpha1.ManagedNode)
-	creationNodes := make(map[string][]*AutoScalerServerNode)
-
-	if len(managedNodeFromStore) > 0 {
-		for _, obj := range managedNodeFromStore {
-			if crd, ok := obj.(*v1alpha1.ManagedNode); ok {
-				crdUID[crd.GetUID()] = crd
-
-				if nodeGroup, found := s.Groups[crd.Spec.NodeGroup]; found {
-					if _, err := nodeGroup.findNodeByUID(crd.GetUID()); err != nil {
-						oldStatus := crd.Status.Code
-
-						if oldStatus == v1alpha1.StatusManagedNodeCreation || oldStatus == v1alpha1.StatusManagedNodeGroupNotFound {
-							// Create managedNode
-							if node, err := nodeGroup.addManagedNode(crd); err == nil {
-								var nodesListByNodegroup []*AutoScalerServerNode
-
-								if nodesListByNodegroup, found = creationNodes[crd.Spec.NodeGroup]; !found {
-									nodesListByNodegroup = make([]*AutoScalerServerNode, 0, 5)
-									nodesListByNodegroup = append(nodesListByNodegroup, node)
-								} else {
-									nodesListByNodegroup = append(nodesListByNodegroup, node)
-								}
-
-								creationNodes[crd.Spec.NodeGroup] = nodesListByNodegroup
-
-								crd.Spec.NodeName = node.NodeName
-
-								crd.Status.Code = v1alpha1.StatusManagedNodeCreation
-								crd.Status.Reason = v1alpha1.StatusManagedNodeReason(v1alpha1.StatusManagedNodeCreation)
-								crd.Status.Message = fmt.Sprintf("Node %s in creation", node.NodeName)
-							} else {
-								crd.Status.Code = v1alpha1.StatusManagedNodeCreationFailed
-								crd.Status.Message = err.Error()
-								crd.Status.Reason = v1alpha1.StatusManagedNodeReason(v1alpha1.StatusManagedNodeCreationFailed)
-							}
-						} else if crd.Status.Code == v1alpha1.StatusManagedNodeCreated {
-							crd.Status.Code = v1alpha1.StatusManagedNodeDeleted
-							crd.Status.Message = fmt.Sprintf("the node %s is deleted", crd.Spec.NodeName)
-							crd.Status.Reason = v1alpha1.StatusManagedNodeReason(v1alpha1.StatusManagedNodeDeleted)
-						}
-
-						if oldStatus != crd.Status.Code {
-							ctx := utils.NewRequestContext(s.requestTimeout)
-
-							defer ctx.Cancel()
-
-							if _, err := clientSet.UpdateStatus(ctx, crd, metav1.UpdateOptions{}); err != nil {
-								glog.Errorf("update crd %v failed, reason: %v", managedNodeFromStore, err)
-							}
-						}
-					}
-				} else if crd.Status.Code == v1alpha1.StatusManagedNodeNeedToCreated {
-					glog.Errorf(constantes.ErrNodeGroupNotFound, crd.Spec.NodeGroup)
-
-					ctx := utils.NewRequestContext(s.requestTimeout)
-
-					defer ctx.Cancel()
-
-					crd.Status.Code = v1alpha1.StatusManagedNodeGroupNotFound
-					crd.Status.Message = fmt.Sprintf(constantes.ErrNodeGroupNotFound, crd.Spec.NodeGroup)
-					crd.Status.Reason = v1alpha1.StatusManagedNodeReason(int(crd.Status.Code))
-
-					if _, err := clientSet.UpdateStatus(ctx, crd, metav1.UpdateOptions{}); err != nil {
-						glog.Errorf("update crd %v failed, reason: %v", managedNodeFromStore, err)
-					}
-				}
-			}
-		}
+	} else {
+		glog.Errorf("can't get kubeclient interface, reason: %v", err)
 	}
 
-	return crdUID, creationNodes
-}
-
-func (s *AutoScalerServerApp) watchResources() {
-	clientSet, store := s.kubeClient.WatchResources()
-
-	go func() {
-		for s.running {
-			crdUID, creationNodes := s.createManagedNodesFromCRD(clientSet, store)
-
-			if len(crdUID)+len(creationNodes) > 0 {
-				s.startManagedNodes(clientSet, crdUID, creationNodes)
-				s.removeDeletedManagedNodes(crdUID)
-
-				store.Resync()
-			}
-
-			time.Sleep(2 * time.Second)
-		}
-	}()
+	return err
 }
 
 func (s *AutoScalerServerApp) run(config *types.AutoScalerServerConfig) {
@@ -1437,9 +1362,6 @@ func (s *AutoScalerServerApp) run(config *types.AutoScalerServerConfig) {
 	if err != nil {
 		glog.Fatalf("failed to listen: %v", err)
 	}
-
-	s.running = true
-	s.watchResources()
 
 	server := grpc.NewServer()
 
@@ -1503,6 +1425,9 @@ func StartServer(kubeClient types.ClientGenerator, c *types.Config) {
 	config.UseExternalEtdc = c.UseExternalEtdc
 	config.ExtDestinationEtcdSslDir = c.ExtDestinationEtcdSslDir
 	config.ExtSourceEtcdSslDir = c.ExtSourceEtcdSslDir
+	config.KubernetesPKISourceDir = c.KubernetesPKISourceDir
+	config.KubernetesPKIDestDir = c.KubernetesPKIDestDir
+	config.ManagedNodeResourceLimiter = c.GetManagedNodeResourceLimiter()
 
 	if !phSaveState || !utils.FileExists(phSavedState) {
 		autoScalerServer = &AutoScalerServerApp{
@@ -1512,6 +1437,9 @@ func StartServer(kubeClient types.ClientGenerator, c *types.Config) {
 			Configuration:   &config,
 			Groups:          make(map[string]*AutoScalerServerNodeGroup),
 		}
+
+		autoScalerServer.ResourceLimiter.SetMaxValue(constantes.ResourceNameNodes, config.MaxNode)
+		autoScalerServer.ResourceLimiter.SetMinValue(constantes.ResourceNameNodes, config.MinNode)
 
 		if phSaveState {
 			if err = autoScalerServer.Save(phSavedState); err != nil {
@@ -1527,6 +1455,10 @@ func StartServer(kubeClient types.ClientGenerator, c *types.Config) {
 		if err := autoScalerServer.Load(phSavedState); err != nil {
 			log.Fatalf(constantes.ErrFailedToLoadServerState, err)
 		}
+	}
+
+	if err = autoScalerServer.startController(); err != nil {
+		glog.Fatalf("Can't start controller, reason:%s", err)
 	}
 
 	autoScalerServer.run(&config)

@@ -52,14 +52,12 @@ func main() {
 	if cfg.DisplayVersion {
 		glog.Infof("The current version is:%s, build at:%s", phVersion, phBuildDate)
 	} else {
+		var err error
+
 		generator := client.NewClientGenerator(cfg)
 
-		if _, err := generator.NodeList(); err != nil {
+		if _, err = generator.NodeList(); err != nil {
 			glog.Fatalf("Can't validate config, reason:%s", err)
-		}
-
-		if err := generator.CreateCRD(); err != nil {
-			glog.Fatalf("Can't create CRD, reason:%s", err)
 		}
 
 		server.StartServer(generator, cfg)

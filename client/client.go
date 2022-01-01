@@ -4,21 +4,18 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	client_v1alpha1 "github.com/Fred78290/kubernetes-vmware-autoscaler/api/clientset/v1alpha1"
-	"github.com/Fred78290/kubernetes-vmware-autoscaler/api/types/v1alpha1"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
 
-	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextension "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	managednodeClientset "github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/generated/clientset/versioned"
+	apiextensionClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 
 	"github.com/linki/instrumented_http"
 	glog "github.com/sirupsen/logrus"
@@ -27,15 +24,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -47,16 +38,16 @@ const (
 
 // SingletonClientGenerator provides clients
 type SingletonClientGenerator struct {
-	KubeConfig         string
-	APIServerURL       string
-	Namespace          string
-	RequestTimeout     time.Duration
-	DeletionTimeout    time.Duration
-	MaxGracePeriod     time.Duration
-	kubeClient         kubernetes.Interface
-	restClient         rest.Interface
-	apiExtensionClient apiextension.Interface
-	kubeOnce           sync.Once
+	KubeConfig           string
+	APIServerURL         string
+	Namespace            string
+	RequestTimeout       time.Duration
+	DeletionTimeout      time.Duration
+	MaxGracePeriod       time.Duration
+	kubeClient           kubernetes.Interface
+	nodeManagerClientset managednodeClientset.Interface
+	apiExtensionClient   apiextensionClientset.Interface
+	kubeOnce             sync.Once
 }
 
 // getRestConfig returns the rest clients config to get automatically
@@ -93,7 +84,7 @@ func getRestConfig(kubeConfig, apiServerURL string) (*rest.Config, error) {
 // newKubeClient returns a new Kubernetes client object. It takes a Config and
 // uses APIServerURL and KubeConfig attributes to connect to the cluster. If
 // KubeConfig isn't provided it defaults to using the recommended default.
-func newKubeClient(kubeConfig, apiServerURL string, requestTimeout time.Duration) (*kubernetes.Clientset, *rest.RESTClient, *apiextension.Clientset, error) {
+func newKubeClient(kubeConfig, apiServerURL string, requestTimeout time.Duration) (kubernetes.Interface, managednodeClientset.Interface, apiextensionClientset.Interface, error) {
 	glog.Infof("Instantiating new Kubernetes client")
 
 	config, err := getRestConfig(kubeConfig, apiServerURL)
@@ -118,197 +109,50 @@ func newKubeClient(kubeConfig, apiServerURL string, requestTimeout time.Duration
 		return nil, nil, nil, err
 	}
 
-	v1alpha1.AddToScheme(scheme.Scheme)
-
-	restConfig := *config
-	restConfig.APIPath = "/apis"
-	restConfig.NegotiatedSerializer = serializer.NewCodecFactory(scheme.Scheme)
-	restConfig.UserAgent = rest.DefaultKubernetesUserAgent()
-	restConfig.ContentConfig.GroupVersion = &schema.GroupVersion{
-		Group:   v1alpha1.GroupName,
-		Version: v1alpha1.GroupVersion,
-	}
-
-	restClient, err := rest.UnversionedRESTClientFor(&restConfig)
+	nodeManagerClientset, err := managednodeClientset.NewForConfig(config)
 
 	if err != nil {
 		return client, nil, nil, err
 	}
 
-	apiExtensionClient, err := apiextension.NewForConfig(config)
+	apiExtensionClient, err := apiextensionClientset.NewForConfig(config)
 
 	if err != nil {
-		return client, restClient, nil, err
+		return client, nodeManagerClientset, nil, err
 	}
 
 	glog.Infof("Created Kubernetes client %s", config.Host)
 
-	return client, restClient, apiExtensionClient, err
+	return client, nodeManagerClientset, apiExtensionClient, err
 }
 
 func (p *SingletonClientGenerator) newRequestContext() *context.Context {
 	return utils.NewRequestContext(p.RequestTimeout)
 }
 
-func (c *SingletonClientGenerator) NodeManager(namespace string) client_v1alpha1.ManagedNodeInterface {
-	client, _ := c.RestClient()
-
-	return client_v1alpha1.NewManagedNodeInterface(client, c.RequestTimeout, namespace)
-}
-
-func (p *SingletonClientGenerator) WatchResources() (client_v1alpha1.ManagedNodeInterface, cache.Store) {
-
-	clientSet := p.NodeManager(p.Namespace)
-
-	scalerNodeStore, scalerNodeController := cache.NewInformer(
-		&cache.ListWatch{
-			ListFunc: func(lo metav1.ListOptions) (result runtime.Object, err error) {
-				return clientSet.List(context.TODO(), lo)
-			},
-			WatchFunc: func(lo metav1.ListOptions) (watch.Interface, error) {
-				return clientSet.Watch(context.TODO(), lo)
-			},
-		},
-		&v1alpha1.ManagedNode{},
-		1*time.Minute,
-		cache.ResourceEventHandlerFuncs{ /*
-				DeleteFunc: func(obj interface{}) {
-					managedNode := obj.(*v1alpha1.ManagedNode)
-					clientSet.Delete(managedNode)
-				},
-				AddFunc: func(obj interface{}) {
-					managedNode := obj.(*v1alpha1.ManagedNode)
-					clientSet.Create(managedNode)
-				},
-				UpdateFunc: func(oldObj, newObj interface{}) {
-					managedNode := newObj.(*v1alpha1.ManagedNode)
-					clientSet.Update(managedNode)
-				},
-			*/},
-	)
-
-	go scalerNodeController.Run(wait.NeverStop)
-
-	return clientSet, scalerNodeStore
-}
-
-func (p *SingletonClientGenerator) CreateCRD() error {
-
-	clientset, err := p.ApiExtentionClient()
-
-	if err != nil {
-		return err
-	}
-
-	ctx := p.newRequestContext()
-	defer ctx.Cancel()
-
-	crd := &apiextensionv1.CustomResourceDefinition{
-		ObjectMeta: metav1.ObjectMeta{Name: v1alpha1.FullCRDName},
-		Spec: apiextensionv1.CustomResourceDefinitionSpec{
-			Group: v1alpha1.GroupName,
-			Scope: apiextensionv1.NamespaceScoped,
-			Versions: []apiextensionv1.CustomResourceDefinitionVersion{
-				{
-					Name:    v1alpha1.GroupVersion,
-					Served:  true,
-					Storage: true,
-					Subresources: &apiextensionv1.CustomResourceSubresources{
-						Status: &apiextensionv1.CustomResourceSubresourceStatus{},
-					},
-					Schema: &apiextensionv1.CustomResourceValidation{
-						OpenAPIV3Schema: &apiextensionv1.JSONSchemaProps{
-							Type: "object",
-							Properties: map[string]apiextensionv1.JSONSchemaProps{
-								"spec": {
-									Type: "object",
-									Properties: map[string]apiextensionv1.JSONSchemaProps{
-										"nodegroup": {
-											Type: "string",
-										},
-										"nodename": {
-											Type: "string",
-										},
-										"vcpus": {
-											Type: "integer",
-											Default: &apiextensionv1.JSON{
-												Raw: []byte("2"),
-											},
-										},
-										"memorySizeInMb": {
-											Type: "integer",
-											Default: &apiextensionv1.JSON{
-												Raw: []byte("2048"),
-											},
-										},
-										"diskSizeInMb": {
-											Type: "integer",
-											Default: &apiextensionv1.JSON{
-												Raw: []byte("10240"),
-											},
-										},
-									},
-								},
-								/*"status": {
-									Type: "object",
-									Properties: map[string]apiextensionv1.JSONSchemaProps{
-										"message": {
-											Type: "string",
-										},
-										"reason": {
-											Type: "string",
-										},
-										"code": {
-											Type: "integer",
-										},
-									},
-								},*/
-							},
-						},
-					},
-				},
-			},
-			Names: apiextensionv1.CustomResourceDefinitionNames{
-				Singular:   v1alpha1.CRDSingular,
-				Plural:     v1alpha1.CRDPlural,
-				Kind:       reflect.TypeOf(v1alpha1.ManagedNode{}).Name(),
-				ShortNames: []string{v1alpha1.CRDShortName},
-			},
-		},
-	}
-
-	_, err = clientset.ApiextensionsV1().CustomResourceDefinitions().Create(ctx, crd, metav1.CreateOptions{})
-
-	if err != nil && apierrors.IsAlreadyExists(err) {
-		return nil
-	}
-
-	return err
-}
-
 // KubeClient generates a kube client if it was not created before
 func (p *SingletonClientGenerator) KubeClient() (kubernetes.Interface, error) {
 	var err error
 	p.kubeOnce.Do(func() {
-		p.kubeClient, p.restClient, p.apiExtensionClient, err = newKubeClient(p.KubeConfig, p.APIServerURL, p.RequestTimeout)
+		p.kubeClient, p.nodeManagerClientset, p.apiExtensionClient, err = newKubeClient(p.KubeConfig, p.APIServerURL, p.RequestTimeout)
 	})
 	return p.kubeClient, err
 }
 
-// KubeClient generates a rest client if it was not created before
-func (p *SingletonClientGenerator) RestClient() (rest.Interface, error) {
+// NodeManagerClient generates node manager client if it was not created before
+func (p *SingletonClientGenerator) NodeManagerClient() (managednodeClientset.Interface, error) {
 	var err error
 	p.kubeOnce.Do(func() {
-		p.kubeClient, p.restClient, p.apiExtensionClient, err = newKubeClient(p.KubeConfig, p.APIServerURL, p.RequestTimeout)
+		p.kubeClient, p.nodeManagerClientset, p.apiExtensionClient, err = newKubeClient(p.KubeConfig, p.APIServerURL, p.RequestTimeout)
 	})
-	return p.restClient, err
+	return p.nodeManagerClientset, err
 }
 
-// KubeClient generates an api extension client if it was not created before
-func (p *SingletonClientGenerator) ApiExtentionClient() (apiextension.Interface, error) {
+// ApiExtentionClient generates an api extension client if it was not created before
+func (p *SingletonClientGenerator) ApiExtentionClient() (apiextensionClientset.Interface, error) {
 	var err error
 	p.kubeOnce.Do(func() {
-		p.kubeClient, p.restClient, p.apiExtensionClient, err = newKubeClient(p.KubeConfig, p.APIServerURL, p.RequestTimeout)
+		p.kubeClient, p.nodeManagerClientset, p.apiExtensionClient, err = newKubeClient(p.KubeConfig, p.APIServerURL, p.RequestTimeout)
 	})
 	return p.apiExtensionClient, err
 }
@@ -650,6 +494,20 @@ func (p *SingletonClientGenerator) DrainNode(nodeName string, ignoreDaemonSet, d
 	return nil
 }
 
+func (p *SingletonClientGenerator) GetNode(nodeName string) (*apiv1.Node, error) {
+	kubeclient, err := p.KubeClient()
+
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := p.newRequestContext()
+	defer ctx.Cancel()
+
+	return kubeclient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+
+}
+
 func (p *SingletonClientGenerator) DeleteNode(nodeName string) error {
 	kubeclient, err := p.KubeClient()
 
@@ -698,7 +556,7 @@ func (p *SingletonClientGenerator) AnnoteNode(nodeName string, annotations map[s
 	})
 }
 
-// AnnoteNode set annotation on node
+// LabelNode set annotation on node
 func (p *SingletonClientGenerator) LabelNode(nodeName string, labels map[string]string) error {
 	ctx := p.newRequestContext()
 	defer ctx.Cancel()
@@ -720,6 +578,62 @@ func (p *SingletonClientGenerator) LabelNode(nodeName string, labels map[string]
 		} else {
 			for k, v := range labels {
 				nodeInfo.Labels[k] = v
+			}
+		}
+
+		if _, err = kubeclient.CoreV1().Nodes().Update(ctx, nodeInfo, metav1.UpdateOptions{}); err != nil {
+			glog.Warnf("Label node:%s is not ready, err = %s", nodeName, err)
+			return false, nil
+		}
+
+		return true, nil
+	})
+}
+
+func containTaint(key string, taints *[]apiv1.Taint) (int, bool) {
+	for i, t := range *taints {
+		if t.Key == key {
+			return i, true
+		}
+	}
+
+	return -1, false
+}
+
+// TaintNode set annotation on node
+func (p *SingletonClientGenerator) TaintNode(nodeName string, taints ...apiv1.Taint) error {
+	ctx := p.newRequestContext()
+	defer ctx.Cancel()
+
+	return wait.PollImmediate(retrySleep, time.Duration(p.RequestTimeout)*time.Second, func() (bool, error) {
+		var nodeInfo *apiv1.Node
+		kubeclient, err := p.KubeClient()
+
+		if err != nil {
+			return false, err
+		}
+
+		if nodeInfo, err = kubeclient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{}); err != nil {
+			return false, err
+		}
+
+		if nodeInfo.Spec.Taints == nil {
+			nodeInfo.Spec.Taints = taints
+		} else {
+			mergedTaints := make([]apiv1.Taint, 0, len(taints))
+
+			for _, taint := range taints {
+				if index, found := containTaint(taint.Key, &nodeInfo.Spec.Taints); found {
+					// Replace taint
+					nodeInfo.Spec.Taints[index] = taint
+				} else {
+					// Merge it later
+					mergedTaints = append(mergedTaints, taint)
+				}
+			}
+
+			if len(mergedTaints) > 0 {
+				nodeInfo.Spec.Taints = append(nodeInfo.Spec.Taints, mergedTaints...)
 			}
 		}
 

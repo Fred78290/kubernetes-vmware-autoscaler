@@ -5,14 +5,12 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"github.com/Fred78290/kubernetes-vmware-autoscaler/api/clientset/v1alpha1"
+	managednodeClientset "github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/generated/clientset/versioned"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/stretchr/testify/assert"
 	apiv1 "k8s.io/api/core/v1"
 	apiextension "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 )
 
 type mockupClientGenerator struct {
@@ -22,7 +20,7 @@ func (m mockupClientGenerator) KubeClient() (kubernetes.Interface, error) {
 	return nil, nil
 }
 
-func (m mockupClientGenerator) RestClient() (rest.Interface, error) {
+func (m mockupClientGenerator) NodeManagerClient() (managednodeClientset.Interface, error) {
 	return nil, nil
 }
 
@@ -58,6 +56,10 @@ func (m mockupClientGenerator) DrainNode(nodeName string, ignoreDaemonSet, delet
 	return nil
 }
 
+func (m mockupClientGenerator) GetNode(nodeName string) (*apiv1.Node, error) {
+	return nil, nil
+}
+
 func (m mockupClientGenerator) DeleteNode(nodeName string) error {
 	return nil
 }
@@ -70,16 +72,12 @@ func (m mockupClientGenerator) LabelNode(nodeName string, labels map[string]stri
 	return nil
 }
 
+func (m mockupClientGenerator) TaintNode(nodeName string, taints ...apiv1.Taint) error {
+	return nil
+}
+
 func (m mockupClientGenerator) WaitNodeToBeReady(nodeName string, timeToWaitInSeconds int) error {
 	return nil
-}
-
-func (m mockupClientGenerator) CreateCRD() error {
-	return nil
-}
-
-func (m mockupClientGenerator) WatchResources() (v1alpha1.ManagedNodeInterface, cache.Store) {
-	return nil, nil
 }
 
 func createTestNode(ng *AutoScalerServerNodeGroup) *AutoScalerServerNode {
@@ -93,11 +91,10 @@ func createTestNode(ng *AutoScalerServerNodeGroup) *AutoScalerServerNode {
 		Addresses: []string{
 			"127.0.0.1",
 		},
-		State:            AutoScalerServerNodeStateNotCreated,
-		AutoProvisionned: true,
-		ManagedNode:      false,
-		VSphereConfig:    ng.configuration.GetVSphereConfiguration(testGroupID),
-		serverConfig:     ng.configuration,
+		State:         AutoScalerServerNodeStateNotCreated,
+		NodeType:      AutoScalerServerNodeAutoscaled,
+		VSphereConfig: ng.configuration.GetVSphereConfiguration(testGroupID),
+		serverConfig:  ng.configuration,
 	}
 }
 
@@ -124,6 +121,7 @@ func newTestNodeGroup() (*types.AutoScalerServerConfig, *AutoScalerServerNodeGro
 			NodeGroupIdentifier:        testGroupID,
 			ProvisionnedNodeNamePrefix: "autoscaled",
 			ManagedNodeNamePrefix:      "worker",
+			ControlPlaneNamePrefix:     "master",
 			Machine: &types.MachineCharacteristic{
 				Memory: 4096,
 				Vcpu:   4,
@@ -233,7 +231,7 @@ func Test_AutoScalerNodeGroup_addNode(t *testing.T) {
 
 	if assert.NoError(t, err) {
 		t.Run("addNode", func(t *testing.T) {
-			if err := ng.addNodes(kubeClient, 1); err != nil {
+			if _, err := ng.addNodes(kubeClient, 1); err != nil {
 				t.Errorf("AutoScalerServerNodeGroup.addNode() error = %v", err)
 			}
 		})

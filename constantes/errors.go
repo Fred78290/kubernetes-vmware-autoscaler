@@ -134,7 +134,10 @@ const (
 	ErrDeleteVMFailed = "could not delete VM: %s, reason: %v"
 
 	// ErrUpdateEtcdSslFailed msg
-	ErrUpdateEtcdSslFailed = "could install etcd ssl on VM: %s, reason: %v"
+	ErrUpdateEtcdSslFailed = "could not install etcd ssl on VM: %s, reason: %v"
+
+	// ErrRecopyKubernetesPKIFailed msg
+	ErrRecopyKubernetesPKIFailed = "could not copy kubernetes pki on VM: %s, reason: %v"
 
 	// ErrVMNotFound error msg
 	ErrVMNotFound = "unable to find VM: %s"

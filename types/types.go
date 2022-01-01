@@ -7,17 +7,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Fred78290/kubernetes-vmware-autoscaler/api/clientset/v1alpha1"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
+	apigrpc "github.com/Fred78290/kubernetes-vmware-autoscaler/grpc"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/vsphere"
 	"github.com/alecthomas/kingpin"
 	glog "github.com/sirupsen/logrus"
 
+	clientset "github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/generated/clientset/versioned"
 	apiv1 "k8s.io/api/core/v1"
 	apiextension "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -26,11 +25,22 @@ const (
 	DefaultMaxDeletionPeriod time.Duration = 300 * time.Second
 )
 
+const (
+	ManagedNodeMinMemory   = 2 * 1024
+	ManagedNodeMaxMemory   = 128 * 1024
+	ManagedNodeMinCores    = 2
+	ManagedNodeMaxCores    = 32
+	ManagedNodeMinDiskSize = 10 * 1024
+	ManagedNodeMaxDiskSize = 1024 * 1024
+)
+
 type Config struct {
 	APIServerURL             string
 	KubeConfig               string
 	ExtDestinationEtcdSslDir string
 	ExtSourceEtcdSslDir      string
+	KubernetesPKISourceDir   string
+	KubernetesPKIDestDir     string
 	UseExternalEtdc          bool
 	RequestTimeout           time.Duration
 	DeletionTimeout          time.Duration
@@ -44,13 +54,40 @@ type Config struct {
 	MinMemory                int64
 	MaxCpus                  int64
 	MaxMemory                int64
+	ManagedNodeMinCpus       int64
+	ManagedNodeMinMemory     int64
+	ManagedNodeMaxCpus       int64
+	ManagedNodeMaxMemory     int64
+	ManagedNodeMinDiskSize   int64
+	ManagedNodeMaxDiskSize   int64
 	Namespace                string
 }
 
 func (c *Config) GetResourceLimiter() *ResourceLimiter {
 	return &ResourceLimiter{
-		MinLimits: map[string]int64{constantes.ResourceNameCores: c.MinCpus, constantes.ResourceNameMemory: c.MinMemory * 1024 * 1024},
-		MaxLimits: map[string]int64{constantes.ResourceNameCores: c.MaxCpus, constantes.ResourceNameMemory: c.MaxMemory * 1024 * 1024},
+		MinLimits: map[string]int64{
+			constantes.ResourceNameCores:  c.MinCpus,
+			constantes.ResourceNameMemory: c.MinMemory * 1024 * 1024,
+		},
+		MaxLimits: map[string]int64{
+			constantes.ResourceNameCores:  c.MaxCpus,
+			constantes.ResourceNameMemory: c.MaxMemory * 1024 * 1024,
+		},
+	}
+}
+
+func (c *Config) GetManagedNodeResourceLimiter() *ResourceLimiter {
+	return &ResourceLimiter{
+		MinLimits: map[string]int64{
+			constantes.ResourceNameManagedNodeDisk:   c.ManagedNodeMinDiskSize,
+			constantes.ResourceNameManagedNodeMemory: c.ManagedNodeMinMemory,
+			constantes.ResourceNameManagedNodeCores:  c.ManagedNodeMinCpus,
+		},
+		MaxLimits: map[string]int64{
+			constantes.ResourceNameManagedNodeDisk:   c.ManagedNodeMaxDiskSize,
+			constantes.ResourceNameManagedNodeMemory: c.ManagedNodeMaxMemory,
+			constantes.ResourceNameManagedNodeCores:  c.ManagedNodeMaxCpus,
+		},
 	}
 }
 
@@ -60,11 +97,12 @@ type PodFilterFunc func(p apiv1.Pod) (bool, error)
 // ClientGenerator provides clients
 type ClientGenerator interface {
 	KubeClient() (kubernetes.Interface, error)
-	RestClient() (rest.Interface, error)
+	NodeManagerClient() (clientset.Interface, error)
 	ApiExtentionClient() (apiextension.Interface, error)
 
 	PodList(nodeName string, podFilter PodFilterFunc) ([]apiv1.Pod, error)
 	NodeList() (*apiv1.NodeList, error)
+	GetNode(nodeName string) (*apiv1.Node, error)
 	SetProviderID(nodeName, providerID string) error
 	UncordonNode(nodeName string) error
 	CordonNode(nodeName string) error
@@ -73,10 +111,8 @@ type ClientGenerator interface {
 	DeleteNode(nodeName string) error
 	AnnoteNode(nodeName string, annotations map[string]string) error
 	LabelNode(nodeName string, labels map[string]string) error
+	TaintNode(nodeName string, taints ...apiv1.Taint) error
 	WaitNodeToBeReady(nodeName string, timeToWaitInSeconds int) error
-
-	CreateCRD() error
-	WatchResources() (v1alpha1.ManagedNodeInterface, cache.Store)
 }
 
 // ResourceLimiter define limit, not really used
@@ -150,26 +186,115 @@ func (ssh *AutoScalerServerSSH) GetAuthKeys() string {
 // AutoScalerServerConfig is contains configuration
 type AutoScalerServerConfig struct {
 	UseExternalEtdc            bool                              `json:"use-external-etcd"`
-	ExtDestinationEtcdSslDir   string                            `json:"src-etcd-ssl-dir"`
-	ExtSourceEtcdSslDir        string                            `json:"dst-etcd-ssl-dir"`
-	Network                    string                            `default:"tcp" json:"network"`                 // Mandatory, Network to listen (see grpc doc) to listen
-	Listen                     string                            `default:"0.0.0.0:5200" json:"listen"`         // Mandatory, Address to listen
-	ProviderID                 string                            `json:"secret"`                                // Mandatory, secret Identifier, client must match this
-	MinNode                    int                               `json:"minNode"`                               // Mandatory, Min AutoScaler VM
-	MaxNode                    int                               `json:"maxNode"`                               // Mandatory, Max AutoScaler VM
-	MaxCreatedNodePerCycle     int                               `json:"maxNode-per-cycle" default:"2"`         // Optional, the max number VM to create in //
-	ProvisionnedNodeNamePrefix string                            `default:"autoscaled" json:"node-name-prefix"` // Optional, the created node name prefix
-	ManagedNodeNamePrefix      string                            `default:"worker" json:"managed-name-prefix"`  // Optional, the created node name prefix
-	NodePrice                  float64                           `json:"nodePrice"`                             // Optional, The VM price
-	PodPrice                   float64                           `json:"podPrice"`                              // Optional, The pod price
+	ExtDestinationEtcdSslDir   string                            `default:"/etc/etcd/ssl" json:"src-etcd-ssl-dir"`
+	ExtSourceEtcdSslDir        string                            `default:"/etc/etcd/ssl" json:"dst-etcd-ssl-dir"`
+	KubernetesPKISourceDir     string                            `default:"/etc/kubernetes/pki" json:"kubernetes-pki-srcdir"`
+	KubernetesPKIDestDir       string                            `default:"/etc/kubernetes/pki" json:"kubernetes-pki-dstdir"`
+	Network                    string                            `default:"tcp" json:"network"`                     // Mandatory, Network to listen (see grpc doc) to listen
+	Listen                     string                            `default:"0.0.0.0:5200" json:"listen"`             // Mandatory, Address to listen
+	ProviderID                 string                            `json:"secret"`                                    // Mandatory, secret Identifier, client must match this
+	MinNode                    int                               `json:"minNode"`                                   // Mandatory, Min AutoScaler VM
+	MaxNode                    int                               `json:"maxNode"`                                   // Mandatory, Max AutoScaler VM
+	MaxCreatedNodePerCycle     int                               `json:"maxNode-per-cycle" default:"2"`             // Optional, the max number VM to create in //
+	ProvisionnedNodeNamePrefix string                            `default:"autoscaled" json:"node-name-prefix"`     // Optional, the created node name prefix
+	ManagedNodeNamePrefix      string                            `default:"worker" json:"managed-name-prefix"`      // Optional, the created node name prefix
+	ControlPlaneNamePrefix     string                            `default:"master" json:"controlplane-name-prefix"` // Optional, the created node name prefix
+	NodePrice                  float64                           `json:"nodePrice"`                                 // Optional, The VM price
+	PodPrice                   float64                           `json:"podPrice"`                                  // Optional, The pod price
 	KubeAdm                    KubeJoinConfig                    `json:"kubeadm"`
 	DefaultMachineType         string                            `default:"standard" json:"default-machine"`
 	Machines                   map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
 	CloudInit                  interface{}                       `json:"cloud-init"`                            // Optional, The cloud init conf file
 	Optionals                  *AutoScalerServerOptionals        `json:"optionals"`
-	ResourceLimiter            *ResourceLimiter                  `json:"limits"`
+	ManagedNodeResourceLimiter *ResourceLimiter                  `json:"managednodes-limits"`
 	SSH                        *AutoScalerServerSSH              `json:"ssh-infos"`
 	VMwareInfos                map[string]*vsphere.Configuration `json:"vmware"`
+}
+
+func (limits *ResourceLimiter) MergeRequestResourceLimiter(limiter *apigrpc.ResourceLimiter) {
+	if limits.MaxLimits == nil {
+		limits.MaxLimits = limiter.MaxLimits
+	} else {
+		for k, v := range limiter.MaxLimits {
+			limits.MaxLimits[k] = v
+		}
+	}
+
+	if limits.MinLimits == nil {
+		limits.MinLimits = limiter.MinLimits
+	} else {
+		for k, v := range limiter.MinLimits {
+			limits.MinLimits[k] = v
+		}
+	}
+}
+
+func (limits *ResourceLimiter) SetMaxValue64(key string, value int64) {
+	if limits.MaxLimits == nil {
+		limits.MaxLimits = make(map[string]int64)
+	}
+
+	limits.MaxLimits[key] = value
+}
+
+func (limits *ResourceLimiter) SetMinValue64(key string, value int64) {
+	if limits.MinLimits == nil {
+		limits.MinLimits = make(map[string]int64)
+	}
+
+	limits.MinLimits[key] = value
+}
+
+func (limits *ResourceLimiter) GetMaxValue64(key string, defaultValue int64) int64 {
+	if limits.MaxLimits != nil {
+		if value, found := limits.MaxLimits[key]; found {
+			return value
+		}
+	}
+	return defaultValue
+}
+
+func (limits *ResourceLimiter) GetMinValue64(key string, defaultValue int64) int64 {
+	if limits.MinLimits != nil {
+		if value, found := limits.MinLimits[key]; found {
+			return value
+		}
+	}
+	return defaultValue
+}
+
+func (limits *ResourceLimiter) SetMaxValue(key string, value int) {
+	if limits.MaxLimits == nil {
+		limits.MaxLimits = make(map[string]int64)
+	}
+
+	limits.MaxLimits[key] = int64(value)
+}
+
+func (limits *ResourceLimiter) SetMinValue(key string, value int) {
+	if limits.MinLimits == nil {
+		limits.MinLimits = make(map[string]int64)
+	}
+
+	limits.MinLimits[key] = int64(value)
+}
+
+func (limits *ResourceLimiter) GetMaxValue(key string, defaultValue int) int {
+	if limits.MaxLimits != nil {
+		if value, found := limits.MaxLimits[key]; found {
+			return int(value)
+		}
+	}
+	return defaultValue
+}
+
+func (limits *ResourceLimiter) GetMinValue(key string, defaultValue int) int {
+	if limits.MinLimits != nil {
+		if value, found := limits.MinLimits[key]; found {
+			return int(value)
+		}
+	}
+	return defaultValue
 }
 
 // GetVSphereConfiguration returns the vsphere named conf or default
@@ -195,6 +320,8 @@ func NewConfig() *Config {
 		UseExternalEtdc:          false,
 		ExtDestinationEtcdSslDir: "/etc/etcd/ssl",
 		ExtSourceEtcdSslDir:      "/etc/etcd/ssl",
+		KubernetesPKISourceDir:   "/etc/kubernetes/pki",
+		KubernetesPKIDestDir:     "/etc/kubernetes/pki",
 		RequestTimeout:           DefaultMaxRequestTimeout,
 		DeletionTimeout:          DefaultMaxDeletionPeriod,
 		MaxGracePeriod:           DefaultMaxGracePeriod,
@@ -204,6 +331,12 @@ func NewConfig() *Config {
 		MinMemory:                1024,
 		MaxCpus:                  24,
 		MaxMemory:                1024 * 24,
+		ManagedNodeMinCpus:       ManagedNodeMinCores,
+		ManagedNodeMaxCpus:       ManagedNodeMaxCores,
+		ManagedNodeMinMemory:     ManagedNodeMinMemory,
+		ManagedNodeMaxMemory:     ManagedNodeMaxMemory,
+		ManagedNodeMinDiskSize:   ManagedNodeMinDiskSize,
+		ManagedNodeMaxDiskSize:   ManagedNodeMaxDiskSize,
 		LogFormat:                "text",
 		LogLevel:                 glog.InfoLevel.String(),
 		Namespace:                "kube-system",
@@ -234,6 +367,9 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.Flag("src-etcd-ssl-dir", "Locate the source etcd ssl files (default: /etc/etcd/ssl)").Default("/etc/etcd/ssl").StringVar(&cfg.ExtSourceEtcdSslDir)
 	app.Flag("dst-etcd-ssl-dir", "Locate the destination etcd ssl files (default: /etc/etcd/ssl)").Default("/etc/etcd/ssl").StringVar(&cfg.ExtDestinationEtcdSslDir)
 
+	app.Flag("kubernetes-pki-srcdir", "Locate the source kubernetes pki files (default: /etc/kubernetes/pki)").Default("/etc/kubernetes/pki").StringVar(&cfg.KubernetesPKISourceDir)
+	app.Flag("kubernetes-pki-dstdir", "Locate the destination kubernetes pki files (default: /etc/kubernetes/pki)").Default("/etc/kubernetes/pki").StringVar(&cfg.KubernetesPKIDestDir)
+
 	// Flags related to Kubernetes
 	app.Flag("server", "The Kubernetes API server to connect to (default: auto-detect)").Default(cfg.APIServerURL).StringVar(&cfg.APIServerURL)
 	app.Flag("kubeconfig", "Retrieve target cluster configuration from a Kubernetes configuration file (default: auto-detect)").Default(cfg.KubeConfig).StringVar(&cfg.KubeConfig)
@@ -243,9 +379,16 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.Flag("namespace", "Namespace of crd").Default(cfg.Namespace).StringVar(&cfg.Namespace)
 
 	app.Flag("min-cpus", "Limits: minimum cpu (default: 1)").Default(strconv.FormatInt(cfg.MinCpus, 10)).Int64Var(&cfg.MinCpus)
-	app.Flag("min-memory", "Limits: minimum memory in MB (default: 1G)").Default(strconv.FormatInt(cfg.MinMemory, 10)).Int64Var(&cfg.MinMemory)
 	app.Flag("max-cpus", "Limits: max cpu (default: 24)").Default(strconv.FormatInt(cfg.MaxCpus, 10)).Int64Var(&cfg.MaxCpus)
+	app.Flag("min-memory", "Limits: minimum memory in MB (default: 1G)").Default(strconv.FormatInt(cfg.MinMemory, 10)).Int64Var(&cfg.MinMemory)
 	app.Flag("max-memory", "Limits: max memory in MB (default: 24G)").Default(strconv.FormatInt(cfg.MaxMemory, 10)).Int64Var(&cfg.MaxMemory)
+
+	app.Flag("min-managednode-cpus", "Managed node: minimum cpu (default: 2)").Default(strconv.FormatInt(cfg.MinCpus, 10)).Int64Var(&cfg.ManagedNodeMinCpus)
+	app.Flag("max-managednode-cpus", "Managed node: max cpu (default: 32)").Default(strconv.FormatInt(cfg.ManagedNodeMaxCpus, 10)).Int64Var(&cfg.ManagedNodeMaxCpus)
+	app.Flag("min-managednode-memory", "Managed node: minimum memory in MB (default: 2G)").Default(strconv.FormatInt(cfg.MinMemory, 10)).Int64Var(&cfg.ManagedNodeMinMemory)
+	app.Flag("max-managednode-memory", "Managed node: max memory in MB (default: 24G)").Default(strconv.FormatInt(cfg.ManagedNodeMaxMemory, 10)).Int64Var(&cfg.ManagedNodeMaxMemory)
+	app.Flag("min-managednode-disksize", "Managed node: minimum disk size in MB (default: 10MB)").Default(strconv.FormatInt(cfg.ManagedNodeMinDiskSize, 10)).Int64Var(&cfg.ManagedNodeMinDiskSize)
+	app.Flag("max-managednode-disksize", "Managed node: max disk size in MB (default: 1T)").Default(strconv.FormatInt(cfg.ManagedNodeMaxDiskSize, 10)).Int64Var(&cfg.ManagedNodeMaxDiskSize)
 
 	app.Flag("version", "Display version and exit").BoolVar(&cfg.DisplayVersion)
 

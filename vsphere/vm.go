@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -213,7 +214,29 @@ func (vm *VirtualMachine) addNetwork(ctx *context.Context, network *Network, dev
 	return devices, err
 }
 
-func (vm *VirtualMachine) addHardDrive(ctx *context.Context, virtualMachine *object.VirtualMachine, diskSize int, devices object.VirtualDeviceList) (object.VirtualDeviceList, error) {
+func (vm *VirtualMachine) findHardDrive(ctx *context.Context, list object.VirtualDeviceList) (*types.VirtualDisk, error) {
+	var disks []*types.VirtualDisk
+
+	for _, device := range list {
+		switch md := device.(type) {
+		case *types.VirtualDisk:
+			disks = append(disks, md)
+		default:
+			continue
+		}
+	}
+
+	switch len(disks) {
+	case 0:
+		return nil, errors.New("no disk found using the given values")
+	case 1:
+		return disks[0], nil
+	}
+
+	return nil, errors.New("the given disk values match multiple disks")
+}
+
+func (vm *VirtualMachine) addOrExpandHardDrive(ctx *context.Context, virtualMachine *object.VirtualMachine, diskSize int, expandHardDrive bool, devices object.VirtualDeviceList) (object.VirtualDeviceList, error) {
 	var err error
 	var existingDevices object.VirtualDeviceList
 	var controller types.BaseVirtualController
@@ -222,26 +245,51 @@ func (vm *VirtualMachine) addHardDrive(ctx *context.Context, virtualMachine *obj
 		drivePath := fmt.Sprintf("[%s] %s/harddrive.vmdk", vm.Datastore.Name, vm.Name)
 
 		if existingDevices, err = virtualMachine.Device(ctx); err == nil {
+			if expandHardDrive {
+				var task *object.Task
+				var disk *types.VirtualDisk
 
-			if controller, err = existingDevices.FindDiskController(""); err == nil {
+				if disk, err = vm.findHardDrive(ctx, existingDevices); err == nil {
+					diskSizeInKB := int64(diskSize * 1024)
 
-				disk := existingDevices.CreateDisk(controller, vm.Datastore.Ref, drivePath)
+					if diskSizeInKB > disk.CapacityInKB {
+						disk.CapacityInKB = diskSizeInKB
 
-				if len(existingDevices.SelectByBackingInfo(disk.Backing)) != 0 {
+						spec := types.VirtualMachineConfigSpec{
+							DeviceChange: []types.BaseVirtualDeviceConfigSpec{
+								&types.VirtualDeviceConfigSpec{
+									Device:    disk,
+									Operation: types.VirtualDeviceConfigSpecOperationEdit,
+								},
+							},
+						}
 
-					err = fmt.Errorf("disk %s already exists", drivePath)
+						if task, err = virtualMachine.Reconfigure(ctx, spec); err == nil {
+							err = task.Wait(ctx)
+						}
+					}
+				}
+			} else {
+				if controller, err = existingDevices.FindDiskController(""); err == nil {
 
-				} else {
+					disk := existingDevices.CreateDisk(controller, vm.Datastore.Ref, drivePath)
 
-					backing := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo)
+					if len(existingDevices.SelectByBackingInfo(disk.Backing)) != 0 {
 
-					backing.ThinProvisioned = types.NewBool(true)
-					backing.DiskMode = string(types.VirtualDiskModePersistent)
-					backing.Sharing = string(types.VirtualDiskSharingSharingNone)
+						err = fmt.Errorf("disk %s already exists", drivePath)
 
-					disk.CapacityInKB = int64(diskSize) * 1024
+					} else {
 
-					devices = append(devices, disk)
+						backing := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo)
+
+						backing.ThinProvisioned = types.NewBool(true)
+						backing.DiskMode = string(types.VirtualDiskModePersistent)
+						backing.Sharing = string(types.VirtualDiskSharingSharingNone)
+
+						disk.CapacityInKB = int64(diskSize) * 1024
+
+						devices = append(devices, disk)
+					}
 				}
 			}
 		}
@@ -251,7 +299,7 @@ func (vm *VirtualMachine) addHardDrive(ctx *context.Context, virtualMachine *obj
 }
 
 // Configure set characteristic of VM a virtual machine
-func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory, cpus, disk, nodeIndex int) error {
+func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey string, cloudInit interface{}, network *Network, annotation string, expandHardDrive bool, memory, cpus, disk, nodeIndex int) error {
 	var devices object.VirtualDeviceList
 	var err error
 	var task *object.Task
@@ -266,7 +314,7 @@ func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey stri
 		Uuid:         virtualMachine.UUID(ctx),
 	}
 
-	if devices, err = vm.addHardDrive(ctx, virtualMachine, disk, devices); err != nil {
+	if devices, err = vm.addOrExpandHardDrive(ctx, virtualMachine, disk, expandHardDrive, devices); err != nil {
 
 		err = fmt.Errorf(constantes.ErrUnableToAddHardDrive, vm.Name, err)
 
