@@ -298,6 +298,12 @@ func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int)
 
 			g.RunningNode[nodeIndex] = ServerNodeStateCreating
 
+			extraAnnotations := KubernetesLabel{}
+			extraLabels := KubernetesLabel{
+				constantes.NodeLabelWorkerRole: "",
+				"worker":                       "true",
+			}
+
 			node := &AutoScalerServerNode{
 				ProviderID:       g.providerIDForNode(nodeName),
 				NodeGroupID:      g.NodeGroupIdentifier,
@@ -307,6 +313,8 @@ func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int)
 				CPU:              g.Machine.Vcpu,
 				Disk:             g.Machine.Disk,
 				NodeType:         AutoScalerServerNodeAutoscaled,
+				ExtraAnnotations: extraAnnotations,
+				ExtraLabels:      extraLabels,
 				ControlPlaneNode: false,
 				AllowDeployment:  true,
 				VSphereConfig:    vsphereConfig,

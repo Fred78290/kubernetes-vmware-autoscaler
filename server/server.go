@@ -162,9 +162,7 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 			ng = s.Groups[nodeGroupIdentifier]
 
 			if ng == nil {
-				systemLabels := map[string]string{
-					constantes.NodeLabelWorkerRole: "",
-				}
+				systemLabels := map[string]string{}
 
 				labels := map[string]string{
 					constantes.NodeLabelGroupName: nodeGroupIdentifier,
@@ -462,8 +460,6 @@ func (s *AutoScalerServerApp) NewNodeGroup(ctx context.Context, request *apigrpc
 
 	labels := make(map[string]string)
 	systemLabels := make(map[string]string)
-
-	systemLabels[constantes.NodeLabelWorkerRole] = ""
 
 	if reqLabels := request.GetLabels(); reqLabels != nil {
 		for k2, v2 := range reqLabels {
