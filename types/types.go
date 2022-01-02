@@ -185,9 +185,9 @@ func (ssh *AutoScalerServerSSH) GetAuthKeys() string {
 
 // AutoScalerServerConfig is contains configuration
 type AutoScalerServerConfig struct {
-	UseExternalEtdc            bool                              `json:"use-external-etcd"`
-	ExtDestinationEtcdSslDir   string                            `default:"/etc/etcd/ssl" json:"src-etcd-ssl-dir"`
-	ExtSourceEtcdSslDir        string                            `default:"/etc/etcd/ssl" json:"dst-etcd-ssl-dir"`
+	UseExternalEtdc            *bool                             `json:"use-external-etcd"`
+	ExtDestinationEtcdSslDir   string                            `default:"/etc/etcd/ssl" json:"dst-etcd-ssl-dir"`
+	ExtSourceEtcdSslDir        string                            `default:"/etc/etcd/ssl" json:"src-etcd-ssl-dir"`
 	KubernetesPKISourceDir     string                            `default:"/etc/kubernetes/pki" json:"kubernetes-pki-srcdir"`
 	KubernetesPKIDestDir       string                            `default:"/etc/kubernetes/pki" json:"kubernetes-pki-dstdir"`
 	Network                    string                            `default:"tcp" json:"network"`                     // Mandatory, Network to listen (see grpc doc) to listen
@@ -363,12 +363,12 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.Flag("log-level", "Set the level of logging. (default: info, options: panic, debug, info, warning, error, fatal").Default(cfg.LogLevel).EnumVar(&cfg.LogLevel, allLogLevelsAsStrings()...)
 
 	// External Etcd
-	app.Flag("use-external-etcd", "Tell we use an external etcd service (default: false)").Default("false").BoolVar(&cfg.UseExternalEtdc)
-	app.Flag("src-etcd-ssl-dir", "Locate the source etcd ssl files (default: /etc/etcd/ssl)").Default("/etc/etcd/ssl").StringVar(&cfg.ExtSourceEtcdSslDir)
-	app.Flag("dst-etcd-ssl-dir", "Locate the destination etcd ssl files (default: /etc/etcd/ssl)").Default("/etc/etcd/ssl").StringVar(&cfg.ExtDestinationEtcdSslDir)
+	app.Flag("use-external-etcd", "Tell we use an external etcd service (overriden by config file if defined)").Default("false").BoolVar(&cfg.UseExternalEtdc)
+	app.Flag("src-etcd-ssl-dir", "Locate the source etcd ssl files (overriden by config file if defined)").Default(cfg.ExtSourceEtcdSslDir).StringVar(&cfg.ExtSourceEtcdSslDir)
+	app.Flag("dst-etcd-ssl-dir", "Locate the destination etcd ssl files (overriden by config file if defined)").Default(cfg.ExtDestinationEtcdSslDir).StringVar(&cfg.ExtDestinationEtcdSslDir)
 
-	app.Flag("kubernetes-pki-srcdir", "Locate the source kubernetes pki files (default: /etc/kubernetes/pki)").Default("/etc/kubernetes/pki").StringVar(&cfg.KubernetesPKISourceDir)
-	app.Flag("kubernetes-pki-dstdir", "Locate the destination kubernetes pki files (default: /etc/kubernetes/pki)").Default("/etc/kubernetes/pki").StringVar(&cfg.KubernetesPKIDestDir)
+	app.Flag("kubernetes-pki-srcdir", "Locate the source kubernetes pki files (overriden by config file if defined)").Default(cfg.KubernetesPKISourceDir).StringVar(&cfg.KubernetesPKISourceDir)
+	app.Flag("kubernetes-pki-dstdir", "Locate the destination kubernetes pki files (overriden by config file if defined)").Default(cfg.KubernetesPKIDestDir).StringVar(&cfg.KubernetesPKIDestDir)
 
 	// Flags related to Kubernetes
 	app.Flag("server", "The Kubernetes API server to connect to (default: auto-detect)").Default(cfg.APIServerURL).StringVar(&cfg.APIServerURL)

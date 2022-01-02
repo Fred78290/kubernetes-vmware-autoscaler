@@ -1421,11 +1421,26 @@ func StartServer(kubeClient types.ClientGenerator, c *types.Config) {
 		}
 	}
 
-	config.UseExternalEtdc = c.UseExternalEtdc
-	config.ExtDestinationEtcdSslDir = c.ExtDestinationEtcdSslDir
-	config.ExtSourceEtcdSslDir = c.ExtSourceEtcdSslDir
-	config.KubernetesPKISourceDir = c.KubernetesPKISourceDir
-	config.KubernetesPKIDestDir = c.KubernetesPKIDestDir
+	if config.UseExternalEtdc == nil {
+		config.UseExternalEtdc = &c.UseExternalEtdc
+	}
+
+	if len(config.ExtDestinationEtcdSslDir) == 0 {
+		config.ExtDestinationEtcdSslDir = c.ExtDestinationEtcdSslDir
+	}
+
+	if len(config.ExtSourceEtcdSslDir) == 0 {
+		config.ExtSourceEtcdSslDir = c.ExtSourceEtcdSslDir
+	}
+
+	if len(config.KubernetesPKISourceDir) == 0 {
+		config.KubernetesPKISourceDir = c.KubernetesPKISourceDir
+	}
+
+	if len(config.KubernetesPKIDestDir) == 0 {
+		config.KubernetesPKIDestDir = c.KubernetesPKIDestDir
+	}
+
 	config.ManagedNodeResourceLimiter = c.GetManagedNodeResourceLimiter()
 
 	if !phSaveState || !utils.FileExists(phSavedState) {
