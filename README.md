@@ -14,6 +14,8 @@ Kubernetes autoscaler for vsphere/esxi
     - This version is supported kubernetes v1.21
 * 1.22.0
     - This version is supported kubernetes v1.22
+* 1.23.0
+    - This version is supported kubernetes v1.23
 
 ### Unmaintened releases
 
