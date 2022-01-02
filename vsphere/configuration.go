@@ -32,8 +32,8 @@ type Configuration struct {
 
 // Status shortened vm status
 type Status struct {
-	Address string
-	Powered bool
+	Interfaces []NetworkInterface
+	Powered    bool
 }
 
 // Copy Make a deep copy from src into dst.
@@ -99,6 +99,22 @@ func (conf *Configuration) Clone(nodeIndex int) (*Configuration, error) {
 	}
 
 	return dup, nil
+}
+
+func (conf *Configuration) FindPreferredIPAddress(interfaces []NetworkInterface) string {
+	address := ""
+
+	if interfaces != nil {
+		for _, inf := range interfaces {
+			if declaredInf := conf.FindInterfaceByName(inf.NetworkName); declaredInf != nil {
+				if declaredInf.Primary {
+					return inf.IPAddress
+				}
+			}
+		}
+	}
+
+	return address
 }
 
 func (conf *Configuration) FindInterfaceByName(networkName string) *NetworkInterface {

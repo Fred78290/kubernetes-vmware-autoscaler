@@ -68,7 +68,7 @@ type AutoScalerServerNode struct {
 	Memory           int                       `json:"memory"`
 	CPU              int                       `json:"cpu"`
 	Disk             int                       `json:"disk"`
-	Addresses        []string                  `json:"addresses"`
+	IPAddress        string                    `json:"address"`
 	State            AutoScalerServerNodeState `json:"state"`
 	NodeType         AutoScalerServerNodeType  `json:"type"`
 	ControlPlaneNode bool                      `json:"control-plane,omitempty"`
@@ -92,13 +92,15 @@ func (vm *AutoScalerServerNode) waitReady(c types.ClientGenerator) error {
 func (vm *AutoScalerServerNode) recopyEtcdSslFilesIfNeeded() error {
 	var err error
 
-	if vm.serverConfig.UseExternalEtdc {
-		if err = utils.Scp(vm.serverConfig.SSH, vm.Addresses[0], vm.serverConfig.ExtSourceEtcdSslDir, "."); err == nil {
-			if _, err = utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], fmt.Sprintf("mkdir -p %s", filepath.Dir(vm.serverConfig.ExtDestinationEtcdSslDir))); err == nil {
-				if _, err = utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], fmt.Sprintf("mv %s %s", filepath.Base(vm.serverConfig.ExtSourceEtcdSslDir), vm.serverConfig.ExtDestinationEtcdSslDir)); err == nil {
-					_, err = utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], fmt.Sprintf("chown -R root:root %s", vm.serverConfig.ExtDestinationEtcdSslDir))
-				}
-			}
+	if vm.ControlPlaneNode || *vm.serverConfig.UseExternalEtdc {
+		if err = utils.Scp(vm.serverConfig.SSH, vm.IPAddress, vm.serverConfig.ExtSourceEtcdSslDir, "."); err != nil {
+			glog.Errorf("scp failed: %v", err)
+		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, fmt.Sprintf("mkdir -p %s", vm.serverConfig.ExtDestinationEtcdSslDir)); err != nil {
+			glog.Errorf("mkdir failed: %v", err)
+		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, fmt.Sprintf("cp -r %s/* %s", filepath.Base(vm.serverConfig.ExtSourceEtcdSslDir), vm.serverConfig.ExtDestinationEtcdSslDir)); err != nil {
+			glog.Errorf("mv failed: %v", err)
+		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, fmt.Sprintf("chown -R root:root %s", vm.serverConfig.ExtDestinationEtcdSslDir)); err != nil {
+			glog.Errorf("chown failed: %v", err)
 		}
 	}
 
@@ -109,12 +111,14 @@ func (vm *AutoScalerServerNode) recopyKubernetesPKIIfNeeded() error {
 	var err error
 
 	if vm.ControlPlaneNode {
-		if err = utils.Scp(vm.serverConfig.SSH, vm.Addresses[0], vm.serverConfig.KubernetesPKISourceDir, "."); err == nil {
-			if _, err = utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], fmt.Sprintf("mkdir -p %s", filepath.Dir(vm.serverConfig.KubernetesPKIDestDir))); err == nil {
-				if _, err = utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], fmt.Sprintf("mv %s %s", filepath.Base(vm.serverConfig.KubernetesPKISourceDir), vm.serverConfig.KubernetesPKIDestDir)); err == nil {
-					_, err = utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], fmt.Sprintf("chown -R root:root %s", vm.serverConfig.KubernetesPKIDestDir))
-				}
-			}
+		if err = utils.Scp(vm.serverConfig.SSH, vm.IPAddress, vm.serverConfig.KubernetesPKISourceDir, "."); err != nil {
+			glog.Errorf("scp failed: %v", err)
+		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, fmt.Sprintf("mkdir -p %s", vm.serverConfig.KubernetesPKIDestDir)); err != nil {
+			glog.Errorf("mkdir failed: %v", err)
+		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, fmt.Sprintf("cp -r %s/* %s", filepath.Base(vm.serverConfig.KubernetesPKISourceDir), vm.serverConfig.KubernetesPKIDestDir)); err != nil {
+			glog.Errorf("mv failed: %v", err)
+		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, fmt.Sprintf("chown -R root:root %s", vm.serverConfig.KubernetesPKIDestDir)); err != nil {
+			glog.Errorf("chown failed: %v", err)
 		}
 	}
 
@@ -132,6 +136,8 @@ func (vm *AutoScalerServerNode) kubeAdmJoin() error {
 		kubeAdm.Token,
 		"--discovery-token-ca-cert-hash",
 		kubeAdm.CACert,
+		"--apiserver-advertise-address",
+		vm.IPAddress,
 	}
 
 	if vm.ControlPlaneNode {
@@ -145,7 +151,7 @@ func (vm *AutoScalerServerNode) kubeAdmJoin() error {
 
 	command := strings.Join(args, " ")
 
-	if out, err := utils.Sudo(vm.serverConfig.SSH, vm.Addresses[0], command); err != nil {
+	if out, err := utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, command); err != nil {
 		return fmt.Errorf("unable to execute command: %s, output: %s, reason:%v", command, out, err)
 	}
 
@@ -459,9 +465,7 @@ func (vm *AutoScalerServerNode) statusVM() (AutoScalerServerNodeState, error) {
 	}
 
 	if status != nil {
-		vm.Addresses = []string{
-			status.Address,
-		}
+		vm.IPAddress = vm.VSphereConfig.FindPreferredIPAddress(status.Interfaces)
 
 		if status.Powered {
 			vm.State = AutoScalerServerNodeStateRunning

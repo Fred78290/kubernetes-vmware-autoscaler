@@ -402,6 +402,30 @@ func (vm *VirtualMachine) waitForToolsRunning(ctx *context.Context, v *object.Vi
 	return running, nil
 }
 
+func (vm *VirtualMachine) ListAddresses(ctx *context.Context) ([]NetworkInterface, error) {
+	var o mo.VirtualMachine
+
+	v := vm.VirtualMachine(ctx)
+
+	if err := v.Properties(ctx, v.Reference(), []string{"guest"}, &o); err != nil {
+		return nil, err
+	}
+
+	addresses := make([]NetworkInterface, 0, len(o.Guest.Net))
+
+	for _, net := range o.Guest.Net {
+		if net.Connected {
+			addresses = append(addresses, NetworkInterface{
+				NetworkName: net.Network,
+				MacAddress:  net.MacAddress,
+				IPAddress:   net.IpAddress[0],
+			})
+		}
+	}
+
+	return addresses, nil
+}
+
 // WaitForToolsRunning wait vmware tool starts
 func (vm *VirtualMachine) WaitForToolsRunning(ctx *context.Context) (bool, error) {
 	var powerState types.VirtualMachinePowerState
@@ -540,20 +564,14 @@ func (vm *VirtualMachine) Delete(ctx *context.Context) error {
 func (vm *VirtualMachine) Status(ctx *context.Context) (*Status, error) {
 	var powerState types.VirtualMachinePowerState
 	var err error
-	var status *Status
-
+	var status *Status = &Status{}
+	var interfaces []NetworkInterface
 	v := vm.VirtualMachine(ctx)
 
 	if powerState, err = v.PowerState(ctx); err == nil {
-		address := ""
-
-		if powerState == types.VirtualMachinePowerStatePoweredOn {
-			address, err = vm.waitForIP(ctx, v)
-		}
-
-		status = &Status{
-			Address: address,
-			Powered: powerState == types.VirtualMachinePowerStatePoweredOn,
+		if interfaces, err = vm.ListAddresses(ctx); err == nil {
+			status.Interfaces = interfaces
+			status.Powered = powerState == types.VirtualMachinePowerStatePoweredOn
 		}
 	}
 

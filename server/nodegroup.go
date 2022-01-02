@@ -599,10 +599,8 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 							Memory:           int(nodeInfo.Status.Capacity.Memory().Value() / (1024 * 1024)),
 							Disk:             int(nodeInfo.Status.Capacity.Storage().Value() / (1024 * 1024)),
 							VSphereConfig:    g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Copy(),
-							Addresses: []string{
-								runningIP,
-							},
-							serverConfig: g.configuration,
+							IPAddress:        runningIP,
+							serverConfig:     g.configuration,
 						}
 
 						err = client.AnnoteNode(nodeInfo.Name, map[string]string{

@@ -82,15 +82,13 @@ func (m mockupClientGenerator) WaitNodeToBeReady(nodeName string, timeToWaitInSe
 
 func createTestNode(ng *AutoScalerServerNodeGroup) *AutoScalerServerNode {
 	return &AutoScalerServerNode{
-		ProviderID:  ng.providerIDForNode(testNodeName),
-		NodeGroupID: testGroupID,
-		NodeName:    testNodeName,
-		Memory:      2048,
-		CPU:         2,
-		Disk:        5120,
-		Addresses: []string{
-			"127.0.0.1",
-		},
+		ProviderID:    ng.providerIDForNode(testNodeName),
+		NodeGroupID:   testGroupID,
+		NodeName:      testNodeName,
+		Memory:        2048,
+		CPU:           2,
+		Disk:          5120,
+		IPAddress:     "127.0.0.1",
 		State:         AutoScalerServerNodeStateNotCreated,
 		NodeType:      AutoScalerServerNodeAutoscaled,
 		VSphereConfig: ng.configuration.GetVSphereConfiguration(testGroupID),
