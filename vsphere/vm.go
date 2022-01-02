@@ -415,10 +415,17 @@ func (vm *VirtualMachine) ListAddresses(ctx *context.Context) ([]NetworkInterfac
 
 	for _, net := range o.Guest.Net {
 		if net.Connected {
+			ip := ""
+
+			// vcsim bug
+			if len(net.IpAddress) > 0 {
+				ip = net.IpAddress[0]
+			}
+
 			addresses = append(addresses, NetworkInterface{
 				NetworkName: net.Network,
 				MacAddress:  net.MacAddress,
-				IPAddress:   net.IpAddress[0],
+				IPAddress:   ip,
 			})
 		}
 	}
