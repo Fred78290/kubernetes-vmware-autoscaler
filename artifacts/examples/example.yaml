@@ -9,11 +9,11 @@ metadata:
   name: "vmware-ca-k8s-managed-01"
   namespace: "vmware-ca-k8s"
 spec:
-  controlPlane: true
+  controlPlane: false
   allowDeployment: false
-  vcpus: 4
-  memorySizeInMb: 4096
-  diskSizeInMb: 20480
+  vcpus: 2
+  memorySizeInMb: 2048
+  diskSizeInMb: 10240
   labels:
   - demo-label.aldunelabs.com=demo
   - sample-label.aldunelabs.com=sample
