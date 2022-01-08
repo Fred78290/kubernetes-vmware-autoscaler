@@ -184,7 +184,7 @@ func (vm *AutoScalerServerNode) setNodeLabels(c types.ClientGenerator, nodeLabel
 
 	annotations := KubernetesLabel{
 		constantes.NodeLabelGroupName:             vm.NodeGroupID,
-		constantes.AnnotationScaleDownDisabled:    strconv.FormatBool(vm.NodeType == AutoScalerServerNodeManaged),
+		constantes.AnnotationScaleDownDisabled:    strconv.FormatBool(vm.NodeType != AutoScalerServerNodeAutoscaled),
 		constantes.AnnotationNodeAutoProvisionned: strconv.FormatBool(vm.NodeType == AutoScalerServerNodeAutoscaled),
 		constantes.AnnotationNodeManaged:          strconv.FormatBool(vm.NodeType == AutoScalerServerNodeManaged),
 		constantes.AnnotationNodeIndex:            strconv.Itoa(vm.NodeIndex),
