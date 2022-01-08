@@ -1,0 +1,57 @@
+apiVersion: "nodemanager.aldunelabs.com/v1alpha1"
+kind: "ManagedNode"
+metadata:
+  name: "vmware-ca-k8s-managed-01"
+spec:
+  nodegroup: vmware-ca-k8s
+  controlPlane: false
+  allowDeployment: false
+  vcpus: 2
+  memorySizeInMb: 2048
+  diskSizeInMb: 10240
+  labels:
+  - demo-label.aldunelabs.com=demo
+  - sample-label.aldunelabs.com=sample
+  annotations:
+  - demo-annotation.aldunelabs.com=demo
+  - sample-annotation.aldunelabs.com=sample
+  networks:
+    -
+      network: "VM Network"
+      address: 10.0.0.80
+      netmask: 255.255.255.0
+      gateway: 10.0.0.1
+    -
+      network: "VM Private"
+      address: 192.168.1.80
+      netmask: 255.255.255.0
+      gateway: 10.0.0.1
+---
+apiVersion: "nodemanager.aldunelabs.com/v1alpha1"
+kind: "ManagedNode"
+metadata:
+  name: "vmware-ca-k8s-managed-02"
+spec:
+  nodegroup: vmware-ca-k8s
+  controlPlane: false
+  allowDeployment: false
+  vcpus: 2
+  memorySizeInMb: 2048
+  diskSizeInMb: 10240
+  labels:
+  - demo-label.aldunelabs.com=demo
+  - sample-label.aldunelabs.com=sample
+  annotations:
+  - demo-annotation.aldunelabs.com=demo
+  - sample-annotation.aldunelabs.com=sample
+  networks:
+    -
+      network: "VM Network"
+      address: 10.0.0.81
+      netmask: 255.255.255.0
+      gateway: 10.0.0.1
+    -
+      network: "VM Private"
+      address: 192.168.1.81
+      netmask: 255.255.255.0
+      gateway: 10.0.0.1

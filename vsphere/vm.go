@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -213,7 +214,29 @@ func (vm *VirtualMachine) addNetwork(ctx *context.Context, network *Network, dev
 	return devices, err
 }
 
-func (vm *VirtualMachine) addHardDrive(ctx *context.Context, virtualMachine *object.VirtualMachine, diskSize int, devices object.VirtualDeviceList) (object.VirtualDeviceList, error) {
+func (vm *VirtualMachine) findHardDrive(ctx *context.Context, list object.VirtualDeviceList) (*types.VirtualDisk, error) {
+	var disks []*types.VirtualDisk
+
+	for _, device := range list {
+		switch md := device.(type) {
+		case *types.VirtualDisk:
+			disks = append(disks, md)
+		default:
+			continue
+		}
+	}
+
+	switch len(disks) {
+	case 0:
+		return nil, errors.New("no disk found using the given values")
+	case 1:
+		return disks[0], nil
+	}
+
+	return nil, errors.New("the given disk values match multiple disks")
+}
+
+func (vm *VirtualMachine) addOrExpandHardDrive(ctx *context.Context, virtualMachine *object.VirtualMachine, diskSize int, expandHardDrive bool, devices object.VirtualDeviceList) (object.VirtualDeviceList, error) {
 	var err error
 	var existingDevices object.VirtualDeviceList
 	var controller types.BaseVirtualController
@@ -222,26 +245,51 @@ func (vm *VirtualMachine) addHardDrive(ctx *context.Context, virtualMachine *obj
 		drivePath := fmt.Sprintf("[%s] %s/harddrive.vmdk", vm.Datastore.Name, vm.Name)
 
 		if existingDevices, err = virtualMachine.Device(ctx); err == nil {
+			if expandHardDrive {
+				var task *object.Task
+				var disk *types.VirtualDisk
 
-			if controller, err = existingDevices.FindDiskController(""); err == nil {
+				if disk, err = vm.findHardDrive(ctx, existingDevices); err == nil {
+					diskSizeInKB := int64(diskSize * 1024)
 
-				disk := existingDevices.CreateDisk(controller, vm.Datastore.Ref, drivePath)
+					if diskSizeInKB > disk.CapacityInKB {
+						disk.CapacityInKB = diskSizeInKB
 
-				if len(existingDevices.SelectByBackingInfo(disk.Backing)) != 0 {
+						spec := types.VirtualMachineConfigSpec{
+							DeviceChange: []types.BaseVirtualDeviceConfigSpec{
+								&types.VirtualDeviceConfigSpec{
+									Device:    disk,
+									Operation: types.VirtualDeviceConfigSpecOperationEdit,
+								},
+							},
+						}
 
-					err = fmt.Errorf("disk %s already exists", drivePath)
+						if task, err = virtualMachine.Reconfigure(ctx, spec); err == nil {
+							err = task.Wait(ctx)
+						}
+					}
+				}
+			} else {
+				if controller, err = existingDevices.FindDiskController(""); err == nil {
 
-				} else {
+					disk := existingDevices.CreateDisk(controller, vm.Datastore.Ref, drivePath)
 
-					backing := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo)
+					if len(existingDevices.SelectByBackingInfo(disk.Backing)) != 0 {
 
-					backing.ThinProvisioned = types.NewBool(true)
-					backing.DiskMode = string(types.VirtualDiskModePersistent)
-					backing.Sharing = string(types.VirtualDiskSharingSharingNone)
+						err = fmt.Errorf("disk %s already exists", drivePath)
 
-					disk.CapacityInKB = int64(diskSize) * 1024
+					} else {
 
-					devices = append(devices, disk)
+						backing := disk.Backing.(*types.VirtualDiskFlatVer2BackingInfo)
+
+						backing.ThinProvisioned = types.NewBool(true)
+						backing.DiskMode = string(types.VirtualDiskModePersistent)
+						backing.Sharing = string(types.VirtualDiskSharingSharingNone)
+
+						disk.CapacityInKB = int64(diskSize) * 1024
+
+						devices = append(devices, disk)
+					}
 				}
 			}
 		}
@@ -251,7 +299,7 @@ func (vm *VirtualMachine) addHardDrive(ctx *context.Context, virtualMachine *obj
 }
 
 // Configure set characteristic of VM a virtual machine
-func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory, cpus, disk, nodeIndex int) error {
+func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey string, cloudInit interface{}, network *Network, annotation string, expandHardDrive bool, memory, cpus, disk, nodeIndex int) error {
 	var devices object.VirtualDeviceList
 	var err error
 	var task *object.Task
@@ -266,7 +314,7 @@ func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey stri
 		Uuid:         virtualMachine.UUID(ctx),
 	}
 
-	if devices, err = vm.addHardDrive(ctx, virtualMachine, disk, devices); err != nil {
+	if devices, err = vm.addOrExpandHardDrive(ctx, virtualMachine, disk, expandHardDrive, devices); err != nil {
 
 		err = fmt.Errorf(constantes.ErrUnableToAddHardDrive, vm.Name, err)
 
@@ -352,6 +400,37 @@ func (vm *VirtualMachine) waitForToolsRunning(ctx *context.Context, v *object.Vi
 	}
 
 	return running, nil
+}
+
+func (vm *VirtualMachine) ListAddresses(ctx *context.Context) ([]NetworkInterface, error) {
+	var o mo.VirtualMachine
+
+	v := vm.VirtualMachine(ctx)
+
+	if err := v.Properties(ctx, v.Reference(), []string{"guest"}, &o); err != nil {
+		return nil, err
+	}
+
+	addresses := make([]NetworkInterface, 0, len(o.Guest.Net))
+
+	for _, net := range o.Guest.Net {
+		if net.Connected {
+			ip := ""
+
+			// vcsim bug
+			if len(net.IpAddress) > 0 {
+				ip = net.IpAddress[0]
+			}
+
+			addresses = append(addresses, NetworkInterface{
+				NetworkName: net.Network,
+				MacAddress:  net.MacAddress,
+				IPAddress:   ip,
+			})
+		}
+	}
+
+	return addresses, nil
 }
 
 // WaitForToolsRunning wait vmware tool starts
@@ -492,20 +571,14 @@ func (vm *VirtualMachine) Delete(ctx *context.Context) error {
 func (vm *VirtualMachine) Status(ctx *context.Context) (*Status, error) {
 	var powerState types.VirtualMachinePowerState
 	var err error
-	var status *Status
-
+	var status *Status = &Status{}
+	var interfaces []NetworkInterface
 	v := vm.VirtualMachine(ctx)
 
 	if powerState, err = v.PowerState(ctx); err == nil {
-		address := ""
-
-		if powerState == types.VirtualMachinePowerStatePoweredOn {
-			address, err = vm.waitForIP(ctx, v)
-		}
-
-		status = &Status{
-			Address: address,
-			Powered: powerState == types.VirtualMachinePowerStatePoweredOn,
+		if interfaces, err = vm.ListAddresses(ctx); err == nil {
+			status.Interfaces = interfaces
+			status.Powered = powerState == types.VirtualMachinePowerStatePoweredOn
 		}
 	}
 
