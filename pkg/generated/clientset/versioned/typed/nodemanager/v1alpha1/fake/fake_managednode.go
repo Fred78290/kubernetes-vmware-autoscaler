@@ -110,7 +110,7 @@ func (c *FakeManagedNodes) UpdateStatus(ctx context.Context, managedNode *v1alph
 // Delete takes name of the managedNode and deletes it. Returns an error if one occurs.
 func (c *FakeManagedNodes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewRootDeleteActionWithOptions(managednodesResource, name, opts), &v1alpha1.ManagedNode{})
+		Invokes(testing.NewRootDeleteAction(managednodesResource, name), &v1alpha1.ManagedNode{})
 	return err
 }
 

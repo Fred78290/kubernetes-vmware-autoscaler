@@ -74,10 +74,7 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
 
-var (
-	_ clientset.Interface = &Clientset{}
-	_ testing.FakeClient  = &Clientset{}
-)
+var _ clientset.Interface = &Clientset{}
 
 // NodemanagerV1alpha1 retrieves the NodemanagerV1alpha1Client
 func (c *Clientset) NodemanagerV1alpha1() nodemanagerv1alpha1.NodemanagerV1alpha1Interface {
