@@ -423,16 +423,19 @@ func (vm *AutoScalerServerNode) deleteVM(c types.ClientGenerator) error {
 
 		if status, err = vsphere.Status(vm.NodeName); err == nil {
 			if status.Powered {
-				if err = c.MarkDrainNode(vm.NodeName); err != nil {
-					glog.Errorf(constantes.ErrCordonNodeReturnError, vm.NodeName, err)
-				}
+				// Delete kubernetes node only is alive
+				if _, err = c.GetNode(vm.NodeName); err == nil {
+					if err = c.MarkDrainNode(vm.NodeName); err != nil {
+						glog.Errorf(constantes.ErrCordonNodeReturnError, vm.NodeName, err)
+					}
 
-				if err = c.DrainNode(vm.NodeName, true, true); err != nil {
-					glog.Errorf(constantes.ErrDrainNodeReturnError, vm.NodeName, err)
-				}
+					if err = c.DrainNode(vm.NodeName, true, true); err != nil {
+						glog.Errorf(constantes.ErrDrainNodeReturnError, vm.NodeName, err)
+					}
 
-				if err = c.DeleteNode(vm.NodeName); err != nil {
-					glog.Errorf(constantes.ErrDeleteNodeReturnError, vm.NodeName, err)
+					if err = c.DeleteNode(vm.NodeName); err != nil {
+						glog.Errorf(constantes.ErrDeleteNodeReturnError, vm.NodeName, err)
+					}
 				}
 
 				if err = vsphere.PowerOff(vm.NodeName); err != nil {
