@@ -31,8 +31,9 @@ type ManagedNodeLister interface {
 	// List lists all ManagedNodes in the indexer.
 	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.ManagedNode, err error)
-	// ManagedNodes returns an object that can list and get ManagedNodes.
-	ManagedNodes(namespace string) ManagedNodeNamespaceLister
+	// Get retrieves the ManagedNode from the index for a given name.
+	// Objects returned here must be treated as read-only.
+	Get(name string) (*v1alpha1.ManagedNode, error)
 	ManagedNodeListerExpansion
 }
 
@@ -54,41 +55,9 @@ func (s *managedNodeLister) List(selector labels.Selector) (ret []*v1alpha1.Mana
 	return ret, err
 }
 
-// ManagedNodes returns an object that can list and get ManagedNodes.
-func (s *managedNodeLister) ManagedNodes(namespace string) ManagedNodeNamespaceLister {
-	return managedNodeNamespaceLister{indexer: s.indexer, namespace: namespace}
-}
-
-// ManagedNodeNamespaceLister helps list and get ManagedNodes.
-// All objects returned here must be treated as read-only.
-type ManagedNodeNamespaceLister interface {
-	// List lists all ManagedNodes in the indexer for a given namespace.
-	// Objects returned here must be treated as read-only.
-	List(selector labels.Selector) (ret []*v1alpha1.ManagedNode, err error)
-	// Get retrieves the ManagedNode from the indexer for a given namespace and name.
-	// Objects returned here must be treated as read-only.
-	Get(name string) (*v1alpha1.ManagedNode, error)
-	ManagedNodeNamespaceListerExpansion
-}
-
-// managedNodeNamespaceLister implements the ManagedNodeNamespaceLister
-// interface.
-type managedNodeNamespaceLister struct {
-	indexer   cache.Indexer
-	namespace string
-}
-
-// List lists all ManagedNodes in the indexer for a given namespace.
-func (s managedNodeNamespaceLister) List(selector labels.Selector) (ret []*v1alpha1.ManagedNode, err error) {
-	err = cache.ListAllByNamespace(s.indexer, s.namespace, selector, func(m interface{}) {
-		ret = append(ret, m.(*v1alpha1.ManagedNode))
-	})
-	return ret, err
-}
-
-// Get retrieves the ManagedNode from the indexer for a given namespace and name.
-func (s managedNodeNamespaceLister) Get(name string) (*v1alpha1.ManagedNode, error) {
-	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+// Get retrieves the ManagedNode from the index for a given name.
+func (s *managedNodeLister) Get(name string) (*v1alpha1.ManagedNode, error) {
+	obj, exists, err := s.indexer.GetByKey(name)
 	if err != nil {
 		return nil, err
 	}

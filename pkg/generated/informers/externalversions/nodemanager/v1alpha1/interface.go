@@ -41,5 +41,5 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 
 // ManagedNodes returns a ManagedNodeInformer.
 func (v *version) ManagedNodes() ManagedNodeInformer {
-	return &managedNodeInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+	return &managedNodeInformer{factory: v.factory, tweakListOptions: v.tweakListOptions}
 }

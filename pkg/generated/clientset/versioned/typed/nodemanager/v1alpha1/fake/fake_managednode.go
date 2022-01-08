@@ -33,7 +33,6 @@ import (
 // FakeManagedNodes implements ManagedNodeInterface
 type FakeManagedNodes struct {
 	Fake *FakeNodemanagerV1alpha1
-	ns   string
 }
 
 var managednodesResource = schema.GroupVersionResource{Group: "nodemanager.aldunelabs.com", Version: "v1alpha1", Resource: "managednodes"}
@@ -43,8 +42,7 @@ var managednodesKind = schema.GroupVersionKind{Group: "nodemanager.aldunelabs.co
 // Get takes name of the managedNode, and returns the corresponding managedNode object, and an error if there is any.
 func (c *FakeManagedNodes) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ManagedNode, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(managednodesResource, c.ns, name), &v1alpha1.ManagedNode{})
-
+		Invokes(testing.NewRootGetAction(managednodesResource, name), &v1alpha1.ManagedNode{})
 	if obj == nil {
 		return nil, err
 	}
@@ -54,8 +52,7 @@ func (c *FakeManagedNodes) Get(ctx context.Context, name string, options v1.GetO
 // List takes label and field selectors, and returns the list of ManagedNodes that match those selectors.
 func (c *FakeManagedNodes) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.ManagedNodeList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(managednodesResource, managednodesKind, c.ns, opts), &v1alpha1.ManagedNodeList{})
-
+		Invokes(testing.NewRootListAction(managednodesResource, managednodesKind, opts), &v1alpha1.ManagedNodeList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -76,15 +73,13 @@ func (c *FakeManagedNodes) List(ctx context.Context, opts v1.ListOptions) (resul
 // Watch returns a watch.Interface that watches the requested managedNodes.
 func (c *FakeManagedNodes) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(managednodesResource, c.ns, opts))
-
+		InvokesWatch(testing.NewRootWatchAction(managednodesResource, opts))
 }
 
 // Create takes the representation of a managedNode and creates it.  Returns the server's representation of the managedNode, and an error, if there is any.
 func (c *FakeManagedNodes) Create(ctx context.Context, managedNode *v1alpha1.ManagedNode, opts v1.CreateOptions) (result *v1alpha1.ManagedNode, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(managednodesResource, c.ns, managedNode), &v1alpha1.ManagedNode{})
-
+		Invokes(testing.NewRootCreateAction(managednodesResource, managedNode), &v1alpha1.ManagedNode{})
 	if obj == nil {
 		return nil, err
 	}
@@ -94,8 +89,7 @@ func (c *FakeManagedNodes) Create(ctx context.Context, managedNode *v1alpha1.Man
 // Update takes the representation of a managedNode and updates it. Returns the server's representation of the managedNode, and an error, if there is any.
 func (c *FakeManagedNodes) Update(ctx context.Context, managedNode *v1alpha1.ManagedNode, opts v1.UpdateOptions) (result *v1alpha1.ManagedNode, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(managednodesResource, c.ns, managedNode), &v1alpha1.ManagedNode{})
-
+		Invokes(testing.NewRootUpdateAction(managednodesResource, managedNode), &v1alpha1.ManagedNode{})
 	if obj == nil {
 		return nil, err
 	}
@@ -106,8 +100,7 @@ func (c *FakeManagedNodes) Update(ctx context.Context, managedNode *v1alpha1.Man
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeManagedNodes) UpdateStatus(ctx context.Context, managedNode *v1alpha1.ManagedNode, opts v1.UpdateOptions) (*v1alpha1.ManagedNode, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(managednodesResource, "status", c.ns, managedNode), &v1alpha1.ManagedNode{})
-
+		Invokes(testing.NewRootUpdateSubresourceAction(managednodesResource, "status", managedNode), &v1alpha1.ManagedNode{})
 	if obj == nil {
 		return nil, err
 	}
@@ -117,14 +110,13 @@ func (c *FakeManagedNodes) UpdateStatus(ctx context.Context, managedNode *v1alph
 // Delete takes name of the managedNode and deletes it. Returns an error if one occurs.
 func (c *FakeManagedNodes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteActionWithOptions(managednodesResource, c.ns, name, opts), &v1alpha1.ManagedNode{})
-
+		Invokes(testing.NewRootDeleteActionWithOptions(managednodesResource, name, opts), &v1alpha1.ManagedNode{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeManagedNodes) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(managednodesResource, c.ns, listOpts)
+	action := testing.NewRootDeleteCollectionAction(managednodesResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.ManagedNodeList{})
 	return err
@@ -133,8 +125,7 @@ func (c *FakeManagedNodes) DeleteCollection(ctx context.Context, opts v1.DeleteO
 // Patch applies the patch and returns the patched managedNode.
 func (c *FakeManagedNodes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ManagedNode, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(managednodesResource, c.ns, name, pt, data, subresources...), &v1alpha1.ManagedNode{})
-
+		Invokes(testing.NewRootPatchSubresourceAction(managednodesResource, name, pt, data, subresources...), &v1alpha1.ManagedNode{})
 	if obj == nil {
 		return nil, err
 	}

@@ -11,7 +11,7 @@ spec:
       - mn
     kind: ManagedNode
     listKind: ManagedNodeList
-  scope: Namespaced
+  scope: Cluster
   versions:
     - name: v1alpha1
       served: true
@@ -23,15 +23,13 @@ spec:
             spec:
               type: object
               properties:
-                controlPlane:
-                  type: boolean
                 allowDeployment:
                   type: boolean
                 annotations:
                   type: array
                   items:
                     type: string
-                control-plane:
+                controlPlane:
                   type: boolean
                 diskSizeInMb:
                   type: integer
@@ -52,10 +50,16 @@ spec:
                         type: string
                       dhcp:
                         type: boolean
+                      gateway:
+                        type: string
                       mac-address:
+                        type: string
+                      netmask:
                         type: string
                       network:
                         type: string
+                nodegroup:
+                  type: string
                 vcpus:
                   type: integer
                   default: 2

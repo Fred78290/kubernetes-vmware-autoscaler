@@ -42,33 +42,32 @@ type ManagedNodeInformer interface {
 type managedNodeInformer struct {
 	factory          internalinterfaces.SharedInformerFactory
 	tweakListOptions internalinterfaces.TweakListOptionsFunc
-	namespace        string
 }
 
 // NewManagedNodeInformer constructs a new informer for ManagedNode type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewManagedNodeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
-	return NewFilteredManagedNodeInformer(client, namespace, resyncPeriod, indexers, nil)
+func NewManagedNodeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers) cache.SharedIndexInformer {
+	return NewFilteredManagedNodeInformer(client, resyncPeriod, indexers, nil)
 }
 
 // NewFilteredManagedNodeInformer constructs a new informer for ManagedNode type.
 // Always prefer using an informer factory to get a shared informer instead of getting an independent
 // one. This reduces memory footprint and number of connections to the server.
-func NewFilteredManagedNodeInformer(client versioned.Interface, namespace string, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
+func NewFilteredManagedNodeInformer(client versioned.Interface, resyncPeriod time.Duration, indexers cache.Indexers, tweakListOptions internalinterfaces.TweakListOptionsFunc) cache.SharedIndexInformer {
 	return cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (runtime.Object, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.NodemanagerV1alpha1().ManagedNodes(namespace).List(context.TODO(), options)
+				return client.NodemanagerV1alpha1().ManagedNodes().List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.NodemanagerV1alpha1().ManagedNodes(namespace).Watch(context.TODO(), options)
+				return client.NodemanagerV1alpha1().ManagedNodes().Watch(context.TODO(), options)
 			},
 		},
 		&nodemanagerv1alpha1.ManagedNode{},
@@ -78,7 +77,7 @@ func NewFilteredManagedNodeInformer(client versioned.Interface, namespace string
 }
 
 func (f *managedNodeInformer) defaultInformer(client versioned.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
-	return NewFilteredManagedNodeInformer(client, f.namespace, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
+	return NewFilteredManagedNodeInformer(client, resyncPeriod, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc}, f.tweakListOptions)
 }
 
 func (f *managedNodeInformer) Informer() cache.SharedIndexInformer {

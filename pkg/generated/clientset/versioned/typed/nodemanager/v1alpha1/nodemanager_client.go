@@ -36,8 +36,8 @@ type NodemanagerV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *NodemanagerV1alpha1Client) ManagedNodes(namespace string) ManagedNodeInterface {
-	return newManagedNodes(c, namespace)
+func (c *NodemanagerV1alpha1Client) ManagedNodes() ManagedNodeInterface {
+	return newManagedNodes(c)
 }
 
 // NewForConfig creates a new NodemanagerV1alpha1Client for the given config.

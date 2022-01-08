@@ -5,6 +5,7 @@ import (
 )
 
 // +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ManagedNode is a specification for a ManagedNode resource
@@ -27,6 +28,7 @@ type ManagedNodeNetwork struct {
 
 // ManagedNodeSpec is the spec for a ManagedNode resource
 type ManagedNodeSpec struct {
+	Nodegroup         string               `default:"vmware-ca-k8s" json:"nodegroup,omitempty"`
 	ControlPlane      bool                 `json:"controlPlane,omitempty"`
 	AllowDeployment   bool                 `json:"allowDeployment,omitempty"`
 	VCpus             int                  `default:"2" json:"vcpus"`
@@ -65,4 +67,8 @@ type ManagedNodeList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 
 	Items []ManagedNode `json:"items"`
+}
+
+func (mn *ManagedNode) GetNodegroup() string {
+	return mn.Spec.Nodegroup
 }

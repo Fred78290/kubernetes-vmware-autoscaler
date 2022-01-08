@@ -33,7 +33,7 @@ import (
 // ManagedNodesGetter has a method to return a ManagedNodeInterface.
 // A group's client should implement this interface.
 type ManagedNodesGetter interface {
-	ManagedNodes(namespace string) ManagedNodeInterface
+	ManagedNodes() ManagedNodeInterface
 }
 
 // ManagedNodeInterface has methods to work with ManagedNode resources.
@@ -53,14 +53,12 @@ type ManagedNodeInterface interface {
 // managedNodes implements ManagedNodeInterface
 type managedNodes struct {
 	client rest.Interface
-	ns     string
 }
 
 // newManagedNodes returns a ManagedNodes
-func newManagedNodes(c *NodemanagerV1alpha1Client, namespace string) *managedNodes {
+func newManagedNodes(c *NodemanagerV1alpha1Client) *managedNodes {
 	return &managedNodes{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
 }
 
@@ -68,7 +66,6 @@ func newManagedNodes(c *NodemanagerV1alpha1Client, namespace string) *managedNod
 func (c *managedNodes) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ManagedNode, err error) {
 	result = &v1alpha1.ManagedNode{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("managednodes").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -85,7 +82,6 @@ func (c *managedNodes) List(ctx context.Context, opts v1.ListOptions) (result *v
 	}
 	result = &v1alpha1.ManagedNodeList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("managednodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -102,7 +98,6 @@ func (c *managedNodes) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("managednodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -113,7 +108,6 @@ func (c *managedNodes) Watch(ctx context.Context, opts v1.ListOptions) (watch.In
 func (c *managedNodes) Create(ctx context.Context, managedNode *v1alpha1.ManagedNode, opts v1.CreateOptions) (result *v1alpha1.ManagedNode, err error) {
 	result = &v1alpha1.ManagedNode{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("managednodes").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(managedNode).
@@ -126,7 +120,6 @@ func (c *managedNodes) Create(ctx context.Context, managedNode *v1alpha1.Managed
 func (c *managedNodes) Update(ctx context.Context, managedNode *v1alpha1.ManagedNode, opts v1.UpdateOptions) (result *v1alpha1.ManagedNode, err error) {
 	result = &v1alpha1.ManagedNode{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("managednodes").
 		Name(managedNode.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -141,7 +134,6 @@ func (c *managedNodes) Update(ctx context.Context, managedNode *v1alpha1.Managed
 func (c *managedNodes) UpdateStatus(ctx context.Context, managedNode *v1alpha1.ManagedNode, opts v1.UpdateOptions) (result *v1alpha1.ManagedNode, err error) {
 	result = &v1alpha1.ManagedNode{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("managednodes").
 		Name(managedNode.Name).
 		SubResource("status").
@@ -155,7 +147,6 @@ func (c *managedNodes) UpdateStatus(ctx context.Context, managedNode *v1alpha1.M
 // Delete takes name of the managedNode and deletes it. Returns an error if one occurs.
 func (c *managedNodes) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("managednodes").
 		Name(name).
 		Body(&opts).
@@ -170,7 +161,6 @@ func (c *managedNodes) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("managednodes").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -183,7 +173,6 @@ func (c *managedNodes) DeleteCollection(ctx context.Context, opts v1.DeleteOptio
 func (c *managedNodes) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.ManagedNode, err error) {
 	result = &v1alpha1.ManagedNode{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("managednodes").
 		Name(name).
 		SubResource(subresources...).

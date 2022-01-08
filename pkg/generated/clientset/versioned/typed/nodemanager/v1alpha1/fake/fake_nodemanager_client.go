@@ -28,8 +28,8 @@ type FakeNodemanagerV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeNodemanagerV1alpha1) ManagedNodes(namespace string) v1alpha1.ManagedNodeInterface {
-	return &FakeManagedNodes{c, namespace}
+func (c *FakeNodemanagerV1alpha1) ManagedNodes() v1alpha1.ManagedNodeInterface {
+	return &FakeManagedNodes{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

@@ -198,7 +198,7 @@ func (c *Controller) CreateCRD() error {
 		ObjectMeta: metav1.ObjectMeta{Name: nodemanager.FullCRDName},
 		Spec: apiextensionv1.CustomResourceDefinitionSpec{
 			Group: nodemanager.GroupName,
-			Scope: apiextensionv1.NamespaceScoped,
+			Scope: apiextensionv1.ClusterScoped,
 			Versions: []apiextensionv1.CustomResourceDefinitionVersion{
 				{
 					Name:    nodemanager.GroupVersion,
@@ -216,6 +216,9 @@ func (c *Controller) CreateCRD() error {
 									Type:                   "object",
 									XPreserveUnknownFields: &TRUE,
 									Properties: map[string]apiextensionv1.JSONSchemaProps{
+										"nodegroup": {
+											Type: "string",
+										},
 										"controlPlane": {
 											Type: "boolean",
 										},
@@ -349,7 +352,7 @@ func (c *Controller) newControllerRef(owner metav1.Object) *metav1.OwnerReferenc
 	return &metav1.OwnerReference{
 		APIVersion:         v1alpha1.SchemeGroupVersionKind.GroupVersion().String(),
 		Kind:               v1alpha1.SchemeGroupVersionKind.Kind,
-		Name:               c.generateKey(owner),
+		Name:               owner.GetName(),
 		UID:                owner.GetUID(),
 		BlockOwnerDeletion: &blockOwnerDeletion,
 		Controller:         &isController,
@@ -430,18 +433,18 @@ func (c *Controller) findManagedNodeDeleted() {
 				// If this object is not owned by a ManagedNode, we should not do anything more with it.
 				if ownerRef.Kind == v1alpha1.SchemeGroupVersionKind.Kind {
 					if _, err := c.getManagedNodeFromKey(ownerRef.Name); apierrors.IsNotFound(err) {
-						namespace, name, _ := cache.SplitMetaNamespaceKey(ownerRef.Name)
-
-						if ng, err := c.application.getNodeGroup(namespace); err == nil {
-							if node, err := ng.findNodeByUID(ownerRef.UID); err == nil {
-								ng.deleteNode(c.client, node)
-								glog.Infof("ManagedNode '%s' is deleted, delete associated node %s", name, node.NodeName)
-								deleted++
+						if nodegroup, found := nodeInfo.Annotations[constantes.NodeLabelGroupName]; found {
+							if ng, err := c.application.getNodeGroup(nodegroup); err == nil {
+								if node, err := ng.findNodeByUID(ownerRef.UID); err == nil {
+									ng.deleteNode(c.client, node)
+									glog.Infof("ManagedNode '%s' is deleted, delete associated node %s", ownerRef.Name, node.NodeName)
+									deleted++
+								} else {
+									glog.Errorf(constantes.ErrNodeNotFoundInNodeGroup, ownerRef.UID, nodegroup)
+								}
 							} else {
-								glog.Errorf(constantes.ErrNodeNotFoundInNodeGroup, ownerRef.UID, namespace)
+								glog.Errorf(constantes.ErrNodeGroupNotFound, nodegroup)
 							}
-						} else {
-							glog.Errorf(constantes.ErrNodeGroupNotFound, namespace)
 						}
 					}
 				}
@@ -469,16 +472,16 @@ func (c *Controller) findManagedNodeDeleted() {
 					glog.Infof("node %s owned by managed node %s was deleted", newStatus.NodeName, c.generateKey(managedNode))
 
 					// Try to find the node group and delete node
-					if ng, err := c.application.getNodeGroup(managedNode.GetNamespace()); err == nil {
+					if ng, err := c.application.getNodeGroup(managedNode.GetNodegroup()); err == nil {
 						if node, err := ng.findNodeByUID(managedNode.GetUID()); err == nil {
 							ng.deleteNode(c.client, node)
 
 							deleted++
 						} else {
-							glog.Errorf(constantes.ErrNodeNotFoundInNodeGroup, managedNode.Status.NodeName, managedNode.GetNamespace())
+							glog.Errorf(constantes.ErrNodeNotFoundInNodeGroup, managedNode.Status.NodeName, managedNode.GetNodegroup())
 						}
 					} else {
-						glog.Errorf(constantes.ErrNodeGroupNotFound, managedNode.GetNamespace())
+						glog.Errorf(constantes.ErrNodeGroupNotFound, managedNode.GetNodegroup())
 					}
 				}
 			}
@@ -621,16 +624,16 @@ func (c *Controller) handleManagedNode(key string, managedNodesByUID map[uid.UID
 		if apierrors.IsNotFound(err) {
 			// Delete node eventually (probably dead code)
 			if managedNode != nil && managedNode.Status.Code == nodemanager.StatusManagedNodeCreated {
-				if nodeGroup, err = c.application.getNodeGroup(managedNode.GetNamespace()); err == nil {
+				if nodeGroup, err = c.application.getNodeGroup(managedNode.GetNodegroup()); err == nil {
 					if node, err = nodeGroup.findNodeByUID(managedNode.GetUID()); err == nil {
 						glog.Infof("ManagedNode '%s' is deleted, delete associated node %s", key, node.NodeName)
 						nodeGroup.deleteNode(c.client, node)
 						c.application.syncState()
 					} else {
-						glog.Errorf(constantes.ErrNodeNotFoundInNodeGroup, managedNode.GetNamespace(), managedNode.GetUID())
+						glog.Errorf(constantes.ErrNodeNotFoundInNodeGroup, managedNode.GetNodegroup(), managedNode.GetUID())
 					}
 				} else {
-					glog.Errorf(constantes.ErrNodeGroupNotFound, managedNode.GetNamespace())
+					glog.Errorf(constantes.ErrNodeGroupNotFound, managedNode.GetNodegroup())
 				}
 			}
 		} else {
@@ -639,22 +642,22 @@ func (c *Controller) handleManagedNode(key string, managedNodesByUID map[uid.UID
 
 		err = nil
 	} else {
-		namespace := managedNode.GetNamespace()
+		nodegroup := managedNode.GetNodegroup()
 		oldStatus := managedNode.Status
 		newStatus := oldStatus
 
 		managedNodesByUID[managedNode.GetUID()] = c.generateKey(managedNode)
 
-		if nodeGroup, err = c.application.getNodeGroup(namespace); err != nil {
-			glog.Errorf(constantes.ErrNodeGroupNotFound, namespace)
+		if nodeGroup, err = c.application.getNodeGroup(nodegroup); err != nil {
+			glog.Errorf(constantes.ErrNodeGroupNotFound, nodegroup)
 
 			if c.application.isNodegroupDiscovered() {
 				newStatus.Code = nodemanager.StatusManagedNodeCreationFailed
-				newStatus.Message = fmt.Sprintf(constantes.ErrNodeGroupNotFound, managedNode.GetNamespace())
+				newStatus.Message = fmt.Sprintf(constantes.ErrNodeGroupNotFound, managedNode.GetNodegroup())
 				newStatus.Reason = nodemanager.StatusManagedNodeReason(nodemanager.StatusManagedNodeCreationFailed)
 			} else {
 				newStatus.Code = nodemanager.StatusManagedNodeGroupNotFound
-				newStatus.Message = fmt.Sprintf(constantes.ErrNodeGroupNotFound, managedNode.GetNamespace())
+				newStatus.Message = fmt.Sprintf(constantes.ErrNodeGroupNotFound, managedNode.GetNodegroup())
 				newStatus.Reason = nodemanager.StatusManagedNodeReason(nodemanager.StatusManagedNodeGroupNotFound)
 			}
 
@@ -704,14 +707,14 @@ func (c *Controller) handleManagedNode(key string, managedNodesByUID map[uid.UID
 					// Create managedNode
 					glog.Infof("create managed node %s", key)
 
-					if nodesListByNodegroup, found = nodesInCreationByNodegroup[managedNode.GetNamespace()]; !found {
+					if nodesListByNodegroup, found = nodesInCreationByNodegroup[managedNode.GetNodegroup()]; !found {
 						nodesListByNodegroup = make([]*AutoScalerServerNode, 0, 5)
 						nodesListByNodegroup = append(nodesListByNodegroup, node)
 					} else {
 						nodesListByNodegroup = append(nodesListByNodegroup, node)
 					}
 
-					nodesInCreationByNodegroup[managedNode.GetNamespace()] = nodesListByNodegroup
+					nodesInCreationByNodegroup[managedNode.GetNodegroup()] = nodesListByNodegroup
 
 					newStatus.NodeName = node.NodeName
 					newStatus.Code = nodemanager.StatusManagedNodeCreation
@@ -770,15 +773,15 @@ func (c *Controller) updateManagedNodeStatus(managedNode *v1alpha1.ManagedNode, 
 	// UpdateStatus will not allow changes to the Spec of the resource,
 	// which is ideal for ensuring nothing other than resource status has been updated.
 	_, err := nodeManagerClientset.NodemanagerV1alpha1().
-		ManagedNodes(managedNode.Namespace).
+		ManagedNodes().
 		UpdateStatus(context.TODO(), managedNodeCopy, metav1.UpdateOptions{})
 
 	return err
 }
 
 func (c *Controller) getManagedNodeFromKey(key string) (*v1alpha1.ManagedNode, error) {
-	if namespace, name, err := cache.SplitMetaNamespaceKey(key); err == nil {
-		return c.managedNodeLister.ManagedNodes(namespace).Get(name)
+	if _, name, err := cache.SplitMetaNamespaceKey(key); err == nil {
+		return c.managedNodeLister.Get(name)
 	} else {
 		return nil, err
 	}
@@ -796,7 +799,7 @@ func (c *Controller) generateKey(obj interface{}) string {
 
 func (c *Controller) deleteManagedNode(obj interface{}) {
 	if managedNode, ok := obj.(*v1alpha1.ManagedNode); ok {
-		if nodeGroup, err := c.application.getNodeGroup(managedNode.GetNamespace()); err == nil {
+		if nodeGroup, err := c.application.getNodeGroup(managedNode.GetNodegroup()); err == nil {
 			if node, err := nodeGroup.findNodeByUID(managedNode.GetUID()); err == nil {
 				glog.Infof("ManagedNode '%s' is deleted, delete associated node %s", c.generateKey(managedNode), node.NodeName)
 
@@ -804,10 +807,10 @@ func (c *Controller) deleteManagedNode(obj interface{}) {
 
 				c.application.syncState()
 			} else {
-				glog.Errorf(constantes.ErrNodeNotFoundInNodeGroup, managedNode.GetUID(), managedNode.GetNamespace())
+				glog.Errorf(constantes.ErrNodeNotFoundInNodeGroup, managedNode.GetUID(), managedNode.GetNodegroup())
 			}
 		} else {
-			glog.Errorf(constantes.ErrNodeGroupNotFound, managedNode.GetNamespace())
+			glog.Errorf(constantes.ErrNodeGroupNotFound, managedNode.GetNodegroup())
 		}
 	}
 }
@@ -825,7 +828,7 @@ func (c *Controller) deleteOwnerRef(ownerRef *metav1.OwnerReference) {
 		if ownerRef.BlockOwnerDeletion != nil && !*ownerRef.BlockOwnerDeletion {
 			if clientset, err := c.application.client().NodeManagerClient(); err == nil {
 				if err = clientset.NodemanagerV1alpha1().
-					ManagedNodes(managedNode.GetNamespace()).
+					ManagedNodes().
 					Delete(context.TODO(), managedNode.GetName(), metav1.DeleteOptions{}); err != nil {
 					glog.Errorf("Unable to delete ManagedNode: %s, reason: %v", ownerRef.Name, err)
 				}

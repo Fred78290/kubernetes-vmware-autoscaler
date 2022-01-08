@@ -21,7 +21,3 @@ package v1alpha1
 // ManagedNodeListerExpansion allows custom methods to be added to
 // ManagedNodeLister.
 type ManagedNodeListerExpansion interface{}
-
-// ManagedNodeNamespaceListerExpansion allows custom methods to be added to
-// ManagedNodeNamespaceLister.
-type ManagedNodeNamespaceListerExpansion interface{}
