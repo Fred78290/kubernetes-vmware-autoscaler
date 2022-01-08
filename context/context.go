@@ -11,6 +11,14 @@ type Context struct {
 	cancel context.CancelFunc
 }
 
+func TODO() context.Context {
+	return context.TODO()
+}
+
+func Background() context.Context {
+	return context.Background()
+}
+
 // NewContext return a context. Timeout is in seconds
 func NewContext(timeout time.Duration) *Context {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)
