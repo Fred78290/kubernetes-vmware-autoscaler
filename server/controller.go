@@ -45,7 +45,7 @@ import (
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	nodemanager "github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/apis/nodemanager"
 	v1alpha1 "github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/apis/nodemanager/v1alpha1"
-	samplescheme "github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/generated/clientset/versioned/scheme"
+	schemeclientset "github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/generated/clientset/versioned/scheme"
 	informers "github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/generated/informers/externalversions"
 	listers "github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/generated/listers/nodemanager/v1alpha1"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
@@ -109,7 +109,7 @@ func NewController(application applicationInterface, stopCh <-chan struct{}) (*C
 	// Create event broadcaster
 	// Add sample-controller types to the default Kubernetes Scheme so Events can be
 	// logged for sample-controller types.
-	utilruntime.Must(samplescheme.AddToScheme(scheme.Scheme))
+	utilruntime.Must(schemeclientset.AddToScheme(scheme.Scheme))
 	glog.Debugf("Creating event broadcaster")
 
 	eventBroadcaster := record.NewBroadcaster()
