@@ -381,6 +381,8 @@ func (c *Controller) startManagedNodes(managedNodesByUID map[uid.UID]string, nod
 
 							c.recorder.Event(managedNode, corev1.EventTypeNormal, SuccessEvent, newStatus.Message)
 
+							cache.WaitForCacheSync(c.stopCh, c.nodesSynced, c.managedNodeSynced)
+
 							if workerNode, err := c.client.GetNode(node.NodeName); err != nil {
 								err = fmt.Errorf("unable to find core node %s, reason: %v", newStatus.NodeName, err)
 								glog.Error(err.Error())
