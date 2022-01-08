@@ -17,7 +17,8 @@ import (
 
 // NetworkInterface declare single interface
 type NetworkInterface struct {
-	Existing         bool   `json:"exists,omitempty" yaml:"primary,omitempty"`
+	Primary          bool   `json:"primary,omitempty" yaml:"primary,omitempty"`
+	Existing         bool   `json:"exists,omitempty" yaml:"exists,omitempty"`
 	NetworkName      string `json:"network,omitempty" yaml:"network,omitempty"`
 	Adapter          string `json:"adapter,omitempty" yaml:"adapter,omitempty"`
 	MacAddress       string `json:"mac-address,omitempty" yaml:"mac-address,omitempty"`

@@ -32,8 +32,8 @@ type Configuration struct {
 
 // Status shortened vm status
 type Status struct {
-	Address string
-	Powered bool
+	Interfaces []NetworkInterface
+	Powered    bool
 }
 
 // Copy Make a deep copy from src into dst.
@@ -101,6 +101,33 @@ func (conf *Configuration) Clone(nodeIndex int) (*Configuration, error) {
 	return dup, nil
 }
 
+func (conf *Configuration) FindPreferredIPAddress(interfaces []NetworkInterface) string {
+	address := ""
+
+	if interfaces != nil {
+		for _, inf := range interfaces {
+			if declaredInf := conf.FindInterfaceByName(inf.NetworkName); declaredInf != nil {
+				if declaredInf.Primary {
+					return inf.IPAddress
+				}
+			}
+		}
+	}
+
+	return address
+}
+
+func (conf *Configuration) FindInterfaceByName(networkName string) *NetworkInterface {
+	if conf.Network != nil {
+		for _, inf := range conf.Network.Interfaces {
+			if inf.NetworkName == networkName {
+				return inf
+			}
+		}
+	}
+	return nil
+}
+
 // GetClient create a new govomi client
 func (conf *Configuration) GetClient(ctx *context.Context) (*Client, error) {
 	var u *url.URL
@@ -124,7 +151,7 @@ func (conf *Configuration) GetClient(ctx *context.Context) (*Client, error) {
 
 // CreateWithContext will create a named VM not powered
 // memory and disk are in megabytes
-func (conf *Configuration) CreateWithContext(ctx *context.Context, name string, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory, cpus, disk, nodeIndex int) (*VirtualMachine, error) {
+func (conf *Configuration) CreateWithContext(ctx *context.Context, name string, userName, authKey string, cloudInit interface{}, network *Network, annotation string, expandHardDrive bool, memory, cpus, disk, nodeIndex int) (*VirtualMachine, error) {
 	var err error
 	var client *Client
 	var dc *Datacenter
@@ -135,7 +162,7 @@ func (conf *Configuration) CreateWithContext(ctx *context.Context, name string, 
 		if dc, err = client.GetDatacenter(ctx, conf.DataCenter); err == nil {
 			if ds, err = dc.GetDatastore(ctx, conf.DataStore); err == nil {
 				if vm, err = ds.CreateVirtualMachine(ctx, name, conf.TemplateName, conf.VMBasePath, conf.Resource, conf.Template, conf.LinkedClone, network, conf.Customization, nodeIndex); err == nil {
-					err = vm.Configure(ctx, userName, authKey, cloudInit, network, annotation, memory, cpus, disk, nodeIndex)
+					err = vm.Configure(ctx, userName, authKey, cloudInit, network, annotation, expandHardDrive, memory, cpus, disk, nodeIndex)
 				}
 			}
 		}
@@ -151,11 +178,11 @@ func (conf *Configuration) CreateWithContext(ctx *context.Context, name string, 
 
 // Create will create a named VM not powered
 // memory and disk are in megabytes
-func (conf *Configuration) Create(name string, userName, authKey string, cloudInit interface{}, network *Network, annotation string, memory, cpus, disk, nodeIndex int) (*VirtualMachine, error) {
+func (conf *Configuration) Create(name string, userName, authKey string, cloudInit interface{}, network *Network, annotation string, expandHardDrive bool, memory, cpus, disk, nodeIndex int) (*VirtualMachine, error) {
 	ctx := context.NewContext(conf.Timeout)
 	defer ctx.Cancel()
 
-	return conf.CreateWithContext(ctx, name, userName, authKey, cloudInit, network, annotation, memory, cpus, disk, nodeIndex)
+	return conf.CreateWithContext(ctx, name, userName, authKey, cloudInit, network, annotation, expandHardDrive, memory, cpus, disk, nodeIndex)
 }
 
 // DeleteWithContext a VM by name

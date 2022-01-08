@@ -33,7 +33,7 @@ func newTestServer(addNodeGroup, addTestNode bool) (*AutoScalerServerApp, *AutoS
 				MaxLimits: map[string]int64{constantes.ResourceNameCores: 5, constantes.ResourceNameMemory: 100000000},
 			},
 			Groups:        map[string]*AutoScalerServerNodeGroup{},
-			Configuration: config,
+			configuration: config,
 		}
 
 		if addNodeGroup {
