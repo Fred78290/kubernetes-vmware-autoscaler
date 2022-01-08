@@ -209,6 +209,8 @@ func (g *AutoScalerServerNodeGroup) addManagedNode(crd *v1alpha1.ManagedNode) (*
 
 	// Clone the vsphere config to allow increment IP address
 	if vsphereConfig, err := g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Clone(nodeIndex); err == nil {
+		g.RunningNode[nodeIndex] = ServerNodeStateCreating
+
 		resLimit := g.configuration.ManagedNodeResourceLimiter
 
 		memorySize := utils.MaxInt(utils.MinInt(crd.Spec.MemorySize, resLimit.GetMaxValue(constantes.ResourceNameManagedNodeMemory, types.ManagedNodeMaxMemory)),
@@ -352,6 +354,7 @@ func (g *AutoScalerServerNodeGroup) createNodes(c types.ClientGenerator, nodes [
 		defer g.pendingNodesWG.Done()
 
 		if g.Status != NodegroupCreated {
+			g.RunningNode[node.NodeIndex] = ServerNodeStateNotRunning
 			glog.Debugf("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s -> g.status != nodegroupCreated", g.NodeGroupIdentifier)
 			return fmt.Errorf(constantes.ErrUnableToLaunchVMNodeGroupNotReady, node.NodeName)
 		}
