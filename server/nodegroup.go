@@ -514,14 +514,28 @@ func (g *AutoScalerServerNodeGroup) nodeAllowDeployment(nodeInfo *apiv1.Node) bo
 	return true
 }
 
-func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenerator, includeExistingNode bool) error {
+func (g *AutoScalerServerNodeGroup) findManagedNodeDeleted(client types.ClientGenerator, formerNodes map[string]*AutoScalerServerNode) {
+
+	for nodeName, formerNode := range formerNodes {
+		if _, found := g.Nodes[nodeName]; !found {
+			if _, err := formerNode.statusVM(); err == nil {
+				glog.Infof("Node '%s' is deleted, delete VM", nodeName)
+				if err := formerNode.deleteVM(client); err != nil {
+					glog.Errorf(constantes.ErrUnableToDeleteVM, nodeName, err)
+				}
+			}
+		}
+	}
+}
+
+func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenerator, includeExistingNode bool) (map[string]*AutoScalerServerNode, error) {
 	var lastNodeIndex = 0
 	var nodeInfos *apiv1.NodeList
 	var out string
 	var err error
 
 	if nodeInfos, err = client.NodeList(); err != nil {
-		return err
+		return nil, err
 	}
 
 	formerNodes := g.Nodes
@@ -665,7 +679,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 		}
 	}
 
-	return nil
+	return formerNodes, nil
 }
 
 func (g *AutoScalerServerNodeGroup) deleteNode(c types.ClientGenerator, node *AutoScalerServerNode) error {

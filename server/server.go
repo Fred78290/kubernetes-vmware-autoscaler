@@ -153,6 +153,7 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 	glog.Debug("Call server doAutoProvision")
 
 	var ng *AutoScalerServerNodeGroup
+	var formerNodes map[string]*AutoScalerServerNode
 	var err error
 
 	for _, nodeGroupDef := range s.NodesDefinition {
@@ -177,23 +178,25 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 
 				glog.Infof("Auto provision for nodegroup:%s, minSize:%d, maxSize:%d", nodeGroupIdentifier, nodeGroupDef.MinSize, nodeGroupDef.MaxSize)
 
-				if _, err = s.newNodeGroup(nodeGroupIdentifier, nodeGroupDef.MinSize, nodeGroupDef.MaxSize, s.configuration.DefaultMachineType, labels, systemLabels, true); err == nil {
-					if ng, err = s.createNodeGroup(nodeGroupIdentifier); err == nil {
-						if err = ng.autoDiscoveryNodes(s.kubeClient, nodeGroupDef.GetIncludeExistingNode()); err == nil {
-							return err
-						}
-					}
-				}
-
-				if err != nil {
+				if _, err = s.newNodeGroup(nodeGroupIdentifier, nodeGroupDef.MinSize, nodeGroupDef.MaxSize, s.configuration.DefaultMachineType, labels, systemLabels, true); err != nil {
 					break
 				}
-			} else {
-				// If the nodegroup already exists, reparse nodes
-				if err = ng.autoDiscoveryNodes(s.kubeClient, nodeGroupDef.GetIncludeExistingNode()); err == nil {
-					return err
+
+				if ng, err = s.createNodeGroup(nodeGroupIdentifier); err != nil {
+					break
 				}
+
+				if formerNodes, err = ng.autoDiscoveryNodes(s.kubeClient, nodeGroupDef.GetIncludeExistingNode()); err != nil {
+					break
+				}
+
+				// If the nodegroup already exists, reparse nodes
+			} else if formerNodes, err = ng.autoDiscoveryNodes(s.kubeClient, nodeGroupDef.GetIncludeExistingNode()); err != nil {
+				break
 			}
+
+			// Drop VM if kubernetes nodes removed
+			ng.findManagedNodeDeleted(s.kubeClient, formerNodes)
 		}
 	}
 
