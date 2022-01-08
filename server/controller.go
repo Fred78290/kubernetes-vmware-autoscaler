@@ -707,7 +707,7 @@ func (c *Controller) handleManagedNode(key string, managedNodesByUID map[uid.UID
 					var found bool
 
 					// Create managedNode
-					glog.Infof("create managed node %s", key)
+					glog.Infof("create managed node %s in group: %s, node name: %s", key, node.NodeGroupID, node.NodeName)
 
 					if nodesListByNodegroup, found = nodesInCreationByNodegroup[managedNode.GetNodegroup()]; !found {
 						nodesListByNodegroup = make([]*AutoScalerServerNode, 0, 5)
