@@ -14,6 +14,9 @@ import (
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
 
+	managednodeClientset "github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/generated/clientset/versioned"
+	apiextensionClientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+
 	"github.com/linki/instrumented_http"
 	glog "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
@@ -35,13 +38,16 @@ const (
 
 // SingletonClientGenerator provides clients
 type SingletonClientGenerator struct {
-	KubeConfig      string
-	APIServerURL    string
-	RequestTimeout  time.Duration
-	DeletionTimeout time.Duration
-	MaxGracePeriod  time.Duration
-	kubeClient      kubernetes.Interface
-	kubeOnce        sync.Once
+	KubeConfig           string
+	APIServerURL         string
+	Namespace            string
+	RequestTimeout       time.Duration
+	DeletionTimeout      time.Duration
+	MaxGracePeriod       time.Duration
+	kubeClient           kubernetes.Interface
+	nodeManagerClientset managednodeClientset.Interface
+	apiExtensionClient   apiextensionClientset.Interface
+	kubeOnce             sync.Once
 }
 
 // getRestConfig returns the rest clients config to get automatically
@@ -78,12 +84,12 @@ func getRestConfig(kubeConfig, apiServerURL string) (*rest.Config, error) {
 // newKubeClient returns a new Kubernetes client object. It takes a Config and
 // uses APIServerURL and KubeConfig attributes to connect to the cluster. If
 // KubeConfig isn't provided it defaults to using the recommended default.
-func newKubeClient(kubeConfig, apiServerURL string, requestTimeout time.Duration) (*kubernetes.Clientset, error) {
+func newKubeClient(kubeConfig, apiServerURL string, requestTimeout time.Duration) (kubernetes.Interface, managednodeClientset.Interface, apiextensionClientset.Interface, error) {
 	glog.Infof("Instantiating new Kubernetes client")
 
 	config, err := getRestConfig(kubeConfig, apiServerURL)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 
 	config.Timeout = requestTimeout * time.Second
@@ -98,26 +104,57 @@ func newKubeClient(kubeConfig, apiServerURL string, requestTimeout time.Duration
 	}
 
 	client, err := kubernetes.NewForConfig(config)
+
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
+	}
+
+	nodeManagerClientset, err := managednodeClientset.NewForConfig(config)
+
+	if err != nil {
+		return client, nil, nil, err
+	}
+
+	apiExtensionClient, err := apiextensionClientset.NewForConfig(config)
+
+	if err != nil {
+		return client, nodeManagerClientset, nil, err
 	}
 
 	glog.Infof("Created Kubernetes client %s", config.Host)
 
-	return client, nil
+	return client, nodeManagerClientset, apiExtensionClient, err
 }
 
 func (p *SingletonClientGenerator) newRequestContext() *context.Context {
-	return context.NewContext(time.Duration(p.RequestTimeout.Seconds()))
+	return utils.NewRequestContext(p.RequestTimeout)
 }
 
 // KubeClient generates a kube client if it was not created before
 func (p *SingletonClientGenerator) KubeClient() (kubernetes.Interface, error) {
 	var err error
 	p.kubeOnce.Do(func() {
-		p.kubeClient, err = newKubeClient(p.KubeConfig, p.APIServerURL, p.RequestTimeout)
+		p.kubeClient, p.nodeManagerClientset, p.apiExtensionClient, err = newKubeClient(p.KubeConfig, p.APIServerURL, p.RequestTimeout)
 	})
 	return p.kubeClient, err
+}
+
+// NodeManagerClient generates node manager client if it was not created before
+func (p *SingletonClientGenerator) NodeManagerClient() (managednodeClientset.Interface, error) {
+	var err error
+	p.kubeOnce.Do(func() {
+		p.kubeClient, p.nodeManagerClientset, p.apiExtensionClient, err = newKubeClient(p.KubeConfig, p.APIServerURL, p.RequestTimeout)
+	})
+	return p.nodeManagerClientset, err
+}
+
+// ApiExtentionClient generates an api extension client if it was not created before
+func (p *SingletonClientGenerator) ApiExtentionClient() (apiextensionClientset.Interface, error) {
+	var err error
+	p.kubeOnce.Do(func() {
+		p.kubeClient, p.nodeManagerClientset, p.apiExtensionClient, err = newKubeClient(p.KubeConfig, p.APIServerURL, p.RequestTimeout)
+	})
+	return p.apiExtensionClient, err
 }
 
 func (p *SingletonClientGenerator) WaitNodeToBeReady(nodeName string, timeToWaitInSeconds int) error {
@@ -457,6 +494,20 @@ func (p *SingletonClientGenerator) DrainNode(nodeName string, ignoreDaemonSet, d
 	return nil
 }
 
+func (p *SingletonClientGenerator) GetNode(nodeName string) (*apiv1.Node, error) {
+	kubeclient, err := p.KubeClient()
+
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := p.newRequestContext()
+	defer ctx.Cancel()
+
+	return kubeclient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+
+}
+
 func (p *SingletonClientGenerator) DeleteNode(nodeName string) error {
 	kubeclient, err := p.KubeClient()
 
@@ -505,7 +556,7 @@ func (p *SingletonClientGenerator) AnnoteNode(nodeName string, annotations map[s
 	})
 }
 
-// AnnoteNode set annotation on node
+// LabelNode set annotation on node
 func (p *SingletonClientGenerator) LabelNode(nodeName string, labels map[string]string) error {
 	ctx := p.newRequestContext()
 	defer ctx.Cancel()
@@ -539,9 +590,66 @@ func (p *SingletonClientGenerator) LabelNode(nodeName string, labels map[string]
 	})
 }
 
-func NewClientGenerator(cfg *types.Config) *SingletonClientGenerator {
+func containTaint(key string, taints *[]apiv1.Taint) (int, bool) {
+	for i, t := range *taints {
+		if t.Key == key {
+			return i, true
+		}
+	}
+
+	return -1, false
+}
+
+// TaintNode set annotation on node
+func (p *SingletonClientGenerator) TaintNode(nodeName string, taints ...apiv1.Taint) error {
+	ctx := p.newRequestContext()
+	defer ctx.Cancel()
+
+	return wait.PollImmediate(retrySleep, time.Duration(p.RequestTimeout)*time.Second, func() (bool, error) {
+		var nodeInfo *apiv1.Node
+		kubeclient, err := p.KubeClient()
+
+		if err != nil {
+			return false, err
+		}
+
+		if nodeInfo, err = kubeclient.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{}); err != nil {
+			return false, err
+		}
+
+		if nodeInfo.Spec.Taints == nil {
+			nodeInfo.Spec.Taints = taints
+		} else {
+			mergedTaints := make([]apiv1.Taint, 0, len(taints))
+
+			for _, taint := range taints {
+				if index, found := containTaint(taint.Key, &nodeInfo.Spec.Taints); found {
+					// Replace taint
+					nodeInfo.Spec.Taints[index] = taint
+				} else {
+					// Merge it later
+					mergedTaints = append(mergedTaints, taint)
+				}
+			}
+
+			if len(mergedTaints) > 0 {
+				nodeInfo.Spec.Taints = append(nodeInfo.Spec.Taints, mergedTaints...)
+			}
+		}
+
+		if _, err = kubeclient.CoreV1().Nodes().Update(ctx, nodeInfo, metav1.UpdateOptions{}); err != nil {
+			glog.Warnf("Label node:%s is not ready, err = %s", nodeName, err)
+			return false, nil
+		}
+
+		return true, nil
+	})
+}
+
+func NewClientGenerator(cfg *types.Config) types.ClientGenerator {
 	return &SingletonClientGenerator{
 		KubeConfig:      cfg.KubeConfig,
+		Namespace:       cfg.Namespace,
 		APIServerURL:    cfg.APIServerURL,
 		RequestTimeout:  cfg.RequestTimeout,
 		DeletionTimeout: cfg.DeletionTimeout,
