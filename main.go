@@ -54,6 +54,8 @@ func main() {
 	} else {
 		var err error
 
+		glog.Infof("Start controller version: %s, build at:%s", phVersion, phBuildDate)
+
 		generator := client.NewClientGenerator(cfg)
 
 		if _, err = generator.NodeList(); err != nil {
