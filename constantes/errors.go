@@ -166,6 +166,9 @@ const (
 	// ErrLabelNodeReturnError error msg
 	ErrLabelNodeReturnError = "set labels on node: %s got error: %s"
 
+	// ErrTaintNodeReturnError error msg
+	ErrTaintNodeReturnError = "taint node: %s got error: %s"
+
 	// ErrAnnoteNodeReturnError error msg
 	ErrAnnoteNodeReturnError = "set annotations on node: %s got error: %s"
 

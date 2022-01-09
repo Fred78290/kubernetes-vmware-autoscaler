@@ -60,7 +60,6 @@ type Config struct {
 	ManagedNodeMaxMemory     int64
 	ManagedNodeMinDiskSize   int64
 	ManagedNodeMaxDiskSize   int64
-	Namespace                string
 }
 
 func (c *Config) GetResourceLimiter() *ResourceLimiter {
@@ -339,7 +338,6 @@ func NewConfig() *Config {
 		ManagedNodeMaxDiskSize:   ManagedNodeMaxDiskSize,
 		LogFormat:                "text",
 		LogLevel:                 glog.InfoLevel.String(),
-		Namespace:                "kube-system",
 	}
 }
 
@@ -376,7 +374,6 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.Flag("request-timeout", "Request timeout when calling Kubernetes APIs. 0s means no timeout").Default(DefaultMaxRequestTimeout.String()).DurationVar(&cfg.RequestTimeout)
 	app.Flag("deletion-timeout", "Deletion timeout when delete node. 0s means no timeout").Default(DefaultMaxDeletionPeriod.String()).DurationVar(&cfg.DeletionTimeout)
 	app.Flag("max-grace-period", "Maximum time evicted pods will be given to terminate gracefully.").Default(DefaultMaxGracePeriod.String()).DurationVar(&cfg.MaxGracePeriod)
-	app.Flag("namespace", "Namespace of crd").Default(cfg.Namespace).StringVar(&cfg.Namespace)
 
 	app.Flag("min-cpus", "Limits: minimum cpu (default: 1)").Default(strconv.FormatInt(cfg.MinCpus, 10)).Int64Var(&cfg.MinCpus)
 	app.Flag("max-cpus", "Limits: max cpu (default: 24)").Default(strconv.FormatInt(cfg.MaxCpus, 10)).Int64Var(&cfg.MaxCpus)

@@ -62,6 +62,7 @@ const (
 )
 
 const controllerAgentName = "nodemanager-controller"
+const warnNodeDeletionErr = "an error occured during node deletion of %s, reason: %v"
 
 const (
 	FailedEvent  = "Failed"
@@ -365,7 +366,9 @@ func (c *Controller) startManagedNodes(managedNodesByUID map[uid.UID]string, nod
 
 	for nodeGroupName, nodesList := range nodesInCreationByNodegroup {
 		if nodeGroup, err := c.application.getNodeGroup(nodeGroupName); err == nil {
-			nodeGroup.createNodes(c.client, nodesList)
+			if _, err := nodeGroup.createNodes(c.client, nodesList); err != nil {
+				glog.Errorf("could not create all nodes, %v", err)
+			}
 
 			for _, node := range nodesList {
 				if key, found := managedNodesByUID[node.UID]; found {
@@ -415,7 +418,7 @@ func (c *Controller) startManagedNodes(managedNodesByUID map[uid.UID]string, nod
 							glog.Errorf("update status managed node %s failed, reason: %v", key, err)
 						}
 					} else {
-						glog.Errorf("managed node by key: %s is not found, reason", key, err)
+						glog.Errorf("managed node by key: %s is not found, reason: %v", key, err)
 					}
 				} else {
 					glog.Errorf("managed node by UID: %s is not found", node.UID)
@@ -438,8 +441,12 @@ func (c *Controller) findManagedNodeDeleted() {
 						if nodegroup, found := nodeInfo.Annotations[constantes.NodeLabelGroupName]; found {
 							if ng, err := c.application.getNodeGroup(nodegroup); err == nil {
 								if node, err := ng.findNodeByUID(ownerRef.UID); err == nil {
-									ng.deleteNode(c.client, node)
+									if err = ng.deleteNode(c.client, node); err != nil {
+										glog.Warnf(warnNodeDeletionErr, node.NodeName, err)
+									}
+
 									glog.Infof("ManagedNode '%s' is deleted, delete associated node %s", ownerRef.Name, node.NodeName)
+
 									deleted++
 								} else {
 									glog.Errorf(constantes.ErrNodeNotFoundInNodeGroup, ownerRef.UID, nodegroup)
@@ -476,7 +483,9 @@ func (c *Controller) findManagedNodeDeleted() {
 					// Try to find the node group and delete node
 					if ng, err := c.application.getNodeGroup(managedNode.GetNodegroup()); err == nil {
 						if node, err := ng.findNodeByUID(managedNode.GetUID()); err == nil {
-							ng.deleteNode(c.client, node)
+							if err = ng.deleteNode(c.client, node); err != nil {
+								glog.Warnf(warnNodeDeletionErr, node.NodeName, err)
+							}
 
 							deleted++
 						} else {
@@ -629,7 +638,11 @@ func (c *Controller) handleManagedNode(key string, managedNodesByUID map[uid.UID
 				if nodeGroup, err = c.application.getNodeGroup(managedNode.GetNodegroup()); err == nil {
 					if node, err = nodeGroup.findNodeByUID(managedNode.GetUID()); err == nil {
 						glog.Infof("ManagedNode '%s' is deleted, delete associated node %s", key, node.NodeName)
-						nodeGroup.deleteNode(c.client, node)
+
+						if err = nodeGroup.deleteNode(c.client, node); err != nil {
+							glog.Warnf(warnNodeDeletionErr, node.NodeName, err)
+						}
+
 						c.application.syncState()
 					} else {
 						glog.Errorf(constantes.ErrNodeNotFoundInNodeGroup, managedNode.GetNodegroup(), managedNode.GetUID())
@@ -805,7 +818,9 @@ func (c *Controller) deleteManagedNode(obj interface{}) {
 			if node, err := nodeGroup.findNodeByUID(managedNode.GetUID()); err == nil {
 				glog.Infof("ManagedNode '%s' is deleted, delete associated node %s", c.generateKey(managedNode), node.NodeName)
 
-				nodeGroup.deleteNode(c.client, node)
+				if err = nodeGroup.deleteNode(c.client, node); err != nil {
+					glog.Warnf(warnNodeDeletionErr, node.NodeName, err)
+				}
 
 				c.application.syncState()
 			} else {

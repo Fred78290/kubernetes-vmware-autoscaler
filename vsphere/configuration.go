@@ -77,7 +77,7 @@ func (conf *Configuration) getURL() (string, error) {
 func (conf *Configuration) Copy() *Configuration {
 	var dup Configuration
 
-	Copy(&dup, conf)
+	_ = Copy(&dup, conf)
 
 	return &dup
 }
@@ -104,12 +104,10 @@ func (conf *Configuration) Clone(nodeIndex int) (*Configuration, error) {
 func (conf *Configuration) FindPreferredIPAddress(interfaces []NetworkInterface) string {
 	address := ""
 
-	if interfaces != nil {
-		for _, inf := range interfaces {
-			if declaredInf := conf.FindInterfaceByName(inf.NetworkName); declaredInf != nil {
-				if declaredInf.Primary {
-					return inf.IPAddress
-				}
+	for _, inf := range interfaces {
+		if declaredInf := conf.FindInterfaceByName(inf.NetworkName); declaredInf != nil {
+			if declaredInf.Primary {
+				return inf.IPAddress
 			}
 		}
 	}
