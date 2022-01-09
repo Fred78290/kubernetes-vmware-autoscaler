@@ -759,8 +759,31 @@ func (g *AutoScalerServerNodeGroup) getManagedNodePrefix() string {
 }
 
 func (g *AutoScalerServerNodeGroup) nodeName(vmIndex int, controlplane, managed bool) string {
+	var start int
+
 	if controlplane {
-		return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getControlPlanePrefix(), vmIndex-g.numOfExternalNodes-g.numOfProvisionnedNodes+g.numOfControlPlanes+1)
+		start = 2
+	}
+
+	for index := start; index <= g.MaxNodeSize; index++ {
+		var nodeName string
+
+		if controlplane {
+			nodeName = fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getControlPlanePrefix(), index)
+		} else if managed {
+			nodeName = fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getManagedNodePrefix(), index)
+		} else {
+			nodeName = fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getProvisionnedNodePrefix(), index)
+		}
+
+		if _, ok := g.Nodes[nodeName]; !ok {
+			return nodeName
+		}
+	}
+
+	// Should never reach this code
+	if controlplane {
+		return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getControlPlanePrefix(), vmIndex-g.numOfExternalNodes-g.numOfProvisionnedNodes-g.numOfManagedNodes+g.numOfControlPlanes+1)
 	} else if managed {
 		return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getManagedNodePrefix(), vmIndex-g.numOfExternalNodes-g.numOfProvisionnedNodes+1)
 	} else {
