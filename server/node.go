@@ -202,7 +202,7 @@ func (vm *AutoScalerServerNode) setNodeLabels(c types.ClientGenerator, nodeLabel
 	}
 
 	if vm.ControlPlaneNode && vm.AllowDeployment {
-		c.TaintNode(vm.NodeName,
+		if err := c.TaintNode(vm.NodeName,
 			apiv1.Taint{
 				Key:    constantes.NodeLabelControlPlaneRole,
 				Effect: apiv1.TaintEffectNoSchedule,
@@ -216,7 +216,9 @@ func (vm *AutoScalerServerNode) setNodeLabels(c types.ClientGenerator, nodeLabel
 				TimeAdded: &metav1.Time{
 					Time: time.Now(),
 				},
-			})
+			}); err != nil {
+			return fmt.Errorf(constantes.ErrTaintNodeReturnError, vm.NodeName, err)
+		}
 	}
 
 	return nil
