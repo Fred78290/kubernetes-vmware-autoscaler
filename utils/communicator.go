@@ -135,7 +135,7 @@ func Sudo(connect *types.AutoScalerServerSSH, host string, command ...string) (s
 	}
 
 	if glog.GetLevel() == glog.DebugLevel && err != nil {
-		glog.Debugf("sudo command:%s, output:%, error:%v", strings.Join(command, ","), stdout.String(), err)
+		glog.Debugf("sudo command:%s, output:%s, error:%v", strings.Join(command, ","), stdout.String(), err)
 	}
 
 	return strings.TrimSpace(stdout.String()), err

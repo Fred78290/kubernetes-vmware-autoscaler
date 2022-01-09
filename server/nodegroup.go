@@ -648,7 +648,9 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 						}
 					}
 
-					node.retrieveNetworkInfos()
+					if err = node.retrieveNetworkInfos(); err != nil {
+						glog.Errorf("an error occured during retrieve network infos: %v", err)
+					}
 
 					g.Nodes[nodeID] = node
 					g.RunningNode[lastNodeIndex] = ServerNodeStateRunning
