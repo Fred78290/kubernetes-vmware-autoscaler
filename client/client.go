@@ -40,7 +40,6 @@ const (
 type SingletonClientGenerator struct {
 	KubeConfig           string
 	APIServerURL         string
-	Namespace            string
 	RequestTimeout       time.Duration
 	DeletionTimeout      time.Duration
 	MaxGracePeriod       time.Duration
@@ -649,7 +648,6 @@ func (p *SingletonClientGenerator) TaintNode(nodeName string, taints ...apiv1.Ta
 func NewClientGenerator(cfg *types.Config) types.ClientGenerator {
 	return &SingletonClientGenerator{
 		KubeConfig:      cfg.KubeConfig,
-		Namespace:       cfg.Namespace,
 		APIServerURL:    cfg.APIServerURL,
 		RequestTimeout:  cfg.RequestTimeout,
 		DeletionTimeout: cfg.DeletionTimeout,
