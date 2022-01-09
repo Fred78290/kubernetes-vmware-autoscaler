@@ -550,6 +550,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 	g.numOfExternalNodes = 0
 	g.numOfManagedNodes = 0
 	g.numOfProvisionnedNodes = 0
+	g.numOfControlPlanes = 0
 
 	for _, nodeInfo := range nodeInfos.Items {
 		var providerID = utils.GetNodeProviderID(g.ServiceIdentifier, &nodeInfo)
