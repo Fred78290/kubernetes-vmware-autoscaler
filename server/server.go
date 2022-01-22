@@ -29,6 +29,9 @@ type applicationInterface interface {
 	getMachineType(instanceType string) *types.MachineCharacteristic
 }
 
+var availableGPUTypes = map[string]string{
+}
+
 // AutoScalerServerApp declare AutoScaler grpc server
 type AutoScalerServerApp struct {
 	ResourceLimiter *types.ResourceLimiter                `json:"limits"`
@@ -462,8 +465,8 @@ func (s *AutoScalerServerApp) NewNodeGroup(ctx context.Context, request *apigrpc
 
 	var nodeGroupIdentifier string
 
-	labels := make(map[string]string)
-	systemLabels := make(map[string]string)
+	labels := make(KubernetesLabel)
+	systemLabels := make(KubernetesLabel)
 
 	if reqLabels := request.GetLabels(); reqLabels != nil {
 		for k2, v2 := range reqLabels {
@@ -553,10 +556,8 @@ func (s *AutoScalerServerApp) GetAvailableGPUTypes(ctx context.Context, request 
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
 
-	gpus := make(map[string]string)
-
 	return &apigrpc.GetAvailableGPUTypesReply{
-		AvailableGpuTypes: gpus,
+		AvailableGpuTypes: availableGPUTypes,
 	}, nil
 }
 
