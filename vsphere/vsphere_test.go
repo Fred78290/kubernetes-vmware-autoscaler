@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
 
 	glog "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -73,7 +74,7 @@ func Test_Sudo(t *testing.T) {
 	if testFeature("Test_Sudo") {
 		config := loadFromJson(confName)
 
-		out, err := utils.Sudo(&config.SSH, "localhost", "ls")
+		out, err := utils.Sudo(&config.SSH, "localhost", 30*time.Second, "ls")
 
 		if assert.NoError(t, err) {
 			t.Log(out)
