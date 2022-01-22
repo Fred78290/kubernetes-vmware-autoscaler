@@ -275,8 +275,6 @@ func (g *AutoScalerServerNodeGroup) addManagedNode(crd *v1alpha1.ManagedNode) (*
 			node.ExtraLabels["worker"] = "true"
 		}
 
-		node.ExtraLabels[constantes.NodeLabelGroupName] = g.NodeGroupIdentifier
-
 		return node, nil
 	} else {
 		return nil, err
@@ -630,6 +628,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 						}
 
 						err = client.AnnoteNode(nodeInfo.Name, map[string]string{
+							constantes.NodeLabelGroupName:             g.NodeGroupIdentifier,
 							constantes.AnnotationScaleDownDisabled:    strconv.FormatBool(nodeType != AutoScalerServerNodeAutoscaled),
 							constantes.AnnotationNodeAutoProvisionned: strconv.FormatBool(autoProvisionned),
 							constantes.AnnotationNodeManaged:          strconv.FormatBool(managedNode),
