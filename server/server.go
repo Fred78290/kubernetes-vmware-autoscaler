@@ -32,6 +32,9 @@ type applicationInterface interface {
 var availableGPUTypes = map[string]string{
 }
 
+var availableGPUTypes = map[string]string{
+}
+
 // AutoScalerServerApp declare AutoScaler grpc server
 type AutoScalerServerApp struct {
 	ResourceLimiter *types.ResourceLimiter                `json:"limits"`
