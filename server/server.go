@@ -166,11 +166,8 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 			ng = s.Groups[nodeGroupIdentifier]
 
 			if ng == nil {
-				systemLabels := map[string]string{}
-
-				labels := map[string]string{
-					constantes.NodeLabelGroupName: nodeGroupIdentifier,
-				}
+				systemLabels := KubernetesLabel{}
+				labels := KubernetesLabel{}
 
 				// Default labels
 				if nodeGroupDef.GetLabels() != nil {
@@ -484,8 +481,6 @@ func (s *AutoScalerServerApp) NewNodeGroup(ctx context.Context, request *apigrpc
 	} else {
 		nodeGroupIdentifier = request.GetNodeGroupID()
 	}
-
-	labels[constantes.NodeLabelGroupName] = nodeGroupIdentifier
 
 	nodeGroup, err := s.newNodeGroup(nodeGroupIdentifier, request.GetMinNodeSize(), request.GetMaxNodeSize(), request.GetMachineType(), labels, systemLabels, false)
 
