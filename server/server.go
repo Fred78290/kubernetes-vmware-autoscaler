@@ -26,6 +26,7 @@ type applicationInterface interface {
 	getResourceLimiter() *types.ResourceLimiter
 	syncState()
 	client() types.ClientGenerator
+	getMachineType(instanceType string) *types.MachineCharacteristic
 }
 
 // AutoScalerServerApp declare AutoScaler grpc server
@@ -1320,6 +1321,15 @@ func (s *AutoScalerServerApp) Load(fileName string) error {
 
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (s *AutoScalerServerApp) getMachineType(instanceType string) *types.MachineCharacteristic {
+
+	if machineSpec, ok := s.configuration.Machines[instanceType]; ok {
+		return machineSpec
 	}
 
 	return nil
