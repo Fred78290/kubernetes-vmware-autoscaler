@@ -325,13 +325,9 @@ func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int)
 
 			tempNodes = append(tempNodes, node)
 
-			if g.pendingNodes == nil {
-				g.pendingNodes = make(map[string]*AutoScalerServerNode)
-			}
-
 			g.pendingNodes[node.NodeName] = node
 		} else {
-			g.pendingNodes = nil
+			g.pendingNodes = make(map[string]*AutoScalerServerNode)
 			return []*AutoScalerServerNode{}, err
 		}
 	}
@@ -764,6 +760,8 @@ func (g *AutoScalerServerNodeGroup) nodeName(vmIndex int, controlplane, managed 
 
 	if controlplane {
 		start = 2
+	} else {
+		start = 1
 	}
 
 	for index := start; index <= g.MaxNodeSize; index++ {
