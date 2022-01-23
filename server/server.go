@@ -29,11 +29,7 @@ type applicationInterface interface {
 	getMachineType(instanceType string) *types.MachineCharacteristic
 }
 
-var availableGPUTypes = map[string]string{
-}
-
-var availableGPUTypes = map[string]string{
-}
+var availableGPUTypes = map[string]string{}
 
 var availableGPUTypes = map[string]string{
 }
