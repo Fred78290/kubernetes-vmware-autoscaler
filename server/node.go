@@ -95,11 +95,11 @@ func (vm *AutoScalerServerNode) recopyEtcdSslFilesIfNeeded() error {
 	if vm.ControlPlaneNode || *vm.serverConfig.UseExternalEtdc {
 		if err = utils.Scp(vm.serverConfig.SSH, vm.IPAddress, vm.serverConfig.ExtSourceEtcdSslDir, "."); err != nil {
 			glog.Errorf("scp failed: %v", err)
-		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, fmt.Sprintf("mkdir -p %s", vm.serverConfig.ExtDestinationEtcdSslDir)); err != nil {
+		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, fmt.Sprintf("mkdir -p %s", vm.serverConfig.ExtDestinationEtcdSslDir)); err != nil {
 			glog.Errorf("mkdir failed: %v", err)
-		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, fmt.Sprintf("cp -r %s/* %s", filepath.Base(vm.serverConfig.ExtSourceEtcdSslDir), vm.serverConfig.ExtDestinationEtcdSslDir)); err != nil {
+		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, fmt.Sprintf("cp -r %s/* %s", filepath.Base(vm.serverConfig.ExtSourceEtcdSslDir), vm.serverConfig.ExtDestinationEtcdSslDir)); err != nil {
 			glog.Errorf("mv failed: %v", err)
-		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, fmt.Sprintf("chown -R root:root %s", vm.serverConfig.ExtDestinationEtcdSslDir)); err != nil {
+		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, fmt.Sprintf("chown -R root:root %s", vm.serverConfig.ExtDestinationEtcdSslDir)); err != nil {
 			glog.Errorf("chown failed: %v", err)
 		}
 	}
@@ -113,11 +113,11 @@ func (vm *AutoScalerServerNode) recopyKubernetesPKIIfNeeded() error {
 	if vm.ControlPlaneNode {
 		if err = utils.Scp(vm.serverConfig.SSH, vm.IPAddress, vm.serverConfig.KubernetesPKISourceDir, "."); err != nil {
 			glog.Errorf("scp failed: %v", err)
-		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, fmt.Sprintf("mkdir -p %s", vm.serverConfig.KubernetesPKIDestDir)); err != nil {
+		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, fmt.Sprintf("mkdir -p %s", vm.serverConfig.KubernetesPKIDestDir)); err != nil {
 			glog.Errorf("mkdir failed: %v", err)
-		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, fmt.Sprintf("cp -r %s/* %s", filepath.Base(vm.serverConfig.KubernetesPKISourceDir), vm.serverConfig.KubernetesPKIDestDir)); err != nil {
+		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, fmt.Sprintf("cp -r %s/* %s", filepath.Base(vm.serverConfig.KubernetesPKISourceDir), vm.serverConfig.KubernetesPKIDestDir)); err != nil {
 			glog.Errorf("mv failed: %v", err)
-		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, fmt.Sprintf("chown -R root:root %s", vm.serverConfig.KubernetesPKIDestDir)); err != nil {
+		} else if _, err = utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, fmt.Sprintf("chown -R root:root %s", vm.serverConfig.KubernetesPKIDestDir)); err != nil {
 			glog.Errorf("chown failed: %v", err)
 		}
 	}
@@ -151,7 +151,7 @@ func (vm *AutoScalerServerNode) kubeAdmJoin() error {
 
 	command := strings.Join(args, " ")
 
-	if out, err := utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, command); err != nil {
+	if out, err := utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, command); err != nil {
 		return fmt.Errorf("unable to execute command: %s, output: %s, reason:%v", command, out, err)
 	}
 
