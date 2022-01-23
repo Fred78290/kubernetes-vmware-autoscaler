@@ -275,6 +275,8 @@ func (g *AutoScalerServerNodeGroup) addManagedNode(crd *v1alpha1.ManagedNode) (*
 			node.ExtraLabels["worker"] = "true"
 		}
 
+		g.pendingNodes[node.NodeName] = node
+
 		return node, nil
 	} else {
 		return nil, err
