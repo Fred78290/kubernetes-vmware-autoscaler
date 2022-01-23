@@ -775,7 +775,10 @@ func (g *AutoScalerServerNodeGroup) nodeName(vmIndex int, controlplane, managed 
 		}
 
 		if _, ok := g.Nodes[nodeName]; !ok {
-			return nodeName
+			// Could be in pending node
+			if _, ok = g.pendingNodes[nodeName]; !ok {
+				return nodeName
+			}
 		}
 	}
 
