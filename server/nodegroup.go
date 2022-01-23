@@ -63,7 +63,7 @@ type AutoScalerServerNodeGroup struct {
 	SystemLabels               KubernetesLabel                  `json:"systemLabels"`
 	AutoProvision              bool                             `json:"auto-provision"`
 	LastCreatedNodeIndex       int                              `json:"node-index"`
-	RunningNode                map[int]ServerNodeState          `json:"running-nodes-state"`
+	RunningNodes               map[int]ServerNodeState          `json:"running-nodes-state"`
 	pendingNodes               map[string]*AutoScalerServerNode
 	pendingNodesWG             sync.WaitGroup
 	numOfControlPlanes         int
@@ -94,7 +94,7 @@ func CreateLabelOrAnnotation(values []string) KubernetesLabel {
 func (g *AutoScalerServerNodeGroup) findNextNodeIndex(managed bool) int {
 
 	for index := 1; index <= g.MaxNodeSize; index++ {
-		if run, found := g.RunningNode[index]; !found || run < ServerNodeStateCreating {
+		if run, found := g.RunningNodes[index]; !found || run < ServerNodeStateCreating {
 			return index
 		}
 	}
@@ -123,7 +123,7 @@ func (g *AutoScalerServerNodeGroup) cleanup(c types.ClientGenerator) error {
 		}
 	}
 
-	g.RunningNode = make(map[int]ServerNodeState)
+	g.RunningNodes = make(map[int]ServerNodeState)
 	g.Nodes = make(map[string]*AutoScalerServerNode)
 	g.pendingNodes = make(map[string]*AutoScalerServerNode)
 	g.numOfControlPlanes = 0
@@ -195,7 +195,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodes(c types.ClientGenerator, delta i
 	}
 
 	for _, node := range tempNodes {
-		g.RunningNode[node.NodeIndex] = ServerNodeStateDeleted
+		g.RunningNodes[node.NodeIndex] = ServerNodeStateDeleted
 		delete(g.Nodes, node.NodeName)
 	}
 
@@ -209,7 +209,7 @@ func (g *AutoScalerServerNodeGroup) addManagedNode(crd *v1alpha1.ManagedNode) (*
 
 	// Clone the vsphere config to allow increment IP address
 	if vsphereConfig, err := g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Clone(nodeIndex); err == nil {
-		g.RunningNode[nodeIndex] = ServerNodeStateCreating
+		g.RunningNodes[nodeIndex] = ServerNodeStateCreating
 
 		resLimit := g.configuration.ManagedNodeResourceLimiter
 
@@ -298,7 +298,7 @@ func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int)
 		// Clone the vsphere config to allow increment IP address
 		if vsphereConfig, err := g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Clone(nodeIndex); err == nil {
 
-			g.RunningNode[nodeIndex] = ServerNodeStateCreating
+			g.RunningNodes[nodeIndex] = ServerNodeStateCreating
 
 			extraAnnotations := KubernetesLabel{}
 			extraLabels := KubernetesLabel{
@@ -354,7 +354,7 @@ func (g *AutoScalerServerNodeGroup) createNodes(c types.ClientGenerator, nodes [
 		defer g.pendingNodesWG.Done()
 
 		if g.Status != NodegroupCreated {
-			g.RunningNode[node.NodeIndex] = ServerNodeStateNotRunning
+			g.RunningNodes[node.NodeIndex] = ServerNodeStateNotRunning
 			glog.Debugf("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s -> g.status != nodegroupCreated", g.NodeGroupIdentifier)
 			return fmt.Errorf(constantes.ErrUnableToLaunchVMNodeGroupNotReady, node.NodeName)
 		}
@@ -373,7 +373,7 @@ func (g *AutoScalerServerNodeGroup) createNodes(c types.ClientGenerator, nodes [
 			mu.Lock()
 			defer mu.Unlock()
 
-			g.RunningNode[node.NodeIndex] = ServerNodeStateDeleted
+			g.RunningNodes[node.NodeIndex] = ServerNodeStateDeleted
 		} else {
 			mu.Lock()
 			defer mu.Unlock()
@@ -381,7 +381,7 @@ func (g *AutoScalerServerNodeGroup) createNodes(c types.ClientGenerator, nodes [
 			createdNodes = append(createdNodes, node)
 
 			g.Nodes[node.NodeName] = node
-			g.RunningNode[node.NodeIndex] = ServerNodeStateRunning
+			g.RunningNodes[node.NodeIndex] = ServerNodeStateRunning
 
 			if node.NodeType == AutoScalerServerNodeAutoscaled {
 				g.numOfProvisionnedNodes++
@@ -545,7 +545,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 
 	g.Nodes = make(map[string]*AutoScalerServerNode)
 	g.pendingNodes = make(map[string]*AutoScalerServerNode)
-	g.RunningNode = make(map[int]ServerNodeState)
+	g.RunningNodes = make(map[int]ServerNodeState)
 	g.LastCreatedNodeIndex = 0
 	g.numOfExternalNodes = 0
 	g.numOfManagedNodes = 0
@@ -654,7 +654,7 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 					}
 
 					g.Nodes[nodeID] = node
-					g.RunningNode[lastNodeIndex] = ServerNodeStateRunning
+					g.RunningNodes[lastNodeIndex] = ServerNodeStateRunning
 
 					if controlPlane {
 						if managedNode {
@@ -695,7 +695,7 @@ func (g *AutoScalerServerNodeGroup) deleteNode(c types.ClientGenerator, node *Au
 		glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, err)
 	}
 
-	g.RunningNode[node.NodeIndex] = ServerNodeStateDeleted
+	g.RunningNodes[node.NodeIndex] = ServerNodeStateDeleted
 	delete(g.Nodes, node.NodeName)
 
 	if node.NodeType == AutoScalerServerNodeAutoscaled {
