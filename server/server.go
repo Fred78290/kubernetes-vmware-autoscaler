@@ -26,7 +26,10 @@ type applicationInterface interface {
 	getResourceLimiter() *types.ResourceLimiter
 	syncState()
 	client() types.ClientGenerator
+	getMachineType(instanceType string) *types.MachineCharacteristic
 }
+
+var availableGPUTypes = map[string]string{}
 
 // AutoScalerServerApp declare AutoScaler grpc server
 type AutoScalerServerApp struct {
@@ -163,11 +166,8 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 			ng = s.Groups[nodeGroupIdentifier]
 
 			if ng == nil {
-				systemLabels := map[string]string{}
-
-				labels := map[string]string{
-					constantes.NodeLabelGroupName: nodeGroupIdentifier,
-				}
+				systemLabels := KubernetesLabel{}
+				labels := KubernetesLabel{}
 
 				// Default labels
 				if nodeGroupDef.GetLabels() != nil {
@@ -461,8 +461,8 @@ func (s *AutoScalerServerApp) NewNodeGroup(ctx context.Context, request *apigrpc
 
 	var nodeGroupIdentifier string
 
-	labels := make(map[string]string)
-	systemLabels := make(map[string]string)
+	labels := make(KubernetesLabel)
+	systemLabels := make(KubernetesLabel)
 
 	if reqLabels := request.GetLabels(); reqLabels != nil {
 		for k2, v2 := range reqLabels {
@@ -481,8 +481,6 @@ func (s *AutoScalerServerApp) NewNodeGroup(ctx context.Context, request *apigrpc
 	} else {
 		nodeGroupIdentifier = request.GetNodeGroupID()
 	}
-
-	labels[constantes.NodeLabelGroupName] = nodeGroupIdentifier
 
 	nodeGroup, err := s.newNodeGroup(nodeGroupIdentifier, request.GetMinNodeSize(), request.GetMaxNodeSize(), request.GetMachineType(), labels, systemLabels, false)
 
@@ -552,10 +550,8 @@ func (s *AutoScalerServerApp) GetAvailableGPUTypes(ctx context.Context, request 
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
 
-	gpus := make(map[string]string)
-
 	return &apigrpc.GetAvailableGPUTypesReply{
-		AvailableGpuTypes: gpus,
+		AvailableGpuTypes: availableGPUTypes,
 	}, nil
 }
 
@@ -1320,6 +1316,15 @@ func (s *AutoScalerServerApp) Load(fileName string) error {
 
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (s *AutoScalerServerApp) getMachineType(instanceType string) *types.MachineCharacteristic {
+
+	if machineSpec, ok := s.configuration.Machines[instanceType]; ok {
+		return machineSpec
 	}
 
 	return nil
