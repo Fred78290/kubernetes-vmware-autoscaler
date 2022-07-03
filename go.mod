@@ -1,6 +1,6 @@
 module github.com/Fred78290/kubernetes-vmware-autoscaler
 
-go 1.17
+go 1.18
 
 require (
 	github.com/alecthomas/kingpin v2.2.6+incompatible
