@@ -20,5 +20,5 @@ ENV PATH $GOPATH/bin:$PATH
 
 RUN apt-get update && apt-get --yes install libseccomp-dev && \
     go version && \
-    go get -u github.com/vmware/govmomi/vcsim
+    go install github.com/vmware/govmomi/vcsim@v0.28.0
 CMD ["/bin/bash"]
