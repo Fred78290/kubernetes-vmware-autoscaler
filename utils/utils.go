@@ -10,6 +10,7 @@ import (
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
 	glog "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 	apiv1 "k8s.io/api/core/v1"
 )
 
@@ -20,6 +21,17 @@ func NodeFromJSON(s string) (*apiv1.Node, error) {
 	err := json.Unmarshal([]byte(s), &data)
 
 	return data, err
+}
+
+// ToYAML serialize interface to yaml
+func ToYAML(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+
+	b, _ := yaml.Marshal(v)
+
+	return string(b)
 }
 
 // ToJSON serialize interface to json
