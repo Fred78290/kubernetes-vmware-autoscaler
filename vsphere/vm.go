@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
@@ -343,8 +344,31 @@ func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey stri
 	return err
 }
 
+func (vm VirtualMachine) isSimulatorRunning(ctx *context.Context, v *object.VirtualMachine) bool {
+	var o mo.VirtualMachine
+
+	err := v.Properties(ctx, v.Reference(), []string{"config.extraConfig"}, &o)
+	if err != nil {
+		return false
+	}
+
+	for _, extra := range o.Config.ExtraConfig {
+		extraValue := extra.GetOptionValue()
+
+		if extraValue.Key == "govcsim" && strings.ToLower(fmt.Sprint(extraValue.Value)) == "true" {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (vm VirtualMachine) isToolsRunning(ctx *context.Context, v *object.VirtualMachine) (bool, error) {
 	var o mo.VirtualMachine
+
+	if vm.isSimulatorRunning(ctx, v) {
+		return true, nil
+	}
 
 	running, err := v.IsToolsRunning(ctx)
 	if err != nil {
@@ -368,6 +392,13 @@ func (vm VirtualMachine) IsToolsRunning(ctx *context.Context) (bool, error) {
 	v := vm.VirtualMachine(ctx)
 
 	return vm.isToolsRunning(ctx, v)
+}
+
+// IsSimulatorRunning returns true if VMware Tools is currently running in the guest OS, and false otherwise.
+func (vm VirtualMachine) IsSimulatorRunning(ctx *context.Context) bool {
+	v := vm.VirtualMachine(ctx)
+
+	return vm.isSimulatorRunning(ctx, v)
 }
 
 func (vm *VirtualMachine) waitForToolsRunning(ctx *context.Context, v *object.VirtualMachine) (bool, error) {
@@ -470,11 +501,13 @@ func (vm *VirtualMachine) WaitForIP(ctx *context.Context) (string, error) {
 
 	v := vm.VirtualMachine(ctx)
 
-	if powerState, err = v.PowerState(ctx); err == nil {
-		if powerState == types.VirtualMachinePowerStatePoweredOn {
-			ip, err = vm.waitForIP(ctx, v)
-		} else {
-			err = fmt.Errorf("the VM: %s is not powered", v.InventoryPath)
+	if !vm.isSimulatorRunning(ctx, v) {
+		if powerState, err = v.PowerState(ctx); err == nil {
+			if powerState == types.VirtualMachinePowerStatePoweredOn {
+				ip, err = vm.waitForIP(ctx, v)
+			} else {
+				err = fmt.Errorf("the VM: %s is not powered", v.InventoryPath)
+			}
 		}
 	}
 
