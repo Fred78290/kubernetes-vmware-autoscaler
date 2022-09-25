@@ -22,6 +22,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	typesv1 "k8s.io/apimachinery/pkg/apis/meta/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -385,10 +386,21 @@ func (p *SingletonClientGenerator) SetProviderID(nodeName, providerID string) er
 
 		node.Spec.ProviderID = providerID
 
-		if _, err = kubeclient.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{}); err != nil {
+		patch := utils.ToYAML(map[string]map[string]string{
+			"spec": {
+				"providerID": providerID,
+			},
+		})
+
+		if _, err = kubeclient.CoreV1().Nodes().Patch(ctx, nodeName, typesv1.ApplyPatchType, []byte(patch), metav1.PatchOptions{}); err != nil {
 			glog.Warnf("Set providerID node:%s is not ready, err = %s", nodeName, err)
 			return false, nil
 		}
+
+		//if _, err = kubeclient.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{}); err != nil {
+		//	glog.Warnf("Set providerID node:%s is not ready, err = %s", nodeName, err)
+		//	return false, nil
+		//}
 
 		return true, nil
 	})

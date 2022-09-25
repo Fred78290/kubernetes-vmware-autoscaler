@@ -459,7 +459,7 @@ func (vm *VirtualMachine) waitForIP(ctx *context.Context, v *object.VirtualMachi
 		return "", err
 	}
 
-	return "", nil
+	return "", fmt.Errorf("VMWare tools is not running on the VM:%s, unable to retrieve IP", vm.Name)
 }
 
 // WaitForIP wait ip
