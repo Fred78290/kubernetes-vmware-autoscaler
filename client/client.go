@@ -384,23 +384,26 @@ func (p *SingletonClientGenerator) SetProviderID(nodeName, providerID string) er
 			return true, nil
 		}
 
-		node.Spec.ProviderID = providerID
-
-		patch := utils.ToYAML(map[string]map[string]string{
-			"spec": {
+		patch := utils.ToYAML(map[string]interface{}{
+			"kind":       "Node",
+			"apiVersion": "v1",
+			"spec": map[string]string{
 				"providerID": providerID,
 			},
 		})
 
-		if _, err = kubeclient.CoreV1().Nodes().Patch(ctx, nodeName, typesv1.ApplyPatchType, []byte(patch), metav1.PatchOptions{}); err != nil {
+		patchOptions := metav1.PatchOptions{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Node",
+				APIVersion: "v1",
+			},
+			FieldManager: "application/apply-patch",
+		}
+
+		if _, err = kubeclient.CoreV1().Nodes().Patch(ctx, nodeName, typesv1.ApplyPatchType, []byte(patch), patchOptions); err != nil {
 			glog.Warnf("Set providerID node:%s is not ready, err = %s", nodeName, err)
 			return false, nil
 		}
-
-		//if _, err = kubeclient.CoreV1().Nodes().Update(ctx, node, metav1.UpdateOptions{}); err != nil {
-		//	glog.Warnf("Set providerID node:%s is not ready, err = %s", nodeName, err)
-		//	return false, nil
-		//}
 
 		return true, nil
 	})
