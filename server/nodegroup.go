@@ -246,6 +246,7 @@ func (g *AutoScalerServerNodeGroup) addManagedNode(crd *v1alpha1.ManagedNode) (*
 				if inf := vsphereConfig.FindInterfaceByName(network.NetworkName); inf != nil {
 					inf.DHCP = network.DHCP
 					inf.UseRoutes = network.UseRoutes
+					inf.Routes = network.Routes
 
 					if len(network.IPV4Address) > 0 {
 						inf.IPAddress = network.IPV4Address

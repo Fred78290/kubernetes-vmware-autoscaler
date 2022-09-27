@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/apis/nodemanager/v1alpha1"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
@@ -17,17 +18,18 @@ import (
 
 // NetworkInterface declare single interface
 type NetworkInterface struct {
-	Primary          bool   `json:"primary,omitempty" yaml:"primary,omitempty"`
-	Existing         bool   `json:"exists,omitempty" yaml:"exists,omitempty"`
-	NetworkName      string `json:"network,omitempty" yaml:"network,omitempty"`
-	Adapter          string `json:"adapter,omitempty" yaml:"adapter,omitempty"`
-	MacAddress       string `json:"mac-address,omitempty" yaml:"mac-address,omitempty"`
-	NicName          string `json:"nic,omitempty" yaml:"nic,omitempty"`
-	DHCP             bool   `json:"dhcp,omitempty" yaml:"dhcp,omitempty"`
-	UseRoutes        bool   `default:"true" json:"use-dhcp-routes,omitempty" yaml:"use-dhcp-routes,omitempty"`
-	IPAddress        string `json:"address,omitempty" yaml:"address,omitempty"`
-	Netmask          string `json:"netmask,omitempty" yaml:"netmask,omitempty"`
-	Gateway          string `json:"gateway,omitempty" yaml:"gateway,omitempty"`
+	Primary          bool                     `json:"primary,omitempty" yaml:"primary,omitempty"`
+	Existing         bool                     `json:"exists,omitempty" yaml:"exists,omitempty"`
+	NetworkName      string                   `json:"network,omitempty" yaml:"network,omitempty"`
+	Adapter          string                   `json:"adapter,omitempty" yaml:"adapter,omitempty"`
+	MacAddress       string                   `json:"mac-address,omitempty" yaml:"mac-address,omitempty"`
+	NicName          string                   `json:"nic,omitempty" yaml:"nic,omitempty"`
+	DHCP             bool                     `json:"dhcp,omitempty" yaml:"dhcp,omitempty"`
+	UseRoutes        bool                     `default:"true" json:"use-dhcp-routes,omitempty" yaml:"use-dhcp-routes,omitempty"`
+	IPAddress        string                   `json:"address,omitempty" yaml:"address,omitempty"`
+	Netmask          string                   `json:"netmask,omitempty" yaml:"netmask,omitempty"`
+	Gateway          string                   `json:"gateway,omitempty" yaml:"gateway,omitempty"`
+	Routes           []v1alpha1.NetworkRoutes `json:"routes,omitempty" yaml:"routes,omitempty"`
 	networkReference object.NetworkReference
 	networkBacking   types.BaseVirtualDeviceBackingInfo
 }
@@ -52,13 +54,14 @@ type Nameserver struct {
 
 // NetworkAdapter wrapper
 type NetworkAdapter struct {
-	DHCP4         bool                    `json:"dhcp4,omitempty" yaml:"dhcp4,omitempty"`
-	NicName       *string                 `json:"set-name,omitempty" yaml:"set-name,omitempty"`
-	Match         *map[string]string      `json:"match,omitempty" yaml:"match,omitempty"`
-	Gateway4      *string                 `json:"gateway4,omitempty" yaml:"gateway4,omitempty"`
-	Addresses     *[]string               `json:"addresses,omitempty" yaml:"addresses,omitempty"`
-	Nameservers   *Nameserver             `json:"nameservers,omitempty" yaml:"nameservers,omitempty"`
-	DHCPOverrides *map[string]interface{} `json:"dhcp4-overrides,omitempty" yaml:"dhcp4-overrides,omitempty"`
+	DHCP4         bool                      `json:"dhcp4,omitempty" yaml:"dhcp4,omitempty"`
+	NicName       *string                   `json:"set-name,omitempty" yaml:"set-name,omitempty"`
+	Match         *map[string]string        `json:"match,omitempty" yaml:"match,omitempty"`
+	Gateway4      *string                   `json:"gateway4,omitempty" yaml:"gateway4,omitempty"`
+	Addresses     *[]string                 `json:"addresses,omitempty" yaml:"addresses,omitempty"`
+	Nameservers   *Nameserver               `json:"nameservers,omitempty" yaml:"nameservers,omitempty"`
+	DHCPOverrides *map[string]interface{}   `json:"dhcp4-overrides,omitempty" yaml:"dhcp4-overrides,omitempty"`
+	Routes        *[]v1alpha1.NetworkRoutes `json:"routes,omitempty" yaml:"routes,omitempty"`
 }
 
 // NetworkDeclare wrapper
@@ -146,6 +149,10 @@ func (net *Network) GetCloudInitNetwork(nodeIndex int) *NetworkConfig {
 				}
 			} else {
 				ethernet.NicName = nil
+			}
+
+			if len(n.Routes) != 0 {
+				ethernet.Routes = &n.Routes
 			}
 
 			if net.DNS != nil {

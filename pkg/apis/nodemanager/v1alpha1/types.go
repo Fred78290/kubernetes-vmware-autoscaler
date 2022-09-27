@@ -16,15 +16,23 @@ type ManagedNode struct {
 	Status            ManagedNodeStatus `json:"status,omitempty"`
 }
 
+// NetworkRoutes is a specification for a network route ManagedNode resource
+type NetworkRoutes struct {
+	To     string `json:"to,omitempty" yaml:"to,omitempty"`
+	Via    string `json:"via,omitempty" yaml:"via,omitempty"`
+	Metric int    `json:"metric,omitempty" yaml:"metric,omitempty"`
+}
+
 // ManagedNodeNetwork is a specification for a network ManagedNode resource
 type ManagedNodeNetwork struct {
-	NetworkName string `json:"network,omitempty"`
-	DHCP        bool   `json:"dhcp,omitempty"`
-	UseRoutes   bool   `default:"true" json:"use-dhcp-routes,omitempty" yaml:"use-dhcp-routes,omitempty"`
-	IPV4Address string `json:"address,omitempty"`
-	Gateway     string `json:"gateway,omitempty"`
-	Netmask     string `json:"netmask,omitempty"`
-	MacAddress  string `json:"mac-address,omitempty" yaml:"mac-address,omitempty"`
+	NetworkName string          `json:"network,omitempty"`
+	DHCP        bool            `json:"dhcp,omitempty"`
+	UseRoutes   bool            `default:"true" json:"use-dhcp-routes,omitempty" yaml:"use-dhcp-routes,omitempty"`
+	IPV4Address string          `json:"address,omitempty"`
+	Gateway     string          `json:"gateway,omitempty"`
+	Netmask     string          `json:"netmask,omitempty"`
+	MacAddress  string          `json:"mac-address,omitempty" yaml:"mac-address,omitempty"`
+	Routes      []NetworkRoutes `json:"routes,omitempty" yaml:"routes,omitempty"`
 }
 
 // ManagedNodeSpec is the spec for a ManagedNode resource
