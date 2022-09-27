@@ -35,6 +35,7 @@ rules:
       - pods/status
     verbs:
       - update
+      - patch
   - apiGroups:
       - ""
     resources:
@@ -248,7 +249,7 @@ spec:
     spec:
       serviceAccountName: cluster-autoscaler
       containers:
-        - image: fred78290/cluster-autoscaler:v1.23.1
+        - image: fred78290/cluster-autoscaler:v1.24.3
           name: cluster-autoscaler
           resources:
             limits:

@@ -20,6 +20,7 @@ type ManagedNode struct {
 type ManagedNodeNetwork struct {
 	NetworkName string `json:"network,omitempty"`
 	DHCP        bool   `json:"dhcp,omitempty"`
+	UseRoutes   bool   `default:"true" json:"use-dhcp-routes,omitempty" yaml:"use-dhcp-routes,omitempty"`
 	IPV4Address string `json:"address,omitempty"`
 	Gateway     string `json:"gateway,omitempty"`
 	Netmask     string `json:"netmask,omitempty"`
