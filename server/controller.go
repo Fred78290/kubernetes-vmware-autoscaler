@@ -272,6 +272,9 @@ func (c *Controller) CreateCRD() error {
 														"dhcp": {
 															Type: "boolean",
 														},
+														"use-dhcp-routes": {
+															Type: "boolean",
+														},
 														"mac-address": {
 															Type: "string",
 														},
