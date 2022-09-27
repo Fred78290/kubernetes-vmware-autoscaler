@@ -24,6 +24,7 @@ type NetworkInterface struct {
 	MacAddress       string `json:"mac-address,omitempty" yaml:"mac-address,omitempty"`
 	NicName          string `json:"nic,omitempty" yaml:"nic,omitempty"`
 	DHCP             bool   `json:"dhcp,omitempty" yaml:"dhcp,omitempty"`
+	UseRoutes        bool   `default:"true" json:"use-dhcp-routes,omitempty" yaml:"use-dhcp-routes,omitempty"`
 	IPAddress        string `json:"address,omitempty" yaml:"address,omitempty"`
 	Netmask          string `json:"netmask,omitempty" yaml:"netmask,omitempty"`
 	Gateway          string `json:"gateway,omitempty" yaml:"gateway,omitempty"`
@@ -51,12 +52,13 @@ type Nameserver struct {
 
 // NetworkAdapter wrapper
 type NetworkAdapter struct {
-	DHCP4       bool               `json:"dhcp4,omitempty" yaml:"dhcp4,omitempty"`
-	NicName     *string            `json:"set-name,omitempty" yaml:"set-name,omitempty"`
-	Match       *map[string]string `json:"match,omitempty" yaml:"match,omitempty"`
-	Gateway4    *string            `json:"gateway4,omitempty" yaml:"gateway4,omitempty"`
-	Addresses   *[]string          `json:"addresses,omitempty" yaml:"addresses,omitempty"`
-	Nameservers *Nameserver        `json:"nameservers,omitempty" yaml:"nameservers,omitempty"`
+	DHCP4         bool                    `json:"dhcp4,omitempty" yaml:"dhcp4,omitempty"`
+	NicName       *string                 `json:"set-name,omitempty" yaml:"set-name,omitempty"`
+	Match         *map[string]string      `json:"match,omitempty" yaml:"match,omitempty"`
+	Gateway4      *string                 `json:"gateway4,omitempty" yaml:"gateway4,omitempty"`
+	Addresses     *[]string               `json:"addresses,omitempty" yaml:"addresses,omitempty"`
+	Nameservers   *Nameserver             `json:"nameservers,omitempty" yaml:"nameservers,omitempty"`
+	DHCPOverrides *map[string]interface{} `json:"dhcp4-overrides,omitempty" yaml:"dhcp4-overrides,omitempty"`
 }
 
 // NetworkDeclare wrapper
@@ -112,11 +114,25 @@ func (net *Network) GetCloudInitNetwork(nodeIndex int) *NetworkConfig {
 				ethernet = &NetworkAdapter{
 					DHCP4: n.DHCP,
 				}
+
+				if !n.UseRoutes {
+					dhcpOverrides := map[string]interface{}{
+						"use-routes": "false",
+					}
+					ethernet.DHCPOverrides = &dhcpOverrides
+				} else if len(n.Gateway) > 0 {
+					ethernet.Gateway4 = &n.Gateway
+				}
+
 			} else {
 				ethernet = &NetworkAdapter{
 					Addresses: &[]string{
 						ToCIDR(n.IPAddress, n.Netmask),
 					},
+				}
+
+				if len(n.Gateway) > 0 {
+					ethernet.Gateway4 = &n.Gateway
 				}
 			}
 
@@ -130,10 +146,6 @@ func (net *Network) GetCloudInitNetwork(nodeIndex int) *NetworkConfig {
 				}
 			} else {
 				ethernet.NicName = nil
-			}
-
-			if len(n.Gateway) > 0 {
-				ethernet.Gateway4 = &n.Gateway
 			}
 
 			if net.DNS != nil {

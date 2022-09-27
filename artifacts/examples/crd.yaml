@@ -50,6 +50,8 @@ spec:
                         type: string
                       dhcp:
                         type: boolean
+                      use-dhcp-routes:
+                        type: boolean
                       gateway:
                         type: string
                       mac-address:
