@@ -27,11 +27,14 @@ const (
 	// NodeLabelWorkerRole k8s annotation
 	NodeLabelWorkerRole = "node-role.kubernetes.io/worker"
 
-	// NodeLabelGroupName k8s annotation
-	NodeLabelGroupName = "cluster.autoscaler.nodegroup/name"
+	// AnnotationNodeGroupName k8s annotation
+	AnnotationNodeGroupName = "cluster.autoscaler.nodegroup/name"
 
 	// AnnotationNodeIndex k8s annotation
 	AnnotationNodeIndex = "cluster.autoscaler.nodegroup/node-index"
+
+	// AnnotationInstanceID k8s annotation
+	AnnotationInstanceID = "cluster.autoscaler.nodegroup/instance-id"
 
 	// AnnotationNodeAutoProvisionned k8s annotation
 	AnnotationNodeAutoProvisionned = "cluster.autoscaler.nodegroup/autoprovision"

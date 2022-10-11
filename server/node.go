@@ -60,11 +60,11 @@ const (
 
 // AutoScalerServerNode Describe a AutoScaler VM
 type AutoScalerServerNode struct {
-	ProviderID       string                    `json:"providerID"`
 	NodeGroupID      string                    `json:"group"`
 	NodeName         string                    `json:"name"`
 	NodeIndex        int                       `json:"index"`
-	UID              uid.UID                   `json:"crd-uid"`
+	VMUUID           string                    `json:"vm-uuid"`
+	CRDUID           uid.UID                   `json:"crd-uid"`
 	Memory           int                       `json:"memory"`
 	CPU              int                       `json:"cpu"`
 	Disk             int                       `json:"disk"`
@@ -73,8 +73,8 @@ type AutoScalerServerNode struct {
 	NodeType         AutoScalerServerNodeType  `json:"type"`
 	ControlPlaneNode bool                      `json:"control-plane,omitempty"`
 	AllowDeployment  bool                      `json:"allow-deployment,omitempty"`
-	ExtraLabels      KubernetesLabel           `json:"labels,omitempty"`
-	ExtraAnnotations KubernetesLabel           `json:"annotations,omitempty"`
+	ExtraLabels      types.KubernetesLabel     `json:"labels,omitempty"`
+	ExtraAnnotations types.KubernetesLabel     `json:"annotations,omitempty"`
 	VSphereConfig    *vsphere.Configuration    `json:"vmware"`
 	serverConfig     *types.AutoScalerServerConfig
 }
@@ -158,47 +158,26 @@ func (vm *AutoScalerServerNode) kubeAdmJoin() error {
 	return nil
 }
 
-func (vm *AutoScalerServerNode) setNodeLabels(c types.ClientGenerator, nodeLabels, systemLabels KubernetesLabel) error {
-	labels := KubernetesLabel{
-		constantes.NodeLabelGroupName: vm.NodeGroupID,
-	}
-
-	// Append extras arguments
-	for k, v := range nodeLabels {
-		labels[k] = v
-	}
-
-	for k, v := range systemLabels {
-		labels[k] = v
-	}
+func (vm *AutoScalerServerNode) setNodeLabels(c types.ClientGenerator, nodeLabels, systemLabels types.KubernetesLabel) error {
+	labels := utils.MergeKubernetesLabel(nodeLabels, systemLabels, vm.ExtraLabels)
 
 	if err := c.LabelNode(vm.NodeName, labels); err != nil {
 		return fmt.Errorf(constantes.ErrLabelNodeReturnError, vm.NodeName, err)
 	}
 
-	if len(vm.ExtraLabels) > 0 {
-		if err := c.LabelNode(vm.NodeName, vm.ExtraLabels); err != nil {
-			return fmt.Errorf(constantes.ErrLabelNodeReturnError, vm.NodeName, err)
-		}
-	}
-
-	annotations := KubernetesLabel{
-		constantes.NodeLabelGroupName:             vm.NodeGroupID,
+	annotations := types.KubernetesLabel{
+		constantes.AnnotationNodeGroupName:        vm.NodeGroupID,
+		constantes.AnnotationInstanceID:           vm.VMUUID,
 		constantes.AnnotationScaleDownDisabled:    strconv.FormatBool(vm.NodeType != AutoScalerServerNodeAutoscaled),
 		constantes.AnnotationNodeAutoProvisionned: strconv.FormatBool(vm.NodeType == AutoScalerServerNodeAutoscaled),
 		constantes.AnnotationNodeManaged:          strconv.FormatBool(vm.NodeType == AutoScalerServerNodeManaged),
 		constantes.AnnotationNodeIndex:            strconv.Itoa(vm.NodeIndex),
 	}
 
+	annotations = utils.MergeKubernetesLabel(annotations, vm.ExtraAnnotations)
+
 	if err := c.AnnoteNode(vm.NodeName, annotations); err != nil {
 		return fmt.Errorf(constantes.ErrAnnoteNodeReturnError, vm.NodeName, err)
-	}
-
-	if len(vm.ExtraAnnotations) > 0 {
-		if err := c.AnnoteNode(vm.NodeName, vm.ExtraAnnotations); err != nil {
-			return fmt.Errorf(constantes.ErrAnnoteNodeReturnError, vm.NodeName, err)
-		}
-
 	}
 
 	if vm.ControlPlaneNode && vm.AllowDeployment {
@@ -224,7 +203,7 @@ func (vm *AutoScalerServerNode) setNodeLabels(c types.ClientGenerator, nodeLabel
 	return nil
 }
 
-func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, systemLabels KubernetesLabel) error {
+func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, systemLabels types.KubernetesLabel) error {
 	glog.Debugf("AutoScalerNode::launchVM, node:%s", vm.NodeName)
 
 	var err error
@@ -248,6 +227,10 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 	} else if _, err = vsphere.Create(vm.NodeName, userInfo.GetUserName(), userInfo.GetAuthKeys(), vm.serverConfig.CloudInit, network, "", true, vm.Memory, vm.CPU, vm.Disk, vm.NodeIndex); err != nil {
 
 		err = fmt.Errorf(constantes.ErrUnableToLaunchVM, vm.NodeName, err)
+
+	} else if vm.VMUUID, err = vsphere.UUID(vm.NodeName); err != nil {
+
+		err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
 
 	} else if err = vsphere.PowerOn(vm.NodeName); err != nil {
 
@@ -288,10 +271,6 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 	} else if err = vm.kubeAdmJoin(); err != nil {
 
 		err = fmt.Errorf(constantes.ErrKubeAdmJoinFailed, vm.NodeName, err)
-
-	} else if err = c.SetProviderID(vm.NodeName, vm.ProviderID); err != nil {
-
-		err = fmt.Errorf(constantes.ErrProviderIDNotConfigured, vm.NodeName, err)
 
 	} else if err = vm.waitReady(c); err != nil {
 
@@ -509,6 +488,16 @@ func (vm *AutoScalerServerNode) GetVSphere() *vsphere.Configuration {
 	}
 
 	return vsphere
+}
+
+func (vm *AutoScalerServerNode) findInstanceUUID() string {
+	if vmUUID, err := vm.VSphereConfig.UUID(vm.NodeName); err == nil {
+		vm.VMUUID = vmUUID
+
+		return vmUUID
+	}
+
+	return ""
 }
 
 func (vm *AutoScalerServerNode) setServerConfiguration(config *types.AutoScalerServerConfig) {

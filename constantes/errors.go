@@ -49,12 +49,6 @@ const (
 	// ErrUnableToDeleteNodeGroup error msg
 	ErrUnableToDeleteNodeGroup = "can't delete node group: %s, reason: %v"
 
-	// ErrCantDecodeNodeIDWithReason error msg
-	ErrCantDecodeNodeIDWithReason = "node providerID %s not conform, reason: %v"
-
-	// ErrCantDecodeNodeID error msg
-	ErrCantDecodeNodeID = "node providerID %s not conform"
-
 	// ErrCantUnmarshallNodeWithReason error msg
 	ErrCantUnmarshallNodeWithReason = "can't unmarshall node definition:%s, reason: %v"
 
@@ -87,12 +81,6 @@ const (
 
 	// ErrUnableToDeleteVM error msg
 	ErrUnableToDeleteVM = "unable to delete the VM owned by node: %s, reason: %v"
-
-	// ErrWrongSchemeInProviderID error msg
-	ErrWrongSchemeInProviderID = "wrong scheme in providerID %s. expect %s, got: %s"
-
-	// ErrWrongPathInProviderID error msg
-	ErrWrongPathInProviderID = "wrong path in providerID: %s. expect object, got: %s"
 
 	// ErrVMAlreadyCreated error msg
 	ErrVMAlreadyCreated = "unable to launch VM, %s is already created"
@@ -186,9 +174,6 @@ const (
 
 	// ErrMarshallingError error msg
 	ErrMarshallingError = "unable to marshall node: %s as json, reason: %v"
-
-	// ErrProviderIDNotConfigured error msg
-	ErrProviderIDNotConfigured = "can't set provider ID for node: %s, reason: %v"
 
 	// ErrVMNotProvisionnedByMe error msg
 	ErrVMNotProvisionnedByMe = "the VM: %s is not provisionned by me"

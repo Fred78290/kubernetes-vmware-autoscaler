@@ -143,6 +143,12 @@ func (g GuestInfos) toExtraConfig() []types.BaseOptionValue {
 	return extraConfig
 }
 
+func (vm *VirtualMachine) UUID(ctx *context.Context) string {
+	virtualMachine := vm.VirtualMachine(ctx)
+
+	return virtualMachine.UUID(ctx)
+}
+
 func (vm *VirtualMachine) HostSystem(ctx *context.Context) (string, error) {
 
 	host, err := vm.VirtualMachine(ctx).HostSystem(ctx)

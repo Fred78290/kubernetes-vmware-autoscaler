@@ -254,6 +254,25 @@ func (conf *Configuration) VirtualMachineList() ([]*VirtualMachine, error) {
 	return conf.VirtualMachineListWithContext(ctx)
 }
 
+// UUID get VM UUID by name
+func (conf *Configuration) UUIDWithContext(ctx *context.Context, name string) (string, error) {
+	vm, err := conf.VirtualMachineWithContext(ctx, name)
+
+	if err != nil {
+		return "", err
+	}
+
+	return vm.UUID(ctx), nil
+}
+
+// UUID get VM UUID by name
+func (conf *Configuration) UUID(name string) (string, error) {
+	ctx := context.NewContext(conf.Timeout)
+	defer ctx.Cancel()
+
+	return conf.UUIDWithContext(ctx, name)
+}
+
 // WaitForIPWithContext wait ip a VM by name
 func (conf *Configuration) WaitForIPWithContext(ctx *context.Context, name string) (string, error) {
 	vm, err := conf.VirtualMachineWithContext(ctx, name)
