@@ -5,6 +5,7 @@ make container
 GOOS=$(go env GOOS)
 GOARCH=$(go env GOARCH)
 ./out/$GOOS/$GOARCH/vsphere-autoscaler \
-    --config=masterkube/config/kubernetes-vmware-autoscaler.json \
-    --save=masterkube/config/autoscaler-state.json \
+    --request-timeout=120s \
+    --config=${HOME}/Projects/autoscaled-masterkube-vmware/config/vmware-ca-k8s/config/kubernetes-vmware-autoscaler.json \
+    --save=${HOME}/Projects/autoscaled-masterkube-vmware/config/vmware-ca-k8s/config/autoscaler-state.json \
     --log-level=info
