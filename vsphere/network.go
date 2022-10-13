@@ -42,6 +42,7 @@ type NetworkResolv struct {
 
 // Network describes a card adapter
 type Network struct {
+	Domain     string              `json:"domain,omitempty" yaml:"domain,omitempty"`
 	Interfaces []*NetworkInterface `json:"interfaces,omitempty" yaml:"interfaces,omitempty"`
 	DNS        *NetworkResolv      `json:"dns,omitempty" yaml:"dns,omitempty"`
 }
@@ -72,7 +73,10 @@ type NetworkDeclare struct {
 
 // NetworkConfig wrapper
 type NetworkConfig struct {
-	Network *NetworkDeclare `json:"network,omitempty" yaml:"network,omitempty"`
+	InstanceID    string          `json:"instance-id,omitempty" yaml:"instance-id,omitempty"`
+	LocalHostname string          `json:"local-hostname,omitempty" yaml:"local-hostname,omitempty"`
+	Hostname      string          `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	Network       *NetworkDeclare `json:"network,omitempty" yaml:"network,omitempty"`
 }
 
 // Converts IP mask to 16 bit unsigned integer.
@@ -101,7 +105,7 @@ func ToCIDR(address, netmask string) string {
 }
 
 // GetCloudInitNetwork create cloud-init object
-func (net *Network) GetCloudInitNetwork(nodeIndex int) *NetworkConfig {
+func (net *Network) GetCloudInitNetwork(nodeIndex int) *NetworkDeclare {
 
 	declare := &NetworkDeclare{
 		Version:   2,
@@ -166,9 +170,7 @@ func (net *Network) GetCloudInitNetwork(nodeIndex int) *NetworkConfig {
 		}
 	}
 
-	return &NetworkConfig{
-		Network: declare,
-	}
+	return declare
 }
 
 // GetDeclaredExistingInterfaces return the declared existing interfaces

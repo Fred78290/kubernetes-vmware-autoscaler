@@ -646,33 +646,32 @@ func (vm *VirtualMachine) SetGuestInfo(ctx *context.Context, guestInfos *GuestIn
 }
 
 func (vm *VirtualMachine) cloudInit(ctx *context.Context, hostName string, userName, authKey string, cloudInit interface{}, network *Network, nodeIndex int) ([]types.BaseOptionValue, error) {
-	var metadata, userdata, vendordata, netconfig string
+	var metadata, userdata, vendordata string
 	var err error
-	var guestInfos *GuestInfos
+	var guestInfos GuestInfos
+	var fqdn string
 
 	v := vm.VirtualMachine(ctx)
 
-	// Only DHCP supported
+	if len(network.Domain) > 0 {
+		fqdn = fmt.Sprintf("%s.%s", hostName, network.Domain)
+	}
+
+	netconfig := &NetworkConfig{
+		InstanceID:    v.UUID(ctx),
+		LocalHostname: hostName,
+		Hostname:      fqdn,
+	}
+
 	if network != nil && len(network.Interfaces) > 0 {
-		if netconfig, err = encodeObject("networkconfig", network.GetCloudInitNetwork(nodeIndex)); err != nil {
-			err = fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "networkconfig", err)
-		} else if metadata, err = encodeMetadata(map[string]string{
-			"network":          netconfig,
-			"network.encoding": "gzip+base64",
-			"local-hostname":   hostName,
-			"instance-id":      v.UUID(ctx),
-		}); err != nil {
-			err = fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "metadata", err)
-		}
-	} else if metadata, _ = encodeMetadata(map[string]string{
-		"local-hostname": hostName,
-		"instance-id":    v.UUID(ctx),
-	}); err != nil {
+		netconfig.Network = network.GetCloudInitNetwork(nodeIndex)
+	}
+
+	if metadata, err = encodeObject("metadata", netconfig); err != nil {
 		err = fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "metadata", err)
 	}
 
 	if err == nil {
-
 		if cloudInit != nil {
 			if userdata, err = encodeCloudInit("userdata", cloudInit); err != nil {
 				return nil, fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "userdata", err)
@@ -689,7 +688,7 @@ func (vm *VirtualMachine) cloudInit(ctx *context.Context, hostName string, userN
 			return nil, fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "vendordata", err)
 		}
 
-		guestInfos = &GuestInfos{
+		guestInfos = GuestInfos{
 			"metadata":            metadata,
 			"metadata.encoding":   "gzip+base64",
 			"userdata":            userdata,
@@ -699,5 +698,5 @@ func (vm *VirtualMachine) cloudInit(ctx *context.Context, hostName string, userN
 		}
 	}
 
-	return guestInfos.toExtraConfig(), err
+	return guestInfos.toExtraConfig(), nil
 }
