@@ -34,6 +34,9 @@ const (
 	ManagedNodeMaxDiskSize = 1024 * 1024
 )
 
+// KubernetesLabel labels
+type KubernetesLabel map[string]string
+
 type Config struct {
 	APIServerURL             string
 	KubeConfig               string
@@ -191,7 +194,7 @@ type AutoScalerServerConfig struct {
 	KubernetesPKIDestDir       string                            `default:"/etc/kubernetes/pki" json:"kubernetes-pki-dstdir"`
 	Network                    string                            `default:"tcp" json:"network"`                     // Mandatory, Network to listen (see grpc doc) to listen
 	Listen                     string                            `default:"0.0.0.0:5200" json:"listen"`             // Mandatory, Address to listen
-	ProviderID                 string                            `json:"secret"`                                    // Mandatory, secret Identifier, client must match this
+	ServiceIdentifier          string                            `json:"secret"`                                    // Mandatory, secret Identifier, client must match this
 	MinNode                    int                               `json:"minNode"`                                   // Mandatory, Min AutoScaler VM
 	MaxNode                    int                               `json:"maxNode"`                                   // Mandatory, Max AutoScaler VM
 	MaxCreatedNodePerCycle     int                               `json:"maxNode-per-cycle" default:"2"`             // Optional, the max number VM to create in //
@@ -202,6 +205,7 @@ type AutoScalerServerConfig struct {
 	PodPrice                   float64                           `json:"podPrice"`                                  // Optional, The pod price
 	KubeAdm                    KubeJoinConfig                    `json:"kubeadm"`
 	DefaultMachineType         string                            `default:"standard" json:"default-machine"`
+	NodeLabels                 KubernetesLabel                   `json:"nodeLabels"`
 	Machines                   map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
 	CloudInit                  interface{}                       `json:"cloud-init"`                            // Optional, The cloud init conf file
 	Optionals                  *AutoScalerServerOptionals        `json:"optionals"`

@@ -34,7 +34,7 @@ const (
 )
 
 // KubernetesLabel labels
-type KubernetesLabel map[string]string
+//type KubernetesLabel map[string]string
 
 type ServerNodeState int
 
@@ -59,8 +59,8 @@ type AutoScalerServerNodeGroup struct {
 	MinNodeSize                int                              `json:"minSize"`
 	MaxNodeSize                int                              `json:"maxSize"`
 	Nodes                      map[string]*AutoScalerServerNode `json:"nodes"`
-	NodeLabels                 KubernetesLabel                  `json:"nodeLabels"`
-	SystemLabels               KubernetesLabel                  `json:"systemLabels"`
+	NodeLabels                 types.KubernetesLabel            `json:"nodeLabels"`
+	SystemLabels               types.KubernetesLabel            `json:"systemLabels"`
 	AutoProvision              bool                             `json:"auto-provision"`
 	LastCreatedNodeIndex       int                              `json:"node-index"`
 	RunningNodes               map[int]ServerNodeState          `json:"running-nodes-state"`
@@ -73,8 +73,8 @@ type AutoScalerServerNodeGroup struct {
 	configuration              *types.AutoScalerServerConfig
 }
 
-func CreateLabelOrAnnotation(values []string) KubernetesLabel {
-	result := KubernetesLabel{}
+func CreateLabelOrAnnotation(values []string) types.KubernetesLabel {
+	result := types.KubernetesLabel{}
 
 	for _, value := range values {
 		if len(value) > 0 {
@@ -223,7 +223,6 @@ func (g *AutoScalerServerNodeGroup) addManagedNode(crd *v1alpha1.ManagedNode) (*
 			resLimit.GetMinValue(constantes.ResourceNameManagedNodeDisk, types.ManagedNodeMinDiskSize))
 
 		node := &AutoScalerServerNode{
-			ProviderID:       g.providerIDForNode(nodeName),
 			NodeGroupID:      g.NodeGroupIdentifier,
 			NodeName:         nodeName,
 			NodeIndex:        nodeIndex,
@@ -235,7 +234,7 @@ func (g *AutoScalerServerNodeGroup) addManagedNode(crd *v1alpha1.ManagedNode) (*
 			AllowDeployment:  crd.Spec.AllowDeployment,
 			ExtraLabels:      CreateLabelOrAnnotation(crd.Spec.Labels),
 			ExtraAnnotations: CreateLabelOrAnnotation(crd.Spec.Annotations),
-			UID:              crd.GetUID(),
+			CRDUID:           crd.GetUID(),
 			VSphereConfig:    vsphereConfig,
 			serverConfig:     g.configuration,
 		}
@@ -302,14 +301,13 @@ func (g *AutoScalerServerNodeGroup) addNodes(c types.ClientGenerator, delta int)
 
 			g.RunningNodes[nodeIndex] = ServerNodeStateCreating
 
-			extraAnnotations := KubernetesLabel{}
-			extraLabels := KubernetesLabel{
+			extraAnnotations := types.KubernetesLabel{}
+			extraLabels := types.KubernetesLabel{
 				constantes.NodeLabelWorkerRole: "",
 				"worker":                       "true",
 			}
 
 			node := &AutoScalerServerNode{
-				ProviderID:       g.providerIDForNode(nodeName),
 				NodeGroupID:      g.NodeGroupIdentifier,
 				NodeName:         nodeName,
 				NodeIndex:        nodeIndex,
@@ -532,7 +530,6 @@ func (g *AutoScalerServerNodeGroup) findManagedNodeDeleted(client types.ClientGe
 func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenerator, includeExistingNode bool) (map[string]*AutoScalerServerNode, error) {
 	var lastNodeIndex = 0
 	var nodeInfos *apiv1.NodeList
-	var out string
 	var err error
 
 	if nodeInfos, err = client.NodeList(); err != nil {
@@ -551,21 +548,20 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 	g.numOfControlPlanes = 0
 
 	for _, nodeInfo := range nodeInfos.Items {
-		var providerID = utils.GetNodeProviderID(g.ServiceIdentifier, &nodeInfo)
-		var nodeID string
-		var nodeType AutoScalerServerNodeType
-		var UID uid.UID
 
-		if len(providerID) > 0 {
-			out, _ = utils.NodeGroupIDFromProviderID(g.ServiceIdentifier, providerID)
+		if nodegroupName, found := nodeInfo.Annotations[constantes.AnnotationNodeGroupName]; found {
+			var nodeType AutoScalerServerNodeType
+			var crdUID uid.UID
+			var vmUUID string
+			var nodeIndex string
 
 			autoProvisionned, _ := strconv.ParseBool(nodeInfo.Annotations[constantes.AnnotationNodeAutoProvisionned])
 			managedNode, _ := strconv.ParseBool(nodeInfo.Annotations[constantes.AnnotationNodeManaged])
 			controlPlane := false
 
-			if _, found := nodeInfo.Labels[constantes.NodeLabelControlPlaneRole]; found {
+			if _, found = nodeInfo.Labels[constantes.NodeLabelControlPlaneRole]; found {
 				controlPlane = true
-			} else if _, found := nodeInfo.Labels[constantes.NodeLabelMasterRole]; found {
+			} else if _, found = nodeInfo.Labels[constantes.NodeLabelMasterRole]; found {
 				controlPlane = true
 			}
 
@@ -578,106 +574,101 @@ func (g *AutoScalerServerNodeGroup) autoDiscoveryNodes(client types.ClientGenera
 			}
 
 			// Ignore nodes not handled by autoscaler if option includeExistingNode == false
-			if out == g.NodeGroupIdentifier && (autoProvisionned || includeExistingNode) {
-				glog.Infof("Discover node:%s matching nodegroup:%s", providerID, g.NodeGroupIdentifier)
+			if nodegroupName == g.NodeGroupIdentifier && (autoProvisionned || includeExistingNode) {
+				glog.Infof("Discover node:%s matching nodegroup:%s", nodeInfo.Name, g.NodeGroupIdentifier)
 
-				if nodeID, err = utils.NodeNameFromProviderID(g.ServiceIdentifier, providerID); err == nil {
-					node := formerNodes[nodeID]
+				node := formerNodes[nodeInfo.Name]
+				runningIP := ""
 
-					runningIP := ""
+				if vmUUID, found = nodeInfo.Annotations[constantes.AnnotationInstanceID]; !found {
+					vmUUID = node.findInstanceUUID()
+				}
 
-					for _, address := range nodeInfo.Status.Addresses {
-						if address.Type == apiv1.NodeInternalIP {
-							runningIP = address.Address
-							break
-						}
+				if nodeIndex, found = nodeInfo.Annotations[constantes.AnnotationNodeIndex]; found {
+					lastNodeIndex, _ = strconv.Atoi(nodeIndex)
+				}
+
+				for _, address := range nodeInfo.Status.Addresses {
+					if address.Type == apiv1.NodeInternalIP {
+						runningIP = address.Address
+						break
+					}
+				}
+
+				glog.Infof("Add node:%s with IP:%s to nodegroup:%s", nodeInfo.Name, runningIP, g.NodeGroupIdentifier)
+
+				g.LastCreatedNodeIndex = utils.MaxInt(g.LastCreatedNodeIndex, lastNodeIndex)
+
+				if ownerRef := metav1.GetControllerOf(&nodeInfo); ownerRef != nil {
+					if ownerRef.Kind == v1alpha1.SchemeGroupVersionKind.Kind {
+						crdUID = ownerRef.UID
+					}
+				}
+
+				if node == nil {
+					node = &AutoScalerServerNode{
+						NodeGroupID:      g.NodeGroupIdentifier,
+						NodeName:         nodeInfo.Name,
+						NodeIndex:        lastNodeIndex,
+						State:            AutoScalerServerNodeStateRunning,
+						NodeType:         nodeType,
+						VMUUID:           vmUUID,
+						CRDUID:           crdUID,
+						ControlPlaneNode: controlPlane,
+						AllowDeployment:  g.nodeAllowDeployment(&nodeInfo),
+						CPU:              int(nodeInfo.Status.Capacity.Cpu().Value()),
+						Memory:           int(nodeInfo.Status.Capacity.Memory().Value() / (1024 * 1024)),
+						Disk:             int(nodeInfo.Status.Capacity.Storage().Value() / (1024 * 1024)),
+						VSphereConfig:    g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Copy(),
+						IPAddress:        runningIP,
+						serverConfig:     g.configuration,
 					}
 
-					glog.Infof("Add node:%s with IP:%s to nodegroup:%s", nodeID, runningIP, g.NodeGroupIdentifier)
+					err = client.AnnoteNode(nodeInfo.Name, map[string]string{
+						constantes.AnnotationNodeGroupName:        g.NodeGroupIdentifier,
+						constantes.AnnotationInstanceID:           vmUUID,
+						constantes.AnnotationScaleDownDisabled:    strconv.FormatBool(nodeType != AutoScalerServerNodeAutoscaled),
+						constantes.AnnotationNodeAutoProvisionned: strconv.FormatBool(autoProvisionned),
+						constantes.AnnotationNodeManaged:          strconv.FormatBool(managedNode),
+						constantes.AnnotationNodeIndex:            strconv.Itoa(node.NodeIndex),
+					})
 
-					if len(nodeInfo.Annotations[constantes.AnnotationNodeIndex]) != 0 {
-						lastNodeIndex, _ = strconv.Atoi(nodeInfo.Annotations[constantes.AnnotationNodeIndex])
+					if err != nil {
+						glog.Errorf(constantes.ErrAnnoteNodeReturnError, nodeInfo.Name, err)
 					}
 
-					g.LastCreatedNodeIndex = utils.MaxInt(g.LastCreatedNodeIndex, lastNodeIndex)
-
-					if ownerRef := metav1.GetControllerOf(&nodeInfo); ownerRef != nil {
-						if ownerRef.Kind == v1alpha1.SchemeGroupVersionKind.Kind {
-							UID = ownerRef.UID
-						}
+					if err != nil {
+						glog.Errorf(constantes.ErrLabelNodeReturnError, nodeInfo.Name, err)
 					}
+				}
 
-					if node == nil {
-						nodeInfo.Status.Capacity.Cpu()
-						node = &AutoScalerServerNode{
-							ProviderID:       providerID,
-							NodeGroupID:      g.NodeGroupIdentifier,
-							NodeName:         nodeID,
-							NodeIndex:        lastNodeIndex,
-							State:            AutoScalerServerNodeStateRunning,
-							NodeType:         nodeType,
-							UID:              UID,
-							ControlPlaneNode: controlPlane,
-							AllowDeployment:  g.nodeAllowDeployment(&nodeInfo),
-							CPU:              int(nodeInfo.Status.Capacity.Cpu().Value()),
-							Memory:           int(nodeInfo.Status.Capacity.Memory().Value() / (1024 * 1024)),
-							Disk:             int(nodeInfo.Status.Capacity.Storage().Value() / (1024 * 1024)),
-							VSphereConfig:    g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Copy(),
-							IPAddress:        runningIP,
-							serverConfig:     g.configuration,
-						}
+				if err = node.retrieveNetworkInfos(); err != nil {
+					glog.Errorf("an error occured during retrieve network infos: %v", err)
+				}
 
-						err = client.AnnoteNode(nodeInfo.Name, map[string]string{
-							constantes.NodeLabelGroupName:             g.NodeGroupIdentifier,
-							constantes.AnnotationScaleDownDisabled:    strconv.FormatBool(nodeType != AutoScalerServerNodeAutoscaled),
-							constantes.AnnotationNodeAutoProvisionned: strconv.FormatBool(autoProvisionned),
-							constantes.AnnotationNodeManaged:          strconv.FormatBool(managedNode),
-							constantes.AnnotationNodeIndex:            strconv.Itoa(node.NodeIndex),
-						})
+				g.Nodes[nodeInfo.Name] = node
+				g.RunningNodes[lastNodeIndex] = ServerNodeStateRunning
 
-						if err != nil {
-							glog.Errorf(constantes.ErrAnnoteNodeReturnError, nodeInfo.Name, err)
-						}
-
-						err = client.LabelNode(nodeInfo.Name, map[string]string{
-							constantes.NodeLabelGroupName: g.NodeGroupIdentifier,
-						})
-
-						if err != nil {
-							glog.Errorf(constantes.ErrLabelNodeReturnError, nodeInfo.Name, err)
-						}
-					}
-
-					if err = node.retrieveNetworkInfos(); err != nil {
-						glog.Errorf("an error occured during retrieve network infos: %v", err)
-					}
-
-					g.Nodes[nodeID] = node
-					g.RunningNodes[lastNodeIndex] = ServerNodeStateRunning
-
-					if controlPlane {
-						if managedNode {
-							g.numOfManagedNodes++
-						} else {
-							g.numOfExternalNodes++
-						}
-
-						g.numOfControlPlanes++
-
-					} else if autoProvisionned {
-						g.numOfProvisionnedNodes++
-					} else if managedNode {
+				if controlPlane {
+					if managedNode {
 						g.numOfManagedNodes++
 					} else {
 						g.numOfExternalNodes++
 					}
 
-					lastNodeIndex++
+					g.numOfControlPlanes++
 
-					_, _ = node.statusVM()
+				} else if autoProvisionned {
+					g.numOfProvisionnedNodes++
+				} else if managedNode {
+					g.numOfManagedNodes++
 				} else {
-					glog.Errorf(constantes.ErrGetVMInfoFailed, nodeInfo.Name, err)
+					g.numOfExternalNodes++
 				}
+
+				lastNodeIndex++
+
+				_, _ = node.statusVM()
 			} else {
 				glog.Infof("Ignore kubernetes node %s not handled by me", nodeInfo.Name)
 			}
@@ -795,17 +786,9 @@ func (g *AutoScalerServerNodeGroup) nodeName(vmIndex int, controlplane, managed 
 	}
 }
 
-func (g *AutoScalerServerNodeGroup) providerID() string {
-	return fmt.Sprintf("%s://%s/object?type=group", g.ServiceIdentifier, g.NodeGroupIdentifier)
-}
-
-func (g *AutoScalerServerNodeGroup) providerIDForNode(nodeName string) string {
-	return fmt.Sprintf("%s://%s/object?type=node&name=%s", g.ServiceIdentifier, g.NodeGroupIdentifier, nodeName)
-}
-
-func (g *AutoScalerServerNodeGroup) findNodeByUID(uid uid.UID) (*AutoScalerServerNode, error) {
+func (g *AutoScalerServerNodeGroup) findNodeByCRDUID(uid uid.UID) (*AutoScalerServerNode, error) {
 	for _, node := range g.Nodes {
-		if node.UID == uid {
+		if node.CRDUID == uid {
 			return node, nil
 		}
 	}
