@@ -74,7 +74,8 @@ Now it's possible to disable dhcp-default routes
 
 ## VMWare CPI compliant
 
-Version 1.24.6 and 1.25.2 and above are VMWare CPI compliant by using provider-id conform to syntax `vsphere://<VM UUID>`
+Version 1.24.6 and 1.25.2 and above are [vsphere cloud provider](https://github.com/kubernetes/cloud-provider-vsphere) by building provider-id conform to syntax `vsphere://<VM UUID>`
+
 
 ## CRD controller
 
