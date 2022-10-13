@@ -374,7 +374,7 @@ func (c *Controller) startManagedNodes(managedNodesByUID map[uid.UID]string, nod
 			}
 
 			for _, node := range nodesList {
-				if key, found := managedNodesByUID[node.UID]; found {
+				if key, found := managedNodesByUID[node.CRDUID]; found {
 					if managedNode, err := c.getManagedNodeFromKey(key); err == nil {
 						newStatus := managedNode.Status
 						key := c.generateKey(managedNode)
@@ -424,7 +424,7 @@ func (c *Controller) startManagedNodes(managedNodesByUID map[uid.UID]string, nod
 						glog.Errorf("managed node by key: %s is not found, reason: %v", key, err)
 					}
 				} else {
-					glog.Errorf("managed node by UID: %s is not found", node.UID)
+					glog.Errorf("managed node by UID: %s is not found", node.CRDUID)
 				}
 			}
 		}
@@ -441,9 +441,9 @@ func (c *Controller) findManagedNodeDeleted() {
 				// If this object is not owned by a ManagedNode, we should not do anything more with it.
 				if ownerRef.Kind == v1alpha1.SchemeGroupVersionKind.Kind {
 					if _, err := c.getManagedNodeFromKey(ownerRef.Name); apierrors.IsNotFound(err) {
-						if nodegroup, found := nodeInfo.Annotations[constantes.NodeLabelGroupName]; found {
+						if nodegroup, found := nodeInfo.Annotations[constantes.AnnotationNodeGroupName]; found {
 							if ng, err := c.application.getNodeGroup(nodegroup); err == nil {
-								if node, err := ng.findNodeByUID(ownerRef.UID); err == nil {
+								if node, err := ng.findNodeByCRDUID(ownerRef.UID); err == nil {
 									if err = ng.deleteNode(c.client, node); err != nil {
 										glog.Warnf(warnNodeDeletionErr, node.NodeName, err)
 									}
@@ -485,7 +485,7 @@ func (c *Controller) findManagedNodeDeleted() {
 
 					// Try to find the node group and delete node
 					if ng, err := c.application.getNodeGroup(managedNode.GetNodegroup()); err == nil {
-						if node, err := ng.findNodeByUID(managedNode.GetUID()); err == nil {
+						if node, err := ng.findNodeByCRDUID(managedNode.GetUID()); err == nil {
 							if err = ng.deleteNode(c.client, node); err != nil {
 								glog.Warnf(warnNodeDeletionErr, node.NodeName, err)
 							}
@@ -639,7 +639,7 @@ func (c *Controller) handleManagedNode(key string, managedNodesByUID map[uid.UID
 			// Delete node eventually (probably dead code)
 			if managedNode != nil && managedNode.Status.Code == nodemanager.StatusManagedNodeCreated {
 				if nodeGroup, err = c.application.getNodeGroup(managedNode.GetNodegroup()); err == nil {
-					if node, err = nodeGroup.findNodeByUID(managedNode.GetUID()); err == nil {
+					if node, err = nodeGroup.findNodeByCRDUID(managedNode.GetUID()); err == nil {
 						glog.Infof("ManagedNode '%s' is deleted, delete associated node %s", key, node.NodeName)
 
 						if err = nodeGroup.deleteNode(c.client, node); err != nil {
@@ -691,7 +691,7 @@ func (c *Controller) handleManagedNode(key string, managedNodesByUID map[uid.UID
 				}
 			}
 
-		} else if node, _ = nodeGroup.findNodeByUID(managedNode.GetUID()); node == nil {
+		} else if node, _ = nodeGroup.findNodeByCRDUID(managedNode.GetUID()); node == nil {
 
 			if oldStatus.Code == nodemanager.StatusManagedNodeNeedToCreated || oldStatus.Code == nodemanager.StatusManagedNodeGroupNotFound || oldStatus.Code == nodemanager.StatusManagedNodeNiceLimitReached {
 
@@ -818,7 +818,7 @@ func (c *Controller) generateKey(obj interface{}) string {
 func (c *Controller) deleteManagedNode(obj interface{}) {
 	if managedNode, ok := obj.(*v1alpha1.ManagedNode); ok {
 		if nodeGroup, err := c.application.getNodeGroup(managedNode.GetNodegroup()); err == nil {
-			if node, err := nodeGroup.findNodeByUID(managedNode.GetUID()); err == nil {
+			if node, err := nodeGroup.findNodeByCRDUID(managedNode.GetUID()); err == nil {
 				glog.Infof("ManagedNode '%s' is deleted, delete associated node %s", c.generateKey(managedNode), node.NodeName)
 
 				if err = nodeGroup.deleteNode(c.client, node); err != nil {

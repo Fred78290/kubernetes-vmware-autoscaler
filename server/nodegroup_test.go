@@ -82,7 +82,6 @@ func (m mockupClientGenerator) WaitNodeToBeReady(nodeName string, timeToWaitInSe
 
 func createTestNode(ng *AutoScalerServerNodeGroup) *AutoScalerServerNode {
 	return &AutoScalerServerNode{
-		ProviderID:    ng.providerIDForNode(testNodeName),
 		NodeGroupID:   testGroupID,
 		NodeName:      testNodeName,
 		Memory:        2048,
@@ -115,7 +114,7 @@ func newTestNodeGroup() (*types.AutoScalerServerConfig, *AutoScalerServerNodeGro
 
 	if err == nil {
 		ng := &AutoScalerServerNodeGroup{
-			ServiceIdentifier:          testProviderID,
+			ServiceIdentifier:          testServiceIdentifier,
 			NodeGroupIdentifier:        testGroupID,
 			ProvisionnedNodeNamePrefix: "autoscaled",
 			ManagedNodeNamePrefix:      "worker",
@@ -128,11 +127,11 @@ func newTestNodeGroup() (*types.AutoScalerServerConfig, *AutoScalerServerNodeGro
 			Status:      NodegroupNotCreated,
 			MinNodeSize: 0,
 			MaxNodeSize: 5,
-			NodeLabels: KubernetesLabel{
+			NodeLabels: types.KubernetesLabel{
 				"monitor":  "true",
 				"database": "true",
 			},
-			SystemLabels:  KubernetesLabel{},
+			SystemLabels:  types.KubernetesLabel{},
 			Nodes:         make(map[string]*AutoScalerServerNode),
 			pendingNodes:  make(map[string]*AutoScalerServerNode),
 			configuration: config,
