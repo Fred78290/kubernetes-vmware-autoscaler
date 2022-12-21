@@ -34,3 +34,5 @@ kubernetes-vmware-autoscaler
 masterkube/bin/govc.defs
 
 build-dev.sh
+
+.secrets
