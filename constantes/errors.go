@@ -160,6 +160,9 @@ const (
 	// ErrAnnoteNodeReturnError error msg
 	ErrAnnoteNodeReturnError = "set annotations on node: %s got error: %s"
 
+	// ErrMissingNodeAnnotationError error msg
+	ErrMissingNodeAnnotationError = "missing mandatories annotations on node: %s"
+
 	// ErrNotImplemented error msg
 	ErrNotImplemented = "not implemented"
 

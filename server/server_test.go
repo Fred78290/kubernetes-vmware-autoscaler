@@ -85,6 +85,38 @@ func (m *serverTest) NodeGroupForNode() {
 	}
 }
 
+func (m *serverTest) HasInstance() {
+	s, _, ctx, err := newTestServer(true, true, AutoScalerServerNodeStateRunning)
+
+	if assert.NoError(m.t, err) {
+		request := &apigrpc.HasInstanceRequest{
+			ProviderID: testServiceIdentifier,
+			Node: utils.ToJSON(
+				apiv1.Node{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: testNodeName,
+						UID:  testCRDUID,
+						Annotations: map[string]string{
+							constantes.AnnotationNodeGroupName:        testGroupID,
+							constantes.AnnotationNodeIndex:            "0",
+							constantes.AnnotationInstanceID:           testVMUUID,
+							constantes.AnnotationNodeAutoProvisionned: "true",
+						},
+					},
+				},
+			),
+		}
+
+		if got, err := s.HasInstance(ctx, request); err != nil {
+			m.t.Errorf("AutoScalerServerApp.HasInstance() error = %v", err)
+		} else if got.GetError() != nil {
+			m.t.Errorf("AutoScalerServerApp.HasInstance() return an error, code = %v, reason = %s", got.GetError().GetCode(), got.GetError().GetReason())
+		} else if got.GetHasInstance() == false {
+			m.t.Error("AutoScalerServerApp.HasInstance() not found")
+		}
+	}
+}
+
 func (m *serverTest) Pricing() {
 	s, _, ctx, err := newTestServer(true, false)
 

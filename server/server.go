@@ -355,6 +355,91 @@ func (s *AutoScalerServerApp) NodeGroupForNode(ctx context.Context, request *api
 
 }
 
+func (s *AutoScalerServerApp) HasInstance(ctx context.Context, request *apigrpc.HasInstanceRequest) (*apigrpc.HasInstanceReply, error) {
+
+	glog.Debugf("Call server HasInstance: %v", request)
+
+	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+		glog.Errorf(constantes.ErrMismatchingProvider)
+		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
+	}
+
+	node, err := utils.NodeFromJSON(request.GetNode())
+
+	if err != nil {
+		glog.Errorf(constantes.ErrCantUnmarshallNodeWithReason, request.GetNode(), err)
+
+		return &apigrpc.HasInstanceReply{
+			Response: &apigrpc.HasInstanceReply_Error{
+				Error: &apigrpc.Error{
+					Code:   constantes.CloudProviderError,
+					Reason: err.Error(),
+				},
+			},
+		}, nil
+	}
+
+	if nodegroupName, found := node.Annotations[constantes.AnnotationNodeGroupName]; found {
+		nodeGroup, err := s.getNodeGroup(nodegroupName)
+
+		if err != nil {
+			return &apigrpc.HasInstanceReply{
+				Response: &apigrpc.HasInstanceReply_Error{
+					Error: &apigrpc.Error{
+						Code:   constantes.CloudProviderError,
+						Reason: err.Error(),
+					},
+				},
+			}, nil
+		}
+
+		if nodeGroup == nil {
+			glog.Infof("Nodegroup not found for node:%s", node.Name)
+
+			return &apigrpc.HasInstanceReply{
+				Response: &apigrpc.HasInstanceReply_Error{
+					Error: &apigrpc.Error{
+						Code:   constantes.CloudProviderError,
+						Reason: fmt.Sprintf(constantes.ErrNodeGroupForNodeNotFound, nodegroupName, node.Name),
+					},
+				},
+			}, nil
+		}
+
+		var hasInstance bool
+
+		if hasInstance, err = nodeGroup.hasInstance(node.Name); err != nil {
+			return &apigrpc.HasInstanceReply{
+				Response: &apigrpc.HasInstanceReply_Error{
+					Error: &apigrpc.Error{
+						Code:   constantes.CloudProviderError,
+						Reason: err.Error(),
+					},
+				},
+			}, nil
+		}
+
+		return &apigrpc.HasInstanceReply{
+			Response: &apigrpc.HasInstanceReply_HasInstance{
+				HasInstance: hasInstance,
+			},
+		}, nil
+
+	} else {
+		glog.Infof("Node annotation[%s] is empty", constantes.AnnotationNodeGroupName)
+
+		return &apigrpc.HasInstanceReply{
+			Response: &apigrpc.HasInstanceReply_Error{
+				Error: &apigrpc.Error{
+					Code:   constantes.CloudProviderError,
+					Reason: fmt.Sprintf(constantes.ErrMissingNodeAnnotationError, node.Name),
+				},
+			},
+		}, nil
+	}
+
+}
+
 // Pricing returns pricing model for this cloud provider or error if not available.
 // Implementation optional.
 func (s *AutoScalerServerApp) Pricing(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.PricingModelReply, error) {

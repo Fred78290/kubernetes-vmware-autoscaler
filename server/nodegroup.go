@@ -513,6 +513,20 @@ func (g *AutoScalerServerNodeGroup) nodeAllowDeployment(nodeInfo *apiv1.Node) bo
 	return true
 }
 
+func (g *AutoScalerServerNodeGroup) hasInstance(nodeName string) (bool, error) {
+	glog.Debugf("AutoScalerServerNodeGroup::hasInstance, nodeGroupID:%s, nodeName:%s", g.NodeGroupIdentifier, nodeName)
+
+	if node := g.Nodes[nodeName]; node != nil {
+		if status, err := node.statusVM(); err != nil {
+			return false, err
+		} else {
+			return status == AutoScalerServerNodeStateRunning, nil
+		}
+	}
+
+	return false, fmt.Errorf(constantes.ErrNodeNotFoundInNodeGroup, nodeName, g.NodeGroupIdentifier)
+}
+
 func (g *AutoScalerServerNodeGroup) findManagedNodeDeleted(client types.ClientGenerator, formerNodes map[string]*AutoScalerServerNode) {
 
 	for nodeName, formerNode := range formerNodes {
