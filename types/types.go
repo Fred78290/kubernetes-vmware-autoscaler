@@ -150,9 +150,10 @@ type AutoScalerServerOptionals struct {
 
 // AutoScalerServerSSH contains ssh client infos
 type AutoScalerServerSSH struct {
-	UserName string `json:"user"`
-	Password string `json:"password"`
-	AuthKeys string `json:"ssh-private-key"`
+	UserName     string `json:"user"`
+	Password     string `json:"password"`
+	AuthKeys     string `json:"ssh-private-key"`
+	UseSimulator bool   `json:"-"`
 }
 
 // GetUserName returns user name from config or the real current username is empty or equal to ~

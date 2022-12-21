@@ -1,0 +1,133 @@
+{
+  "use-external-etcd": false,
+  "src-etcd-ssl-dir": "/etc/etcd/ssl",
+  "dst-etcd-ssl-dir": "/etc/kubernetes/pki/etcd",
+  "kubernetes-pki-srcdir": "/etc/kubernetes/pki",
+  "kubernetes-pki-dstdir": "/etc/kubernetes/pki",
+  "network": "unix",
+  "listen": "/var/run/cluster-autoscaler/vmware.sock",
+  "secret": "vmware",
+  "minNode": 0,
+  "maxNode": 9,
+  "maxNode-per-cycle": 2,
+  "node-name-prefix": "autoscaled",
+  "managed-name-prefix": "managed",
+  "controlplane-name-prefix": "master",
+  "nodePrice": 0,
+  "podPrice": 0,
+  "image": "DC0_H0_VM0",
+  "optionals": {
+    "pricing": false,
+    "getAvailableMachineTypes": false,
+    "newNodeGroup": false,
+    "templateNodeInfo": false,
+    "createNodeGroup": false,
+    "deleteNodeGroup": false
+  },
+  "kubeadm": {
+    "address": "192.168.1.20:6443",
+    "token": "XXX.YYYYYY",
+    "ca": "sha256:aff09a080fd113f0b5013c8af5f78608599ad1e053efdb59e9948d34269588db",
+    "extras-args": [
+      "--ignore-preflight-errors=All"
+    ]
+  },
+  "default-machine": "large",
+  "machines": {
+    "tiny": {
+      "memsize": 2048,
+      "vcpus": 2,
+      "disksize": 10240
+    },
+    "small": {
+      "memsize": 4096,
+      "vcpus": 2,
+      "disksize": 20480
+    },
+    "medium": {
+      "memsize": 4096,
+      "vcpus": 4,
+      "disksize": 20480
+    },
+    "large": {
+      "memsize": 8192,
+      "vcpus": 4,
+      "disksize": 51200
+    },
+    "xlarge": {
+      "memsize": 16384,
+      "vcpus": 4,
+      "disksize": 102400
+    },
+    "2xlarge": {
+      "memsize": 16384,
+      "vcpus": 8,
+      "disksize": 102400
+    },
+    "4xlarge": {
+      "memsize": 32768,
+      "vcpus": 8,
+      "disksize": 102400
+    }
+  },
+  "cloud-init": {
+    "package_update": false,
+    "package_upgrade": false
+  },
+  "ssh-infos": {
+    "user": "kubernetes",
+    "ssh-private-key": "~/.ssh/id_rsa"
+  },
+  "vmware": {
+    "vmware-ca-k8s": {
+      "url": "https://127.0.0.1:8989/sdk",
+      "uid": "user",
+      "password": "pass",
+      "insecure": true,
+      "dc": "DC0",
+      "datastore": "LocalDS_0",
+      "resource-pool": "/DC0/host/DC0_H0/Resources",
+      "vmFolder": "",
+      "timeout": 300,
+      "template-name": "DC0_H0_VM0",
+      "template": false,
+      "linked": false,
+      "customization": "",
+      "network": {
+        "domain": "sample.com",
+        "dns": {
+          "search": [
+            "sample.com"
+          ],
+          "nameserver": [
+            "8.8.8.8"
+          ]
+        },
+        "interfaces": [
+          {
+            "primary": false,
+            "exists": true,
+            "network": "VM Network",
+            "adapter": "vmxnet3",
+            "mac-address": "generate",
+            "nic": "eth0",
+            "dhcp": true,
+            "use-dhcp-routes": true
+          },
+          {
+            "primary": true,
+            "exists": true,
+            "network": "DC0_DVPG0",
+            "adapter": "vmxnet3",
+            "mac-address": "generate",
+            "nic": "eth1",
+            "dhcp": false,
+            "address": "192.168.1.26",
+            "gateway": "192.168.1.1",
+            "netmask": "255.255.255.0"
+          }
+        ]
+      }
+    }
+  }
+}

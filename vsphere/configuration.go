@@ -28,6 +28,7 @@ type Configuration struct {
 	LinkedClone   bool          `json:"linked"`
 	Customization string        `json:"customization"`
 	Network       *Network      `json:"network"`
+	UseSimulator  bool          `json:"-"`
 }
 
 // Status shortened vm status
@@ -78,6 +79,8 @@ func (conf *Configuration) Copy() *Configuration {
 	var dup Configuration
 
 	_ = Copy(&dup, conf)
+
+	dup.UseSimulator = conf.UseSimulator
 
 	return &dup
 }
@@ -275,6 +278,11 @@ func (conf *Configuration) UUID(name string) (string, error) {
 
 // WaitForIPWithContext wait ip a VM by name
 func (conf *Configuration) WaitForIPWithContext(ctx *context.Context, name string) (string, error) {
+
+	if conf.UseSimulator {
+		return "127.0.0.1", nil
+	}
+
 	vm, err := conf.VirtualMachineWithContext(ctx, name)
 
 	if err != nil {
@@ -294,15 +302,18 @@ func (conf *Configuration) WaitForIP(name string) (string, error) {
 
 // SetAutoStartWithContext set autostart for the VM
 func (conf *Configuration) SetAutoStartWithContext(ctx *context.Context, esxi, name string, startOrder int) error {
-	var err error
-	var client *Client
-	var dc *Datacenter
-	var host *HostAutoStartManager
+	var err error = nil
 
-	if client, err = conf.GetClient(ctx); err == nil {
-		if dc, err = client.GetDatacenter(ctx, conf.DataCenter); err == nil {
-			if host, err = dc.GetHostAutoStartManager(ctx, esxi); err == nil {
-				return host.SetAutoStart(ctx, conf.DataStore, name, startOrder)
+	if !conf.UseSimulator {
+		var client *Client
+		var dc *Datacenter
+		var host *HostAutoStartManager
+
+		if client, err = conf.GetClient(ctx); err == nil {
+			if dc, err = client.GetDatacenter(ctx, conf.DataCenter); err == nil {
+				if host, err = dc.GetHostAutoStartManager(ctx, esxi); err == nil {
+					return host.SetAutoStart(ctx, conf.DataStore, name, startOrder)
+				}
 			}
 		}
 	}
@@ -312,6 +323,10 @@ func (conf *Configuration) SetAutoStartWithContext(ctx *context.Context, esxi, n
 
 // WaitForToolsRunningWithContext wait vmware tools is running a VM by name
 func (conf *Configuration) WaitForToolsRunningWithContext(ctx *context.Context, name string) (bool, error) {
+	if conf.UseSimulator {
+		return true, nil
+	}
+
 	vm, err := conf.VirtualMachineWithContext(ctx, name)
 
 	if err != nil {

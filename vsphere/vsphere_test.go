@@ -21,6 +21,7 @@ type ConfigurationTest struct {
 	SSH       types.AutoScalerServerSSH `json:"ssh"`
 	VM        string                    `json:"old-vm"`
 	New       *NewVirtualMachineConf    `json:"new-vm"`
+	inited    bool
 }
 
 type NewVirtualMachineConf struct {
@@ -32,36 +33,27 @@ type NewVirtualMachineConf struct {
 	Network    *vsphere.Network
 }
 
-var testConfig *ConfigurationTest
-var confName = "test.json"
-
-func testFeature(name string) bool {
-	if feature := os.Getenv(name); feature != "" {
-		return feature != "NO"
-	}
-
-	return true
-}
+var testConfig ConfigurationTest
+var confName = "../test/vsphere.json"
 
 func loadFromJson(fileName string) *ConfigurationTest {
-	if testConfig == nil {
-		file, err := os.Open(fileName)
-		if err != nil {
+	if !testConfig.inited {
+		if configStr, err := os.ReadFile(fileName); err != nil {
 			glog.Fatalf("failed to open config file:%s, error:%v", fileName, err)
-		}
+		} else {
+			err = json.Unmarshal(configStr, &testConfig)
 
-		decoder := json.NewDecoder(file)
-		err = decoder.Decode(&testConfig)
-		if err != nil {
-			glog.Fatalf("failed to decode config file:%s, error:%v", fileName, err)
+			if err != nil {
+				glog.Fatalf("failed to decode config file:%s, error:%v", fileName, err)
+			}
 		}
 	}
 
-	return testConfig
+	return &testConfig
 }
 
 func Test_AuthMethodKey(t *testing.T) {
-	if testFeature("Test_AuthMethodKey") {
+	if utils.ShouldTestFeature("Test_AuthMethodKey") {
 		config := loadFromJson(confName)
 
 		signer := utils.AuthMethodFromPrivateKeyFile(config.SSH.GetAuthKeys())
@@ -71,7 +63,7 @@ func Test_AuthMethodKey(t *testing.T) {
 }
 
 func Test_Sudo(t *testing.T) {
-	if testFeature("Test_Sudo") {
+	if utils.ShouldTestFeature("Test_Sudo") {
 		config := loadFromJson(confName)
 
 		out, err := utils.Sudo(&config.SSH, "localhost", 30*time.Second, "ls")
@@ -83,7 +75,7 @@ func Test_Sudo(t *testing.T) {
 }
 
 func Test_CIDR(t *testing.T) {
-	if testFeature("Test_CIDR") {
+	if utils.ShouldTestFeature("Test_CIDR") {
 
 		cidr := vsphere.ToCIDR("10.65.4.201", "255.255.255.0")
 
@@ -95,7 +87,7 @@ func Test_CIDR(t *testing.T) {
 }
 
 func Test_getVM(t *testing.T) {
-	if testFeature("Test_getVM") {
+	if utils.ShouldTestFeature("Test_getVM") {
 		config := loadFromJson(confName)
 
 		ctx := context.NewContext(config.Timeout)
@@ -116,7 +108,7 @@ func Test_getVM(t *testing.T) {
 }
 
 func Test_listVM(t *testing.T) {
-	if testFeature("Test_listVM") {
+	if utils.ShouldTestFeature("Test_listVM") {
 		config := loadFromJson(confName)
 
 		ctx := context.NewContext(config.Timeout)
@@ -139,7 +131,7 @@ func Test_listVM(t *testing.T) {
 }
 
 func Test_createVM(t *testing.T) {
-	if testFeature("Test_createVM") {
+	if utils.ShouldTestFeature("Test_createVM") {
 		config := loadFromJson(confName)
 
 		_, err := config.Create(config.New.Name, config.SSH.GetUserName(), config.SSH.GetAuthKeys(), config.CloudInit, config.New.Network, config.New.Annotation, false, config.New.Memory, config.New.CPUS, config.New.Disk, 0)
@@ -151,7 +143,7 @@ func Test_createVM(t *testing.T) {
 }
 
 func Test_statusVM(t *testing.T) {
-	if testFeature("Test_statusVM") {
+	if utils.ShouldTestFeature("Test_statusVM") {
 		config := loadFromJson(confName)
 
 		status, err := config.Status(config.New.Name)
@@ -163,7 +155,7 @@ func Test_statusVM(t *testing.T) {
 }
 
 func Test_powerOnVM(t *testing.T) {
-	if testFeature("Test_powerOnVM") {
+	if utils.ShouldTestFeature("Test_powerOnVM") {
 		config := loadFromJson(confName)
 
 		if status, err := config.Status(config.New.Name); assert.NoError(t, err, "Can't get status on VM") && status.Powered == false {
@@ -181,7 +173,7 @@ func Test_powerOnVM(t *testing.T) {
 }
 
 func Test_powerOffVM(t *testing.T) {
-	if testFeature("Test_powerOffVM") {
+	if utils.ShouldTestFeature("Test_powerOffVM") {
 		config := loadFromJson(confName)
 
 		if status, err := config.Status(config.New.Name); assert.NoError(t, err, "Can't get status on VM") && status.Powered {
@@ -195,7 +187,7 @@ func Test_powerOffVM(t *testing.T) {
 }
 
 func Test_shutdownGuest(t *testing.T) {
-	if testFeature("Test_shutdownGuest") {
+	if utils.ShouldTestFeature("Test_shutdownGuest") {
 		config := loadFromJson(confName)
 
 		if status, err := config.Status(config.New.Name); assert.NoError(t, err, "Can't get status on VM") && status.Powered {
@@ -209,7 +201,7 @@ func Test_shutdownGuest(t *testing.T) {
 }
 
 func Test_deleteVM(t *testing.T) {
-	if testFeature("Test_deleteVM") {
+	if utils.ShouldTestFeature("Test_deleteVM") {
 		config := loadFromJson(confName)
 
 		err := config.Delete(config.New.Name)

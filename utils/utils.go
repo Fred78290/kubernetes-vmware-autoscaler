@@ -12,6 +12,15 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 )
 
+// ShouldTestFeature check if test must be done
+func ShouldTestFeature(name string) bool {
+	if feature := os.Getenv(name); feature != "" {
+		return feature != "NO"
+	}
+
+	return true
+}
+
 // MergeKubernetesLabel merge kubernetes map in one
 func MergeKubernetesLabel(labels ...types.KubernetesLabel) types.KubernetesLabel {
 	merged := types.KubernetesLabel{}
