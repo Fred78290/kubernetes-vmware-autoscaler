@@ -692,12 +692,6 @@ func TestServer_NodeGroupForNode(t *testing.T) {
 
 }
 
-func TestServer_HasInstance(t *testing.T) {
-	test := serverTest{t: t}
-
-	test.HasInstance()
-}
-
 func TestServer_Pricing(t *testing.T) {
 	test := serverTest{t: t}
 
