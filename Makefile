@@ -5,8 +5,8 @@ ALL_ARCH = amd64 arm64
 all: $(addprefix build-arch-,$(ALL_ARCH))
 
 VERSION_MAJOR ?= 1
-VERSION_MINOR ?= 23
-VERSION_BUILD ?= 0
+VERSION_MINOR ?= 25
+VERSION_BUILD ?= 5
 TAG?=v$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_BUILD)
 FLAGS=
 ENVVAR=
@@ -28,7 +28,7 @@ build-arch-%: deps clean-arch-%
 	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -ldflags="-X main.phVersion=$(TAG) -X main.phBuildDate=$(BUILD_DATE)" -a -o out/$(GOOS)/$*/vsphere-autoscaler
 
 test-unit: clean build
-	go install github.com/vmware/govmomi/vcsim@v0.28.0
+	go install github.com/vmware/govmomi/vcsim@v0.30.0
 	bash ./scripts/run-tests.sh
 
 make-image: $(addprefix make-image-arch-,$(ALL_ARCH))

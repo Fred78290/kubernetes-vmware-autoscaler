@@ -28,32 +28,37 @@
         "cpus": 4,
         "disk": 10240,
         "network": {
+            "domain": "sample.com",
             "dns": {
                 "search": [
-                    "aldune.com"
+                    "sample.com"
                 ],
                 "nameserver": [
-                    "10.0.0.1"
+                    "8.8.8.8"
                 ]
             },
             "interfaces": [
                 {
+                    "primary": false,
+                    "exists": true,
+                    "network": "VM Network",
+                    "adapter": "vmxnet3",
+                    "mac-address": "generate",
+                    "nic": "eth0",
+                    "dhcp": true,
+                    "use-dhcp-routes": true
+                },
+                {
+                    "primary": true,
                     "exists": true,
                     "network": "DC0_DVPG0",
                     "adapter": "vmxnet3",
-                    "mac-address": "00:16:3E:03:CC:05",
-                    "nic": "eth0",
-                    "dhcp": true
-                },
-                {
-                    "exists": true,
-                    "network": "DC0_DVPG1",
-                    "adapter": "vmxnet3",
-                    "mac-address": "00:16:3E:1E:F1:81",
-                    "address": "10.254.254.80",
-                    "gateway": "10.0.0.1",
+                    "mac-address": "generate",
                     "nic": "eth1",
-                    "dhcp": false
+                    "dhcp": false,
+                    "address": "192.168.1.26",
+                    "gateway": "192.168.1.1",
+                    "netmask": "255.255.255.0"
                 }
             ]
         }

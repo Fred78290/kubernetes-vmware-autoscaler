@@ -344,7 +344,7 @@ func (s *AutoScalerServerApp) NodeGroupForNode(ctx context.Context, request *api
 			},
 		}, nil
 	} else {
-		glog.Debug("Node annotation[%s] is empty", constantes.AnnotationNodeGroupName)
+		glog.Infof("Node annotation[%s] is empty", constantes.AnnotationNodeGroupName)
 
 		return &apigrpc.NodeGroupForNodeReply{
 			Response: &apigrpc.NodeGroupForNodeReply_NodeGroup{
@@ -360,7 +360,7 @@ func (s *AutoScalerServerApp) NodeGroupForNode(ctx context.Context, request *api
 func (s *AutoScalerServerApp) Pricing(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.PricingModelReply, error) {
 	glog.Debugf("Call server Pricing: %v", request)
 
-	if s.configuration.Optionals.Pricing {
+	if s.configuration.Optionals != nil && s.configuration.Optionals.Pricing {
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
 	}
 
@@ -383,7 +383,7 @@ func (s *AutoScalerServerApp) Pricing(ctx context.Context, request *apigrpc.Clou
 func (s *AutoScalerServerApp) GetAvailableMachineTypes(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.AvailableMachineTypesReply, error) {
 	glog.Debugf("Call server GetAvailableMachineTypes: %v", request)
 
-	if s.configuration.Optionals.GetAvailableMachineTypes {
+	if s.configuration.Optionals != nil && s.configuration.Optionals.GetAvailableMachineTypes {
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
 	}
 
@@ -413,7 +413,7 @@ func (s *AutoScalerServerApp) GetAvailableMachineTypes(ctx context.Context, requ
 func (s *AutoScalerServerApp) NewNodeGroup(ctx context.Context, request *apigrpc.NewNodeGroupRequest) (*apigrpc.NewNodeGroupReply, error) {
 	glog.Debugf("Call server NewNodeGroup: %v", request)
 
-	if s.configuration.Optionals.NewNodeGroup {
+	if s.configuration.Optionals != nil && s.configuration.Optionals.NewNodeGroup {
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
 	}
 
@@ -999,7 +999,7 @@ func (s *AutoScalerServerApp) Nodes(ctx context.Context, request *apigrpc.NodeGr
 func (s *AutoScalerServerApp) TemplateNodeInfo(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.TemplateNodeInfoReply, error) {
 	glog.Debugf("Call server TemplateNodeInfo: %v", request)
 
-	if s.configuration.Optionals.TemplateNodeInfo {
+	if s.configuration.Optionals != nil && s.configuration.Optionals.TemplateNodeInfo {
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
 	}
 
@@ -1057,7 +1057,7 @@ func (s *AutoScalerServerApp) Exist(ctx context.Context, request *apigrpc.NodeGr
 func (s *AutoScalerServerApp) Create(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.CreateReply, error) {
 	glog.Debugf("Call server Create: %v", request)
 
-	if s.configuration.Optionals.Create {
+	if s.configuration.Optionals != nil && s.configuration.Optionals.Create {
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
 	}
 
@@ -1096,7 +1096,7 @@ func (s *AutoScalerServerApp) Create(ctx context.Context, request *apigrpc.NodeG
 func (s *AutoScalerServerApp) Delete(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.DeleteReply, error) {
 	glog.Debugf("Call server Delete: %v", request)
 
-	if s.configuration.Optionals.Delete {
+	if s.configuration.Optionals != nil && s.configuration.Optionals.Delete {
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
 	}
 

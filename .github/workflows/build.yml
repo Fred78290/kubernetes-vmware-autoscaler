@@ -1,0 +1,83 @@
+name: build-vsphere-autoscaler
+on:
+  push:
+    branches:
+      - '*'
+    tags:
+      - '!*'
+
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  REGISTRY: ${{ secrets.REGISTRY }}
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Cache vendor
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-vendor
+        with:
+          path: vendor
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+
+      - name:  Setup Go environment
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+
+      - name: Build binary
+        shell: bash
+        run: |
+          make -e REGISTRY=$REGISTRY -e TAG=build-ci build-in-docker
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Cache vendor
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-vendor
+        with:
+          path: vendor
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+
+      - name: test-in-docker
+        shell: bash
+        run: |
+          make -e REGISTRY=$REGISTRY -e TAG=test-ci test-in-docker
+
+  sonarcloud:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@v1.8
+
+      - name: Prepare SonarCloud
+        shell: bash
+        run: sudo chown -R $USER .scannerwork
