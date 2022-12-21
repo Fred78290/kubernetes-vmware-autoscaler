@@ -41,7 +41,6 @@ jobs:
         shell: bash
         run: |
           make -e REGISTRY=$REGISTRY -e TAG=build-ci build-in-docker
-          sudo chown -R $USER out vendor
 
   test:
     name: Test
@@ -65,7 +64,6 @@ jobs:
         shell: bash
         run: |
           make -e REGISTRY=$REGISTRY -e TAG=test-ci test-in-docker
-          sudo chown -R $USER out vendor
 
   sonarcloud:
     name: SonarCloud
