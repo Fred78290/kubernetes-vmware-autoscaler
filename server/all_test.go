@@ -8,7 +8,7 @@ import (
 
 func Test_Nodegroup(t *testing.T) {
 	if utils.ShouldTestFeature("TestNodegroup") {
-		test := nodegroupTest{t: t}
+		test := createTestNodegroup(t)
 
 		if utils.ShouldTestFeature("TestNodeGroup_launchVM") {
 			t.Run("TestNodeGroup_launchVM", func(t *testing.T) {
@@ -62,7 +62,7 @@ func Test_Nodegroup(t *testing.T) {
 
 func Test_Server(t *testing.T) {
 	if utils.ShouldTestFeature("TestServer") {
-		test := serverTest{t: t}
+		test := createServerTest(t)
 
 		if utils.ShouldTestFeature("TestServer_NodeGroups") {
 			t.Run("TestServer_NodeGroups", func(t *testing.T) {
