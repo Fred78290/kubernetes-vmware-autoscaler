@@ -28,7 +28,7 @@ type Configuration struct {
 	LinkedClone   bool          `json:"linked"`
 	Customization string        `json:"customization"`
 	Network       *Network      `json:"network"`
-	UseSimulator  bool          `json:"-"`
+	TestMode      bool          `json:"-"`
 }
 
 // Status shortened vm status
@@ -80,7 +80,7 @@ func (conf *Configuration) Copy() *Configuration {
 
 	_ = Copy(&dup, conf)
 
-	dup.UseSimulator = conf.UseSimulator
+	dup.TestMode = conf.TestMode
 
 	return &dup
 }
@@ -279,7 +279,7 @@ func (conf *Configuration) UUID(name string) (string, error) {
 // WaitForIPWithContext wait ip a VM by name
 func (conf *Configuration) WaitForIPWithContext(ctx *context.Context, name string) (string, error) {
 
-	if conf.UseSimulator {
+	if conf.TestMode {
 		return "127.0.0.1", nil
 	}
 
@@ -304,7 +304,7 @@ func (conf *Configuration) WaitForIP(name string) (string, error) {
 func (conf *Configuration) SetAutoStartWithContext(ctx *context.Context, esxi, name string, startOrder int) error {
 	var err error = nil
 
-	if !conf.UseSimulator {
+	if !conf.TestMode {
 		var client *Client
 		var dc *Datacenter
 		var host *HostAutoStartManager
@@ -323,7 +323,7 @@ func (conf *Configuration) SetAutoStartWithContext(ctx *context.Context, esxi, n
 
 // WaitForToolsRunningWithContext wait vmware tools is running a VM by name
 func (conf *Configuration) WaitForToolsRunningWithContext(ctx *context.Context, name string) (bool, error) {
-	if conf.UseSimulator {
+	if conf.TestMode {
 		return true, nil
 	}
 
