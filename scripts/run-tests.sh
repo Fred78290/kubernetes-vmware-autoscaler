@@ -42,6 +42,7 @@ echo "Run server test"
 export TestServer=YES
 export TestServer_NodeGroups=YES
 export TestServer_NodeGroupForNode=YES
+export TestServer_HasInstance=YES
 export TestServer_Pricing=YES
 export TestServer_GetAvailableMachineTypes=YES
 export TestServer_NewNodeGroup=YES

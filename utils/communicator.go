@@ -63,7 +63,7 @@ func Shell(args ...string) error {
 // Scp copy file
 func Scp(connect *types.AutoScalerServerSSH, host, src, dst string) error {
 
-	if connect.UseSimulator {
+	if connect.TestMode {
 		return nil
 	}
 
@@ -82,7 +82,7 @@ func Sudo(connect *types.AutoScalerServerSSH, host string, timeoutInSeconds time
 	var sshConfig *ssh.ClientConfig
 	var err error
 
-	if connect.UseSimulator {
+	if connect.TestMode {
 		return "", nil
 	}
 
