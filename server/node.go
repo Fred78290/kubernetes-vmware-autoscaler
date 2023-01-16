@@ -26,6 +26,7 @@ type AutoScalerServerNodeType int32
 // autoScalerServerNodeStateString strings
 var autoScalerServerNodeStateString = []string{
 	"AutoScalerServerNodeStateNotCreated",
+	"AutoScalerServerNodeStateCreating",
 	"AutoScalerServerNodeStateRunning",
 	"AutoScalerServerNodeStateStopped",
 	"AutoScalerServerNodeStateDeleted",
@@ -35,6 +36,9 @@ var autoScalerServerNodeStateString = []string{
 const (
 	// AutoScalerServerNodeStateNotCreated not created state
 	AutoScalerServerNodeStateNotCreated = iota
+
+	// AutoScalerServerNodeStateCreating running state
+	AutoScalerServerNodeStateCreating
 
 	// AutoScalerServerNodeStateRunning running state
 	AutoScalerServerNodeStateRunning
@@ -216,13 +220,15 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 
 	glog.Infof("Launch VM:%s for nodegroup: %s", vm.NodeName, vm.NodeGroupID)
 
+	if vm.State != AutoScalerServerNodeStateNotCreated {
+		return fmt.Errorf(constantes.ErrVMAlreadyCreated, vm.NodeName)
+	}
+
+	vm.State = AutoScalerServerNodeStateCreating
+
 	if vm.NodeType != AutoScalerServerNodeAutoscaled && vm.NodeType != AutoScalerServerNodeManaged {
 
 		err = fmt.Errorf(constantes.ErrVMNotProvisionnedByMe, vm.NodeName)
-
-	} else if vm.State != AutoScalerServerNodeStateNotCreated {
-
-		err = fmt.Errorf(constantes.ErrVMAlreadyCreated, vm.NodeName)
 
 	} else if _, err = vsphere.Create(vm.NodeName, userInfo.GetUserName(), userInfo.GetAuthKeys(), vm.serverConfig.CloudInit, network, "", true, vm.Memory, vm.CPU, vm.Disk, vm.NodeIndex); err != nil {
 

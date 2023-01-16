@@ -45,6 +45,7 @@ type Config struct {
 	KubernetesPKISourceDir   string
 	KubernetesPKIDestDir     string
 	UseExternalEtdc          bool
+	UseVanillaGrpcProvider   bool
 	RequestTimeout           time.Duration
 	DeletionTimeout          time.Duration
 	MaxGracePeriod           time.Duration
@@ -186,15 +187,37 @@ func (ssh *AutoScalerServerSSH) GetAuthKeys() string {
 	return ssh.AuthKeys
 }
 
+type NodeGroupAutoscalingOptions struct {
+	// ScaleDownUtilizationThreshold sets threshold for nodes to be considered for scale down
+	// if cpu or memory utilization is over threshold.
+	ScaleDownUtilizationThreshold float64 `json:"scaleDownUtilizationThreshold,omitempty"`
+
+	// ScaleDownGpuUtilizationThreshold sets threshold for gpu nodes to be
+	// considered for scale down if gpu utilization is over threshold.
+	ScaleDownGpuUtilizationThreshold float64 `json:"scaleDownGpuUtilizationThreshold,omitempty"`
+
+	// ScaleDownUnneededTime sets the duration CA expects a node to be
+	// unneeded/eligible for removal before scaling down the node.
+	ScaleDownUnneededTime time.Duration `json:"scaleDownUnneededTime,omitempty"`
+
+	// ScaleDownUnreadyTime represents how long an unready node should be
+	// unneeded before it is eligible for scale down.
+	ScaleDownUnreadyTime time.Duration `json:"scaleDownUnreadyTime,omitempty"`
+}
+
 // AutoScalerServerConfig is contains configuration
 type AutoScalerServerConfig struct {
 	UseExternalEtdc            *bool                             `json:"use-external-etcd"`
+	UseVanillaGrpcProvider     *bool                             `json:"use-vanilla-grpc"`
 	ExtDestinationEtcdSslDir   string                            `default:"/etc/etcd/ssl" json:"dst-etcd-ssl-dir"`
 	ExtSourceEtcdSslDir        string                            `default:"/etc/etcd/ssl" json:"src-etcd-ssl-dir"`
 	KubernetesPKISourceDir     string                            `default:"/etc/kubernetes/pki" json:"kubernetes-pki-srcdir"`
 	KubernetesPKIDestDir       string                            `default:"/etc/kubernetes/pki" json:"kubernetes-pki-dstdir"`
 	Network                    string                            `default:"tcp" json:"network"`                     // Mandatory, Network to listen (see grpc doc) to listen
 	Listen                     string                            `default:"0.0.0.0:5200" json:"listen"`             // Mandatory, Address to listen
+	CertPrivateKey             string                            `json:"cert-private-key,omitempty"`                // Optional to secure grcp channel
+	CertPublicKey              string                            `json:"cert-public-key,omitempty"`                 // Optional to secure grcp channel
+	CertCA                     string                            `json:"cert-ca,omitempty"`                         // Optional to secure grcp channel
 	ServiceIdentifier          string                            `json:"secret"`                                    // Mandatory, secret Identifier, client must match this
 	MinNode                    int                               `json:"minNode"`                                   // Mandatory, Min AutoScaler VM
 	MaxNode                    int                               `json:"maxNode"`                                   // Mandatory, Max AutoScaler VM
@@ -212,6 +235,7 @@ type AutoScalerServerConfig struct {
 	Optionals                  *AutoScalerServerOptionals        `json:"optionals"`
 	ManagedNodeResourceLimiter *ResourceLimiter                  `json:"managednodes-limits"`
 	SSH                        *AutoScalerServerSSH              `json:"ssh-infos"`
+	AutoScalingOptions         *NodeGroupAutoscalingOptions      `json:"autoscaling-options,omitempty"`
 	VMwareInfos                map[string]*vsphere.Configuration `json:"vmware"`
 }
 
@@ -322,6 +346,7 @@ func NewConfig() *Config {
 		APIServerURL:             "",
 		KubeConfig:               "",
 		UseExternalEtdc:          false,
+		UseVanillaGrpcProvider:   false,
 		ExtDestinationEtcdSslDir: "/etc/etcd/ssl",
 		ExtSourceEtcdSslDir:      "/etc/etcd/ssl",
 		KubernetesPKISourceDir:   "/etc/kubernetes/pki",
@@ -364,6 +389,8 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 
 	app.Flag("log-format", "The format in which log messages are printed (default: text, options: text, json)").Default(cfg.LogFormat).EnumVar(&cfg.LogFormat, "text", "json")
 	app.Flag("log-level", "Set the level of logging. (default: info, options: panic, debug, info, warning, error, fatal").Default(cfg.LogLevel).EnumVar(&cfg.LogLevel, allLogLevelsAsStrings()...)
+
+	app.Flag("use-vanilla-grpc", "Tell we use vanilla autoscaler externalgrpc cloudprovider").Default("false").BoolVar(&cfg.UseVanillaGrpcProvider)
 
 	// External Etcd
 	app.Flag("use-external-etcd", "Tell we use an external etcd service (overriden by config file if defined)").Default("false").BoolVar(&cfg.UseExternalEtdc)
