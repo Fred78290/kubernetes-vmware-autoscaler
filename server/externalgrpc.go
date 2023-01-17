@@ -238,7 +238,11 @@ func (v *externalgrpcServerApp) NodeGroupIncreaseSize(ctx context.Context, reque
 		return nil, fmt.Errorf(constantes.ErrIncreaseSizeTooLarge, newSize, nodeGroup.MaxNodeSize)
 	}
 
-	go nodeGroup.setNodeGroupSize(v.appServer.kubeClient, newSize)
+	if nodes, err := nodeGroup.setNodeGroupSize(v.appServer.kubeClient, newSize, true); err != nil {
+		return &externalgrpc.NodeGroupIncreaseSizeResponse{}, err
+	} else {
+		go nodeGroup.createNodes(v.appServer.kubeClient, nodes)
+	}
 
 	return &externalgrpc.NodeGroupIncreaseSizeResponse{}, nil
 }
@@ -316,7 +320,11 @@ func (v *externalgrpcServerApp) NodeGroupDecreaseTargetSize(ctx context.Context,
 		return nil, fmt.Errorf(constantes.ErrDecreaseSizeAttemptDeleteNodes, nodeGroup.targetSize(), request.GetDelta(), newSize)
 	}
 
-	go nodeGroup.setNodeGroupSize(v.appServer.kubeClient, newSize)
+	if nodes, err := nodeGroup.setNodeGroupSize(v.appServer.kubeClient, newSize, true); err != nil {
+		return &externalgrpc.NodeGroupDecreaseTargetSizeResponse{}, nil
+	} else {
+		go nodeGroup.destroyNodes(v.appServer.kubeClient, nodes)
+	}
 
 	return &externalgrpc.NodeGroupDecreaseTargetSizeResponse{}, nil
 }

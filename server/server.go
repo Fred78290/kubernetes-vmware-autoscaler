@@ -825,9 +825,7 @@ func (s *AutoScalerServerApp) IncreaseSize(ctx context.Context, request *apigrpc
 		}, nil
 	}
 
-	err := nodeGroup.setNodeGroupSize(s.kubeClient, newSize)
-
-	if err != nil {
+	if _, err := nodeGroup.setNodeGroupSize(s.kubeClient, newSize, false); err != nil {
 		return &apigrpc.IncreaseSizeReply{
 			Error: &apigrpc.Error{
 				Code:   constantes.CloudProviderError,
@@ -978,9 +976,7 @@ func (s *AutoScalerServerApp) DecreaseTargetSize(ctx context.Context, request *a
 		}, nil
 	}
 
-	err := nodeGroup.setNodeGroupSize(s.kubeClient, newSize)
-
-	if err != nil {
+	if _, err := nodeGroup.setNodeGroupSize(s.kubeClient, newSize, false); err != nil {
 		return &apigrpc.DecreaseTargetSizeReply{
 			Error: &apigrpc.Error{
 				Code:   constantes.CloudProviderError,
