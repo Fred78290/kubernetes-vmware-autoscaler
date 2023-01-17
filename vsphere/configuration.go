@@ -462,3 +462,19 @@ func (conf *Configuration) RetrieveNetworkInfos(name string, nodeIndex int) erro
 
 	return conf.RetrieveNetworkInfosWithContext(ctx, name, nodeIndex)
 }
+
+// ExistsWithContext return the current status of VM by name
+func (conf *Configuration) ExistsWithContext(ctx *context.Context, name string) bool {
+	if _, err := conf.VirtualMachineWithContext(ctx, name); err == nil {
+		return true
+	}
+
+	return false
+}
+
+func (conf *Configuration) Exists(name string) bool {
+	ctx := context.NewContext(conf.Timeout)
+	defer ctx.Cancel()
+
+	return conf.ExistsWithContext(ctx, name)
+}

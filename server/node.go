@@ -224,6 +224,11 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 		return fmt.Errorf(constantes.ErrVMAlreadyCreated, vm.NodeName)
 	}
 
+	if vsphere.Exists(vm.NodeName) {
+		glog.Warnf(constantes.ErrVMAlreadyExists, vm.NodeName)
+		return fmt.Errorf(constantes.ErrVMAlreadyExists, vm.NodeName)
+	}
+
 	vm.State = AutoScalerServerNodeStateCreating
 
 	if vm.NodeType != AutoScalerServerNodeAutoscaled && vm.NodeType != AutoScalerServerNodeManaged {
