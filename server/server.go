@@ -1695,15 +1695,15 @@ func StartServer(kubeClient types.ClientGenerator, c *types.Config) {
 	}
 
 	if !autoScalerServer.checkPrivateKeyExists() {
-		log.Fatal(constantes.ErrFatalMissingSSHKey)
+		log.Fatalf(constantes.ErrFatalMissingSSHKey, autoScalerServer.configuration.SSH.AuthKeys)
 	}
 
 	if !autoScalerServer.checkKubernetesPKIReadable() {
-		log.Fatal(constantes.ErrFatalMissingSSHKey)
+		log.Fatalf(constantes.ErrFatalKubernetesPKIMissingOrUnreadable, autoScalerServer.configuration.KubernetesPKISourceDir)
 	}
 
 	if !autoScalerServer.checkEtcdSslReadable() {
-		log.Fatal(constantes.ErrFatalMissingSSHKey)
+		log.Fatalf(constantes.ErrFatalEtcdMissingOrUnreadable, autoScalerServer.configuration.ExtSourceEtcdSslDir)
 	}
 
 	if err = autoScalerServer.startController(); err != nil {

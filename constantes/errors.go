@@ -237,4 +237,13 @@ const (
 
 	// ErrTimeoutWhenWaitingEvictions err msg
 	ErrTimeoutWhenWaitingEvictions = "timed out waiting for evictions to complete on node: %s"
+
+	// ErrFatalMissingSSHKey err msg
+	ErrFatalMissingSSHKey = "%s ssh key not found"
+
+	// ErrFatalEtcdMissingOrUnreadable err msg
+	ErrFatalEtcdMissingOrUnreadable = "%s etcd certs directory is missing or unreadable"
+
+	// ErrFatalKubernetesPKIMissingOrUnreadable err msg
+	ErrFatalKubernetesPKIMissingOrUnreadable = "%s kubernetes pki directory is missing or unreadable"
 )
