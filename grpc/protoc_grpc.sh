@@ -19,8 +19,8 @@ if [ "$(uname)" = "Darwin" ]; then
     curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-osx-universal_binary.zip
     unzip protoc-${PB_RELEASE}-osx-universal_binary.zip
 else
-    curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-osx-linux-x86_64.zip
-    unzip protoc-${PB_RELEASE}-osx-linux-x86_64.zip
+    curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-linux-x86_64.zip
+    unzip protoc-${PB_RELEASE}-linux-x86_64.zip
 fi
 
 popd
