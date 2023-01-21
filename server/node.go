@@ -133,7 +133,22 @@ func (vm *AutoScalerServerNode) recopyKubernetesPKIIfNeeded() error {
 	return err
 }
 
-func (vm *AutoScalerServerNode) kubeAdmJoin() error {
+func (vm *AutoScalerServerNode) waitForSshReady() error {
+	return utils.PollImmediate(time.Second, time.Duration(vm.serverConfig.SSH.WaitSshReadyInSeconds)*time.Second, func() (done bool, err error) {
+		if _, err := utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, "ls"); err != nil {
+			if strings.HasSuffix(err.Error(), "connection refused") {
+				glog.Warnf("Wait ssh ready for node: %s, address: %s.", vm.NodeName, vm.IPAddress)
+				return false, nil
+			}
+
+			return false, fmt.Errorf("unable to ssh: %s, reason:%v", vm.NodeName, err)
+		}
+
+		return true, nil
+	})
+}
+
+func (vm *AutoScalerServerNode) kubeAdmJoin(c types.ClientGenerator) error {
 	kubeAdm := vm.serverConfig.KubeAdm
 
 	args := []string{
@@ -274,6 +289,10 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 		err = fmt.Errorf(constantes.ErrGetVMInfoFailed, vm.NodeName, err)
 
 	} else if status != AutoScalerServerNodeStateRunning {
+
+		err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
+
+	} else if err = vm.waitForSshReady(); err != nil {
 
 		err = fmt.Errorf(constantes.ErrStartVMFailed, vm.NodeName, err)
 
