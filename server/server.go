@@ -1572,6 +1572,30 @@ func (s *AutoScalerServerApp) run(config *types.AutoScalerServerConfig) {
 	}
 }
 
+func (s *AutoScalerServerApp) checkPrivateKeyExists() bool {
+	if len(s.configuration.SSH.Password) > 0 {
+		return true
+	}
+
+	if len(s.configuration.SSH.AuthKeys) == 0 {
+		return false
+	}
+
+	return utils.FileExistAndReadable(s.configuration.SSH.AuthKeys)
+}
+
+func (s *AutoScalerServerApp) checkKubernetesPKIReadable() bool {
+	return utils.DirExistAndReadable(s.configuration.KubernetesPKISourceDir)
+}
+
+func (s *AutoScalerServerApp) checkEtcdSslReadable() bool {
+	if *s.configuration.UseExternalEtdc {
+		return utils.DirExistAndReadable(s.configuration.ExtSourceEtcdSslDir)
+	}
+
+	return true
+}
+
 // StartServer start the service
 func StartServer(kubeClient types.ClientGenerator, c *types.Config) {
 	var config types.AutoScalerServerConfig
@@ -1664,6 +1688,18 @@ func StartServer(kubeClient types.ClientGenerator, c *types.Config) {
 		if err := autoScalerServer.Load(phSavedState); err != nil {
 			log.Fatalf(constantes.ErrFailedToLoadServerState, err)
 		}
+	}
+
+	if !autoScalerServer.checkPrivateKeyExists() {
+		log.Fatal(constantes.ErrFatalMissingSSHKey)
+	}
+
+	if !autoScalerServer.checkKubernetesPKIReadable() {
+		log.Fatal(constantes.ErrFatalMissingSSHKey)
+	}
+
+	if !autoScalerServer.checkEtcdSslReadable() {
+		log.Fatal(constantes.ErrFatalMissingSSHKey)
 	}
 
 	if err = autoScalerServer.startController(); err != nil {

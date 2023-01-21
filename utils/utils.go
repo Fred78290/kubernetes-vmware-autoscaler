@@ -65,6 +65,61 @@ func ToJSON(v interface{}) string {
 	return string(b)
 }
 
+func DirExistAndReadable(name string) bool {
+	if len(name) == 0 {
+		return false
+	}
+
+	if entry, err := os.Stat(name); err != nil {
+		return false
+	} else if entry.IsDir() {
+
+		if files, err := os.ReadDir(name); err == nil {
+			for _, file := range files {
+				if entry, err := file.Info(); err == nil {
+					if !entry.IsDir() {
+						fm := entry.Mode()
+						sys := entry.Sys().(*syscall.Stat_t)
+
+						if (fm&(1<<2) != 0) || ((fm&(1<<5)) != 0 && os.Getegid() == int(sys.Gid)) || ((fm&(1<<8)) != 0 && (os.Geteuid() == int(sys.Uid))) {
+							continue
+						}
+					} else if DirExistAndReadable(name + "/" + entry.Name()) {
+						continue
+					}
+				}
+
+				return false
+			}
+
+			return true
+		}
+	}
+
+	return false
+}
+
+func FileExistAndReadable(name string) bool {
+	if len(name) == 0 {
+		return false
+	}
+
+	if entry, err := os.Stat(name); err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
+	} else {
+		fm := entry.Mode()
+		sys := entry.Sys().(*syscall.Stat_t)
+
+		if (fm&(1<<2) != 0) || ((fm&(1<<5)) != 0 && os.Getegid() == int(sys.Gid)) || ((fm&(1<<8)) != 0 && (os.Geteuid() == int(sys.Uid))) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // FileExists Check if FileExists
 func FileExists(name string) bool {
 	if len(name) == 0 {
