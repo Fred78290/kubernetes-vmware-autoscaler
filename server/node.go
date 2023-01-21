@@ -90,7 +90,7 @@ func (s AutoScalerServerNodeState) String() string {
 func (vm *AutoScalerServerNode) waitReady(c types.ClientGenerator) error {
 	glog.Debugf("AutoScalerNode::waitReady, node:%s", vm.NodeName)
 
-	return c.WaitNodeToBeReady(vm.NodeName, 60)
+	return c.WaitNodeToBeReady(vm.NodeName)
 }
 
 func (vm *AutoScalerServerNode) recopyEtcdSslFilesIfNeeded() error {

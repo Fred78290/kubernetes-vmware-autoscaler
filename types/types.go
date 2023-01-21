@@ -23,6 +23,7 @@ const (
 	DefaultMaxGracePeriod    time.Duration = 120 * time.Second
 	DefaultMaxRequestTimeout time.Duration = 120 * time.Second
 	DefaultMaxDeletionPeriod time.Duration = 300 * time.Second
+	DefaultNodeReadyTimeout  time.Duration = 300 * time.Second
 )
 
 const (
@@ -50,6 +51,7 @@ type Config struct {
 	RequestTimeout           time.Duration
 	DeletionTimeout          time.Duration
 	MaxGracePeriod           time.Duration
+	NodeReadyTimeout         time.Duration
 	Config                   string
 	SaveLocation             string
 	DisplayVersion           bool
@@ -116,7 +118,7 @@ type ClientGenerator interface {
 	AnnoteNode(nodeName string, annotations map[string]string) error
 	LabelNode(nodeName string, labels map[string]string) error
 	TaintNode(nodeName string, taints ...apiv1.Taint) error
-	WaitNodeToBeReady(nodeName string, timeToWaitInSeconds int) error
+	WaitNodeToBeReady(nodeName string) error
 }
 
 // ResourceLimiter define limit, not really used
@@ -357,6 +359,7 @@ func NewConfig() *Config {
 		RequestTimeout:           DefaultMaxRequestTimeout,
 		DeletionTimeout:          DefaultMaxDeletionPeriod,
 		MaxGracePeriod:           DefaultMaxGracePeriod,
+		NodeReadyTimeout:         DefaultNodeReadyTimeout,
 		DisplayVersion:           false,
 		Config:                   "/etc/cluster/vmware-cluster-autoscaler.json",
 		MinCpus:                  2,
@@ -409,6 +412,7 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.Flag("kubeconfig", "Retrieve target cluster configuration from a Kubernetes configuration file (default: auto-detect)").Default(cfg.KubeConfig).StringVar(&cfg.KubeConfig)
 	app.Flag("request-timeout", "Request timeout when calling Kubernetes APIs. 0s means no timeout").Default(DefaultMaxRequestTimeout.String()).DurationVar(&cfg.RequestTimeout)
 	app.Flag("deletion-timeout", "Deletion timeout when delete node. 0s means no timeout").Default(DefaultMaxDeletionPeriod.String()).DurationVar(&cfg.DeletionTimeout)
+	app.Flag("node-ready-timeout", "Node ready timeout to wait for a node to be ready. 0s means no timeout").Default(DefaultNodeReadyTimeout.String()).DurationVar(&cfg.NodeReadyTimeout)
 	app.Flag("max-grace-period", "Maximum time evicted pods will be given to terminate gracefully.").Default(DefaultMaxGracePeriod.String()).DurationVar(&cfg.MaxGracePeriod)
 
 	app.Flag("min-cpus", "Limits: minimum cpu (default: 1)").Default(strconv.FormatInt(cfg.MinCpus, 10)).Int64Var(&cfg.MinCpus)
