@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,15 +12,22 @@ import (
 	"time"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
+	"github.com/Fred78290/kubernetes-vmware-autoscaler/externalgrpc"
 	apigrpc "github.com/Fred78290/kubernetes-vmware-autoscaler/grpc"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/signals"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/types"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/utils"
 	glog "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 	apiv1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+type cloudProviderRequest interface {
+	GetProviderID() string
+}
 
 type applicationInterface interface {
 	getNodeGroup(nodegroup string) (*AutoScalerServerNodeGroup, error)
@@ -33,6 +42,9 @@ var availableGPUTypes = map[string]string{}
 
 // AutoScalerServerApp declare AutoScaler grpc server
 type AutoScalerServerApp struct {
+	apigrpc.UnimplementedCloudProviderServiceServer
+	apigrpc.UnimplementedNodeGroupServiceServer
+	apigrpc.UnimplementedPricingModelServiceServer
 	ResourceLimiter *types.ResourceLimiter                `json:"limits"`
 	Groups          map[string]*AutoScalerServerNodeGroup `json:"groups"`
 	NodesDefinition []*apigrpc.NodeGroupDef               `json:"nodedefs"`
@@ -205,11 +217,15 @@ func (s *AutoScalerServerApp) doAutoProvision() error {
 	return err
 }
 
+func (s *AutoScalerServerApp) isCallDenied(request cloudProviderRequest) bool {
+	return request.GetProviderID() != s.configuration.ServiceIdentifier
+}
+
 // Connect allows client to connect
 func (s *AutoScalerServerApp) Connect(ctx context.Context, request *apigrpc.ConnectRequest) (*apigrpc.ConnectReply, error) {
 	glog.Debugf("Call server Connect: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
@@ -251,7 +267,7 @@ func (s *AutoScalerServerApp) Connect(ctx context.Context, request *apigrpc.Conn
 func (s *AutoScalerServerApp) Name(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.NameReply, error) {
 	glog.Debugf("Call server Name: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -265,7 +281,7 @@ func (s *AutoScalerServerApp) Name(ctx context.Context, request *apigrpc.CloudPr
 func (s *AutoScalerServerApp) NodeGroups(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.NodeGroupsReply, error) {
 	glog.Debugf("Call server NodeGroups: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -292,7 +308,7 @@ func (s *AutoScalerServerApp) NodeGroups(ctx context.Context, request *apigrpc.C
 func (s *AutoScalerServerApp) NodeGroupForNode(ctx context.Context, request *apigrpc.NodeGroupForNodeRequest) (*apigrpc.NodeGroupForNodeReply, error) {
 	glog.Debugf("Call server NodeGroupForNode: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -327,7 +343,7 @@ func (s *AutoScalerServerApp) NodeGroupForNode(ctx context.Context, request *api
 		}
 
 		if nodeGroup == nil {
-			glog.Infof("Nodegroup not found for node:%s", node.Name)
+			glog.Errorf("Nodegroup not found for node:%s", node.Name)
 
 			return &apigrpc.NodeGroupForNodeReply{
 				Response: &apigrpc.NodeGroupForNodeReply_NodeGroup{
@@ -344,8 +360,6 @@ func (s *AutoScalerServerApp) NodeGroupForNode(ctx context.Context, request *api
 			},
 		}, nil
 	} else {
-		glog.Infof("Node annotation[%s] is empty", constantes.AnnotationNodeGroupName)
-
 		return &apigrpc.NodeGroupForNodeReply{
 			Response: &apigrpc.NodeGroupForNodeReply_NodeGroup{
 				NodeGroup: &apigrpc.NodeGroup{},
@@ -364,7 +378,7 @@ func (s *AutoScalerServerApp) Pricing(ctx context.Context, request *apigrpc.Clou
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
 	}
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -387,7 +401,7 @@ func (s *AutoScalerServerApp) GetAvailableMachineTypes(ctx context.Context, requ
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
 	}
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -417,7 +431,7 @@ func (s *AutoScalerServerApp) NewNodeGroup(ctx context.Context, request *apigrpc
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
 	}
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -488,7 +502,7 @@ func (s *AutoScalerServerApp) NewNodeGroup(ctx context.Context, request *apigrpc
 func (s *AutoScalerServerApp) GetResourceLimiter(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.ResourceLimiterReply, error) {
 	glog.Debugf("Call server GetResourceLimiter: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -507,7 +521,7 @@ func (s *AutoScalerServerApp) GetResourceLimiter(ctx context.Context, request *a
 func (s *AutoScalerServerApp) GPULabel(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.GPULabelReply, error) {
 	glog.Debugf("Call server GPULabel: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -523,7 +537,7 @@ func (s *AutoScalerServerApp) GPULabel(ctx context.Context, request *apigrpc.Clo
 func (s *AutoScalerServerApp) GetAvailableGPUTypes(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.GetAvailableGPUTypesReply, error) {
 	glog.Debugf("Call server GetAvailableGPUTypes: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -539,7 +553,7 @@ func (s *AutoScalerServerApp) Cleanup(ctx context.Context, request *apigrpc.Clou
 
 	var lastError *apigrpc.Error
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -579,7 +593,7 @@ func (s *AutoScalerServerApp) syncState() {
 func (s *AutoScalerServerApp) Refresh(ctx context.Context, request *apigrpc.CloudProviderServiceRequest) (*apigrpc.RefreshReply, error) {
 	glog.Debugf("Call server Refresh: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -605,7 +619,7 @@ func (s *AutoScalerServerApp) MaxSize(ctx context.Context, request *apigrpc.Node
 
 	var maxSize int
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -629,7 +643,7 @@ func (s *AutoScalerServerApp) MinSize(ctx context.Context, request *apigrpc.Node
 
 	var minSize int
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
 
@@ -653,7 +667,7 @@ func (s *AutoScalerServerApp) MinSize(ctx context.Context, request *apigrpc.Node
 func (s *AutoScalerServerApp) TargetSize(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.TargetSizeReply, error) {
 	glog.Debugf("Call server TargetSize: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -686,7 +700,7 @@ func (s *AutoScalerServerApp) TargetSize(ctx context.Context, request *apigrpc.N
 func (s *AutoScalerServerApp) IncreaseSize(ctx context.Context, request *apigrpc.IncreaseSizeRequest) (*apigrpc.IncreaseSizeReply, error) {
 	glog.Debugf("Call server IncreaseSize: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -715,7 +729,7 @@ func (s *AutoScalerServerApp) IncreaseSize(ctx context.Context, request *apigrpc
 		}, nil
 	}
 
-	newSize := len(nodeGroup.Nodes) + int(request.GetDelta())
+	newSize := nodeGroup.targetSize() + int(request.GetDelta())
 
 	if newSize > nodeGroup.MaxNodeSize {
 		glog.Errorf(constantes.ErrIncreaseSizeTooLarge, newSize, nodeGroup.MaxNodeSize)
@@ -728,9 +742,7 @@ func (s *AutoScalerServerApp) IncreaseSize(ctx context.Context, request *apigrpc
 		}, nil
 	}
 
-	err := nodeGroup.setNodeGroupSize(s.kubeClient, newSize)
-
-	if err != nil {
+	if _, err := nodeGroup.setNodeGroupSize(s.kubeClient, newSize, false); err != nil {
 		return &apigrpc.IncreaseSizeReply{
 			Error: &apigrpc.Error{
 				Code:   constantes.CloudProviderError,
@@ -750,7 +762,7 @@ func (s *AutoScalerServerApp) IncreaseSize(ctx context.Context, request *apigrpc
 func (s *AutoScalerServerApp) DeleteNodes(ctx context.Context, request *apigrpc.DeleteNodesRequest) (*apigrpc.DeleteNodesReply, error) {
 	glog.Debugf("Call server DeleteNodes: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -779,8 +791,6 @@ func (s *AutoScalerServerApp) DeleteNodes(ctx context.Context, request *apigrpc.
 
 	// Iterate over each requested node to delete
 	for idx, sNode := range request.GetNode() {
-		var nodeGroup *AutoScalerServerNodeGroup
-
 		node, err := utils.NodeFromJSON(sNode)
 
 		// Can't deserialize
@@ -796,7 +806,6 @@ func (s *AutoScalerServerApp) DeleteNodes(ctx context.Context, request *apigrpc.
 		}
 
 		// Check node group owner
-
 		if nodegroupName, found := node.Annotations[constantes.AnnotationNodeGroupName]; found {
 			if nodeGroup, err = s.getNodeGroup(nodegroupName); err != nil {
 				glog.Errorf(constantes.ErrNodeGroupNotFound, nodegroupName)
@@ -842,7 +851,7 @@ func (s *AutoScalerServerApp) DeleteNodes(ctx context.Context, request *apigrpc.
 func (s *AutoScalerServerApp) DecreaseTargetSize(ctx context.Context, request *apigrpc.DecreaseTargetSizeRequest) (*apigrpc.DecreaseTargetSizeReply, error) {
 	glog.Debugf("Call server DecreaseTargetSize: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -884,9 +893,7 @@ func (s *AutoScalerServerApp) DecreaseTargetSize(ctx context.Context, request *a
 		}, nil
 	}
 
-	err := nodeGroup.setNodeGroupSize(s.kubeClient, newSize)
-
-	if err != nil {
+	if _, err := nodeGroup.setNodeGroupSize(s.kubeClient, newSize, false); err != nil {
 		return &apigrpc.DecreaseTargetSizeReply{
 			Error: &apigrpc.Error{
 				Code:   constantes.CloudProviderError,
@@ -904,7 +911,7 @@ func (s *AutoScalerServerApp) DecreaseTargetSize(ctx context.Context, request *a
 func (s *AutoScalerServerApp) Id(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.IdReply, error) {
 	glog.Debugf("Call server Id: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -925,7 +932,7 @@ func (s *AutoScalerServerApp) Id(ctx context.Context, request *apigrpc.NodeGroup
 func (s *AutoScalerServerApp) Debug(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.DebugReply, error) {
 	glog.Debugf("Call server Debug: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -949,7 +956,7 @@ func (s *AutoScalerServerApp) Debug(ctx context.Context, request *apigrpc.NodeGr
 func (s *AutoScalerServerApp) Nodes(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.NodesReply, error) {
 	glog.Debugf("Call server Nodes: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -969,9 +976,9 @@ func (s *AutoScalerServerApp) Nodes(ctx context.Context, request *apigrpc.NodeGr
 		}, nil
 	}
 
-	instances := make([]*apigrpc.Instance, 0, len(nodeGroup.Nodes))
+	instances := make([]*apigrpc.Instance, 0, nodeGroup.targetSize())
 
-	for _, node := range nodeGroup.Nodes {
+	for _, node := range nodeGroup.AllNodes() {
 		instances = append(instances, &apigrpc.Instance{
 			Id: node.generateProviderID(),
 			Status: &apigrpc.InstanceStatus{
@@ -1003,7 +1010,7 @@ func (s *AutoScalerServerApp) TemplateNodeInfo(ctx context.Context, request *api
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
 	}
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -1023,7 +1030,19 @@ func (s *AutoScalerServerApp) TemplateNodeInfo(ctx context.Context, request *api
 		}, nil
 	}
 
+	labels := utils.MergeKubernetesLabel(nodeGroup.NodeLabels, nodeGroup.SystemLabels)
+	annotations := types.KubernetesLabel{
+		constantes.AnnotationNodeGroupName:        request.GetNodeGroupID(),
+		constantes.AnnotationScaleDownDisabled:    "false",
+		constantes.AnnotationNodeAutoProvisionned: "true",
+		constantes.AnnotationNodeManaged:          "false",
+	}
+
 	node := &apiv1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels:      labels,
+			Annotations: annotations,
+		},
 		Spec: apiv1.NodeSpec{
 			Unschedulable: false,
 		},
@@ -1036,12 +1055,84 @@ func (s *AutoScalerServerApp) TemplateNodeInfo(ctx context.Context, request *api
 	}, nil
 }
 
+func (s *AutoScalerServerApp) GetOptions(ctx context.Context, request *apigrpc.GetOptionsRequest) (*apigrpc.GetOptionsReply, error) {
+	glog.Debugf("Call server GetOptions: %v", request)
+
+	if s.isCallDenied(request) {
+		glog.Errorf(constantes.ErrMismatchingProvider)
+		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
+	}
+
+	pbDefaults := request.GetDefaults()
+
+	if pbDefaults == nil {
+		return &apigrpc.GetOptionsReply{
+			Response: &apigrpc.GetOptionsReply_Error{
+				Error: &apigrpc.Error{
+					Code:   constantes.CloudProviderError,
+					Reason: "request fields were nil",
+				},
+			},
+		}, nil
+	}
+
+	nodeGroup := s.Groups[request.GetNodeGroupID()]
+
+	if nodeGroup == nil {
+		glog.Errorf(constantes.ErrNodeGroupNotFound, request.GetNodeGroupID())
+
+		return &apigrpc.GetOptionsReply{
+			Response: &apigrpc.GetOptionsReply_Error{
+				Error: &apigrpc.Error{
+					Code:   constantes.CloudProviderError,
+					Reason: fmt.Sprintf(constantes.ErrNodeGroupNotFound, request.GetNodeGroupID()),
+				},
+			},
+		}, nil
+	}
+
+	defaults := &types.NodeGroupAutoscalingOptions{
+		ScaleDownUtilizationThreshold:    pbDefaults.GetScaleDownGpuUtilizationThreshold(),
+		ScaleDownGpuUtilizationThreshold: pbDefaults.GetScaleDownGpuUtilizationThreshold(),
+		ScaleDownUnneededTime:            pbDefaults.GetScaleDownUnneededTime().Duration,
+		ScaleDownUnreadyTime:             pbDefaults.GetScaleDownUnneededTime().Duration,
+	}
+
+	opts, err := nodeGroup.GetOptions(defaults)
+
+	if err != nil {
+		return &apigrpc.GetOptionsReply{
+			Response: &apigrpc.GetOptionsReply_Error{
+				Error: &apigrpc.Error{
+					Code:   constantes.CloudProviderError,
+					Reason: err.Error(),
+				},
+			},
+		}, nil
+	}
+
+	return &apigrpc.GetOptionsReply{
+		Response: &apigrpc.GetOptionsReply_NodeGroupAutoscalingOptions{
+			NodeGroupAutoscalingOptions: &apigrpc.AutoscalingOptions{
+				ScaleDownUtilizationThreshold:    opts.ScaleDownUtilizationThreshold,
+				ScaleDownGpuUtilizationThreshold: opts.ScaleDownGpuUtilizationThreshold,
+				ScaleDownUnneededTime: &metav1.Duration{
+					Duration: opts.ScaleDownUnneededTime,
+				},
+				ScaleDownUnreadyTime: &metav1.Duration{
+					Duration: opts.ScaleDownUnreadyTime,
+				},
+			},
+		},
+	}, nil
+}
+
 // Exist checks if the node group really exists on the cloud provider side. Allows to tell the
 // theoretical node group from the real one. Implementation required.
 func (s *AutoScalerServerApp) Exist(ctx context.Context, request *apigrpc.NodeGroupServiceRequest) (*apigrpc.ExistReply, error) {
 	glog.Debugf("Call server Exist: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -1061,7 +1152,7 @@ func (s *AutoScalerServerApp) Create(ctx context.Context, request *apigrpc.NodeG
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
 	}
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -1100,7 +1191,7 @@ func (s *AutoScalerServerApp) Delete(ctx context.Context, request *apigrpc.NodeG
 		return nil, fmt.Errorf(constantes.ErrNotImplemented)
 	}
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -1129,7 +1220,7 @@ func (s *AutoScalerServerApp) Autoprovisioned(ctx context.Context, request *apig
 
 	var b bool
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -1149,7 +1240,7 @@ func (s *AutoScalerServerApp) Autoprovisioned(ctx context.Context, request *apig
 func (s *AutoScalerServerApp) Belongs(ctx context.Context, request *apigrpc.BelongsRequest) (*apigrpc.BelongsReply, error) {
 	glog.Debugf("Call server Belongs: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -1185,7 +1276,7 @@ func (s *AutoScalerServerApp) Belongs(ctx context.Context, request *apigrpc.Belo
 
 		return &apigrpc.BelongsReply{
 			Response: &apigrpc.BelongsReply_Belongs{
-				Belongs: nodeGroup.Nodes[node.Name] != nil,
+				Belongs: nodeGroup.findNamedNode(node.Name) != nil,
 			},
 		}, nil
 	}
@@ -1205,7 +1296,7 @@ func (s *AutoScalerServerApp) Belongs(ctx context.Context, request *apigrpc.Belo
 func (s *AutoScalerServerApp) NodePrice(ctx context.Context, request *apigrpc.NodePriceRequest) (*apigrpc.NodePriceReply, error) {
 	glog.Debugf("Call server NodePrice: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -1222,7 +1313,7 @@ func (s *AutoScalerServerApp) NodePrice(ctx context.Context, request *apigrpc.No
 func (s *AutoScalerServerApp) PodPrice(ctx context.Context, request *apigrpc.PodPriceRequest) (*apigrpc.PodPriceReply, error) {
 	glog.Debugf("Call server PodPrice: %v", request)
 
-	if request.GetProviderID() != s.configuration.ServiceIdentifier {
+	if s.isCallDenied(request) {
 		glog.Errorf(constantes.ErrMismatchingProvider)
 		return nil, fmt.Errorf(constantes.ErrMismatchingProvider)
 	}
@@ -1331,31 +1422,95 @@ func (s *AutoScalerServerApp) startController() error {
 	return err
 }
 
-func (s *AutoScalerServerApp) run(config *types.AutoScalerServerConfig) {
-	lis, err := net.Listen(config.Network, config.Listen)
+func (s *AutoScalerServerApp) runServer(config *types.AutoScalerServerConfig, registerService func(*grpc.Server)) error {
+	var server *grpc.Server
 
-	if err != nil {
-		glog.Fatalf("failed to listen: %v", err)
+	if config.CertCA == "" || config.CertPrivateKey == "" || config.CertPublicKey == "" {
+		server = grpc.NewServer()
+	} else {
+		certPool := x509.NewCertPool()
+
+		if certificate, err := tls.LoadX509KeyPair(config.CertPublicKey, config.CertPrivateKey); err != nil {
+			return fmt.Errorf("failed to read certificate files: %s", err)
+		} else if bs, err := os.ReadFile(config.CertCA); err != nil {
+			return fmt.Errorf("failed to read client ca cert: %s", err)
+		} else if ok := certPool.AppendCertsFromPEM(bs); !ok {
+			return fmt.Errorf("failed to append client certs")
+		} else {
+
+			transportCreds := credentials.NewTLS(&tls.Config{
+				ClientAuth:   tls.RequireAndVerifyClientCert,
+				Certificates: []tls.Certificate{certificate},
+				ClientCAs:    certPool,
+			})
+
+			server = grpc.NewServer(grpc.Creds(transportCreds))
+		}
 	}
-
-	server := grpc.NewServer()
 
 	defer func() {
 		s.running = false
 		server.Stop()
 	}()
 
-	apigrpc.RegisterCloudProviderServiceServer(server, s)
-	apigrpc.RegisterNodeGroupServiceServer(server, s)
-	apigrpc.RegisterPricingModelServiceServer(server, s)
-
+	registerService(server)
 	reflection.Register(server)
 
-	if err := server.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+	if listener, err := net.Listen(config.Network, config.Listen); err != nil {
+		return fmt.Errorf("failed to listen: %v", err)
+	} else if err = server.Serve(listener); err != nil {
+		return fmt.Errorf("failed to serve: %v", err)
 	}
 
 	glog.Infof("End listening server")
+
+	return nil
+}
+
+func (s *AutoScalerServerApp) runVanillaGrpc(config *types.AutoScalerServerConfig) {
+	if err := s.runServer(config, func(server *grpc.Server) {
+		if external, err := NewExternalgrpcServerApp(s); err != nil {
+			glog.Fatalf("failed to create externalgrpc: %v", err)
+		} else {
+			externalgrpc.RegisterCloudProviderServer(server, external)
+		}
+	}); err != nil {
+		glog.Fatalf("failed to start server: %v", err)
+	}
+}
+
+func (s *AutoScalerServerApp) run(config *types.AutoScalerServerConfig) {
+	if err := s.runServer(config, func(server *grpc.Server) {
+		apigrpc.RegisterCloudProviderServiceServer(server, s)
+		apigrpc.RegisterNodeGroupServiceServer(server, s)
+		apigrpc.RegisterPricingModelServiceServer(server, s)
+	}); err != nil {
+		glog.Fatalf("failed to start server: %v", err)
+	}
+}
+
+func (s *AutoScalerServerApp) checkPrivateKeyExists() bool {
+	if len(s.configuration.SSH.Password) > 0 {
+		return true
+	}
+
+	if len(s.configuration.SSH.AuthKeys) == 0 {
+		return false
+	}
+
+	return utils.FileExistAndReadable(s.configuration.SSH.AuthKeys)
+}
+
+func (s *AutoScalerServerApp) checkKubernetesPKIReadable() bool {
+	return utils.DirExistAndReadable(s.configuration.KubernetesPKISourceDir)
+}
+
+func (s *AutoScalerServerApp) checkEtcdSslReadable() bool {
+	if *s.configuration.UseExternalEtdc {
+		return utils.DirExistAndReadable(s.configuration.ExtSourceEtcdSslDir)
+	}
+
+	return true
 }
 
 // StartServer start the service
@@ -1397,8 +1552,16 @@ func StartServer(kubeClient types.ClientGenerator, c *types.Config) {
 		}
 	}
 
+	if config.UseControllerManager == nil {
+		config.UseControllerManager = &c.UseControllerManager
+	}
+
 	if config.UseExternalEtdc == nil {
 		config.UseExternalEtdc = &c.UseExternalEtdc
+	}
+
+	if config.UseVanillaGrpcProvider == nil {
+		config.UseVanillaGrpcProvider = &c.UseVanillaGrpcProvider
 	}
 
 	if len(config.ExtDestinationEtcdSslDir) == 0 {
@@ -1448,9 +1611,25 @@ func StartServer(kubeClient types.ClientGenerator, c *types.Config) {
 		}
 	}
 
+	if !autoScalerServer.checkPrivateKeyExists() {
+		log.Fatalf(constantes.ErrFatalMissingSSHKey, autoScalerServer.configuration.SSH.AuthKeys)
+	}
+
+	if !autoScalerServer.checkKubernetesPKIReadable() {
+		log.Fatalf(constantes.ErrFatalKubernetesPKIMissingOrUnreadable, autoScalerServer.configuration.KubernetesPKISourceDir)
+	}
+
+	if !autoScalerServer.checkEtcdSslReadable() {
+		log.Fatalf(constantes.ErrFatalEtcdMissingOrUnreadable, autoScalerServer.configuration.ExtSourceEtcdSslDir)
+	}
+
 	if err = autoScalerServer.startController(); err != nil {
 		glog.Fatalf("Can't start controller, reason:%s", err)
 	}
 
-	autoScalerServer.run(&config)
+	if *config.UseVanillaGrpcProvider {
+		autoScalerServer.runVanillaGrpc(&config)
+	} else {
+		autoScalerServer.run(&config)
+	}
 }

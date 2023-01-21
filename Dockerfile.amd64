@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#ARG BASEIMAGE=gcr.io/distroless/static:latest-amd64
-ARG BASEIMAGE=ubuntu:focal
+ARG BASEIMAGE=gcr.io/distroless/static:nonroot-amd64
 FROM $BASEIMAGE
 LABEL maintainer="Frederic Boltz <frederic.boltz@gmail.com>"
 

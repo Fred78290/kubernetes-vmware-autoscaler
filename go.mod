@@ -4,7 +4,6 @@ go 1.19
 
 require (
 	github.com/alecthomas/kingpin v2.2.6+incompatible
-	github.com/golang/protobuf v1.5.2
 	github.com/linki/instrumented_http v0.3.0
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.0
@@ -13,11 +12,11 @@ require (
 	google.golang.org/grpc v1.49.0
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v2 v2.4.0
-	k8s.io/api v0.25.5
-	k8s.io/apiextensions-apiserver v0.25.5
-	k8s.io/apimachinery v0.25.5
-	k8s.io/client-go v0.25.5
-	k8s.io/code-generator v0.25.5
+	k8s.io/api v0.25.6
+	k8s.io/apiextensions-apiserver v0.25.6
+	k8s.io/apimachinery v0.25.6
+	k8s.io/client-go v0.25.6
+	k8s.io/code-generator v0.25.6
 )
 
 require (
@@ -37,6 +36,7 @@ require (
 	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/gnostic v0.5.7-v3refs // indirect
 	github.com/google/go-cmp v0.5.8 // indirect
 	github.com/google/gofuzz v1.1.0 // indirect
@@ -77,5 +77,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
-
-replace google.golang.org/grpc => google.golang.org/grpc v1.29.1

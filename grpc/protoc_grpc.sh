@@ -1,6 +1,6 @@
 #/bin/bash
-
-PB_RELEASE="3.11.1"
+CURDIR=$(dirname $0)
+PB_RELEASE="21.12"
 PB_REL="https://github.com/protocolbuffers/protobuf/releases"
 
 export PROTOC_DIR="/tmp/protoc-${PB_RELEASE}"
@@ -12,18 +12,24 @@ mkdir -p $PROTOC_DIR
 
 pushd $PROTOC_DIR
 
-#go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.27.1
-#go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
 
-go get -v google.golang.org/grpc@v1.29.1
-#go get -v github.com/golang/protobuf@v1.3.2
-#go get -v github.com/golang/protobuf/protoc-gen-go@v1.3.2
-
-curl -LO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-linux-x86_64.zip
-unzip protoc-${PB_RELEASE}-linux-x86_64.zip
+if [ "$(uname)" = "Darwin" ]; then
+    curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-osx-universal_binary.zip
+    unzip protoc-${PB_RELEASE}-osx-universal_binary.zip
+else
+    curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-linux-x86_64.zip
+    unzip protoc-${PB_RELEASE}-linux-x86_64.zip
+fi
 
 popd
 
-$PROTOC_DIR/bin/protoc -I . -I vendor grpc/grpc.proto --go_out=plugins=grpc:.
+$PROTOC_DIR/bin/protoc -I . -I vendor --proto_path=grpc/ --go_out=. --go-grpc_out=. grpc.proto
+
+pushd $CURDIR
+cp ./grpccloudprovider/*.go .
+rm -rf ./grpccloudprovider
+popd
 
 sudo rm -rf $PROTOC_DIR

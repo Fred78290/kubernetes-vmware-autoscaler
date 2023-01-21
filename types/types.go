@@ -23,6 +23,7 @@ const (
 	DefaultMaxGracePeriod    time.Duration = 120 * time.Second
 	DefaultMaxRequestTimeout time.Duration = 120 * time.Second
 	DefaultMaxDeletionPeriod time.Duration = 300 * time.Second
+	DefaultNodeReadyTimeout  time.Duration = 300 * time.Second
 )
 
 const (
@@ -45,9 +46,12 @@ type Config struct {
 	KubernetesPKISourceDir   string
 	KubernetesPKIDestDir     string
 	UseExternalEtdc          bool
+	UseVanillaGrpcProvider   bool
+	UseControllerManager     bool
 	RequestTimeout           time.Duration
 	DeletionTimeout          time.Duration
 	MaxGracePeriod           time.Duration
+	NodeReadyTimeout         time.Duration
 	Config                   string
 	SaveLocation             string
 	DisplayVersion           bool
@@ -114,7 +118,7 @@ type ClientGenerator interface {
 	AnnoteNode(nodeName string, annotations map[string]string) error
 	LabelNode(nodeName string, labels map[string]string) error
 	TaintNode(nodeName string, taints ...apiv1.Taint) error
-	WaitNodeToBeReady(nodeName string, timeToWaitInSeconds int) error
+	WaitNodeToBeReady(nodeName string) error
 }
 
 // ResourceLimiter define limit, not really used
@@ -150,10 +154,11 @@ type AutoScalerServerOptionals struct {
 
 // AutoScalerServerSSH contains ssh client infos
 type AutoScalerServerSSH struct {
-	UserName string `json:"user"`
-	Password string `json:"password"`
-	AuthKeys string `json:"ssh-private-key"`
-	TestMode bool   `json:"-"`
+	UserName              string `json:"user"`
+	Password              string `json:"password"`
+	AuthKeys              string `json:"ssh-private-key"`
+	WaitSshReadyInSeconds int    `default:"180" json:"wait-ssh-ready-seconds"`
+	TestMode              bool   `json:"-"`
 }
 
 // GetUserName returns user name from config or the real current username is empty or equal to ~
@@ -186,15 +191,38 @@ func (ssh *AutoScalerServerSSH) GetAuthKeys() string {
 	return ssh.AuthKeys
 }
 
+type NodeGroupAutoscalingOptions struct {
+	// ScaleDownUtilizationThreshold sets threshold for nodes to be considered for scale down
+	// if cpu or memory utilization is over threshold.
+	ScaleDownUtilizationThreshold float64 `json:"scaleDownUtilizationThreshold,omitempty"`
+
+	// ScaleDownGpuUtilizationThreshold sets threshold for gpu nodes to be
+	// considered for scale down if gpu utilization is over threshold.
+	ScaleDownGpuUtilizationThreshold float64 `json:"scaleDownGpuUtilizationThreshold,omitempty"`
+
+	// ScaleDownUnneededTime sets the duration CA expects a node to be
+	// unneeded/eligible for removal before scaling down the node.
+	ScaleDownUnneededTime time.Duration `json:"scaleDownUnneededTime,omitempty"`
+
+	// ScaleDownUnreadyTime represents how long an unready node should be
+	// unneeded before it is eligible for scale down.
+	ScaleDownUnreadyTime time.Duration `json:"scaleDownUnreadyTime,omitempty"`
+}
+
 // AutoScalerServerConfig is contains configuration
 type AutoScalerServerConfig struct {
 	UseExternalEtdc            *bool                             `json:"use-external-etcd"`
+	UseVanillaGrpcProvider     *bool                             `json:"use-vanilla-grpc"`
+	UseControllerManager       *bool                             `json:"use-controller-manager"`
 	ExtDestinationEtcdSslDir   string                            `default:"/etc/etcd/ssl" json:"dst-etcd-ssl-dir"`
 	ExtSourceEtcdSslDir        string                            `default:"/etc/etcd/ssl" json:"src-etcd-ssl-dir"`
 	KubernetesPKISourceDir     string                            `default:"/etc/kubernetes/pki" json:"kubernetes-pki-srcdir"`
 	KubernetesPKIDestDir       string                            `default:"/etc/kubernetes/pki" json:"kubernetes-pki-dstdir"`
 	Network                    string                            `default:"tcp" json:"network"`                     // Mandatory, Network to listen (see grpc doc) to listen
 	Listen                     string                            `default:"0.0.0.0:5200" json:"listen"`             // Mandatory, Address to listen
+	CertPrivateKey             string                            `json:"cert-private-key,omitempty"`                // Optional to secure grcp channel
+	CertPublicKey              string                            `json:"cert-public-key,omitempty"`                 // Optional to secure grcp channel
+	CertCA                     string                            `json:"cert-ca,omitempty"`                         // Optional to secure grcp channel
 	ServiceIdentifier          string                            `json:"secret"`                                    // Mandatory, secret Identifier, client must match this
 	MinNode                    int                               `json:"minNode"`                                   // Mandatory, Min AutoScaler VM
 	MaxNode                    int                               `json:"maxNode"`                                   // Mandatory, Max AutoScaler VM
@@ -212,6 +240,7 @@ type AutoScalerServerConfig struct {
 	Optionals                  *AutoScalerServerOptionals        `json:"optionals"`
 	ManagedNodeResourceLimiter *ResourceLimiter                  `json:"managednodes-limits"`
 	SSH                        *AutoScalerServerSSH              `json:"ssh-infos"`
+	AutoScalingOptions         *NodeGroupAutoscalingOptions      `json:"autoscaling-options,omitempty"`
 	VMwareInfos                map[string]*vsphere.Configuration `json:"vmware"`
 }
 
@@ -322,6 +351,8 @@ func NewConfig() *Config {
 		APIServerURL:             "",
 		KubeConfig:               "",
 		UseExternalEtdc:          false,
+		UseVanillaGrpcProvider:   false,
+		UseControllerManager:     true,
 		ExtDestinationEtcdSslDir: "/etc/etcd/ssl",
 		ExtSourceEtcdSslDir:      "/etc/etcd/ssl",
 		KubernetesPKISourceDir:   "/etc/kubernetes/pki",
@@ -329,6 +360,7 @@ func NewConfig() *Config {
 		RequestTimeout:           DefaultMaxRequestTimeout,
 		DeletionTimeout:          DefaultMaxDeletionPeriod,
 		MaxGracePeriod:           DefaultMaxGracePeriod,
+		NodeReadyTimeout:         DefaultNodeReadyTimeout,
 		DisplayVersion:           false,
 		Config:                   "/etc/cluster/vmware-cluster-autoscaler.json",
 		MinCpus:                  2,
@@ -365,6 +397,9 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.Flag("log-format", "The format in which log messages are printed (default: text, options: text, json)").Default(cfg.LogFormat).EnumVar(&cfg.LogFormat, "text", "json")
 	app.Flag("log-level", "Set the level of logging. (default: info, options: panic, debug, info, warning, error, fatal").Default(cfg.LogLevel).EnumVar(&cfg.LogLevel, allLogLevelsAsStrings()...)
 
+	app.Flag("use-vanilla-grpc", "Tell we use vanilla autoscaler externalgrpc cloudprovider").Default("false").BoolVar(&cfg.UseVanillaGrpcProvider)
+	app.Flag("use-controller-manager", "Tell we use vsphere controller manager").Default("true").BoolVar(&cfg.UseControllerManager)
+
 	// External Etcd
 	app.Flag("use-external-etcd", "Tell we use an external etcd service (overriden by config file if defined)").Default("false").BoolVar(&cfg.UseExternalEtdc)
 	app.Flag("src-etcd-ssl-dir", "Locate the source etcd ssl files (overriden by config file if defined)").Default(cfg.ExtSourceEtcdSslDir).StringVar(&cfg.ExtSourceEtcdSslDir)
@@ -378,6 +413,7 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.Flag("kubeconfig", "Retrieve target cluster configuration from a Kubernetes configuration file (default: auto-detect)").Default(cfg.KubeConfig).StringVar(&cfg.KubeConfig)
 	app.Flag("request-timeout", "Request timeout when calling Kubernetes APIs. 0s means no timeout").Default(DefaultMaxRequestTimeout.String()).DurationVar(&cfg.RequestTimeout)
 	app.Flag("deletion-timeout", "Deletion timeout when delete node. 0s means no timeout").Default(DefaultMaxDeletionPeriod.String()).DurationVar(&cfg.DeletionTimeout)
+	app.Flag("node-ready-timeout", "Node ready timeout to wait for a node to be ready. 0s means no timeout").Default(DefaultNodeReadyTimeout.String()).DurationVar(&cfg.NodeReadyTimeout)
 	app.Flag("max-grace-period", "Maximum time evicted pods will be given to terminate gracefully.").Default(DefaultMaxGracePeriod.String()).DurationVar(&cfg.MaxGracePeriod)
 
 	app.Flag("min-cpus", "Limits: minimum cpu (default: 1)").Default(strconv.FormatInt(cfg.MinCpus, 10)).Int64Var(&cfg.MinCpus)
