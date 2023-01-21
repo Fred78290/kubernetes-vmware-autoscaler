@@ -1635,6 +1635,10 @@ func StartServer(kubeClient types.ClientGenerator, c *types.Config) {
 		}
 	}
 
+	if config.UseControllerManager == nil {
+		config.UseControllerManager = &c.UseControllerManager
+	}
+
 	if config.UseExternalEtdc == nil {
 		config.UseExternalEtdc = &c.UseExternalEtdc
 	}

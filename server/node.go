@@ -283,7 +283,7 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 
 		err = fmt.Errorf(constantes.ErrKubeAdmJoinFailed, vm.NodeName, err)
 
-	} else if err = c.SetProviderID(vm.NodeName, vm.generateProviderID()); err != nil {
+	} else if err = vm.setProviderID(c); err != nil {
 
 		err = fmt.Errorf(constantes.ErrProviderIDNotConfigured, vm.NodeName, err)
 
@@ -503,6 +503,14 @@ func (vm *AutoScalerServerNode) GetVSphere() *vsphere.Configuration {
 	}
 
 	return vsphere
+}
+
+func (vm *AutoScalerServerNode) setProviderID(c types.ClientGenerator) error {
+	if vm.serverConfig.UseControllerManager != nil && *vm.serverConfig.UseControllerManager == false {
+		return c.SetProviderID(vm.NodeName, vm.generateProviderID())
+	}
+
+	return nil
 }
 
 func (vm *AutoScalerServerNode) generateProviderID() string {

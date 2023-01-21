@@ -46,6 +46,7 @@ type Config struct {
 	KubernetesPKIDestDir     string
 	UseExternalEtdc          bool
 	UseVanillaGrpcProvider   bool
+	UseControllerManager     bool
 	RequestTimeout           time.Duration
 	DeletionTimeout          time.Duration
 	MaxGracePeriod           time.Duration
@@ -209,6 +210,7 @@ type NodeGroupAutoscalingOptions struct {
 type AutoScalerServerConfig struct {
 	UseExternalEtdc            *bool                             `json:"use-external-etcd"`
 	UseVanillaGrpcProvider     *bool                             `json:"use-vanilla-grpc"`
+	UseControllerManager       *bool                             `json:"use-controller-manager"`
 	ExtDestinationEtcdSslDir   string                            `default:"/etc/etcd/ssl" json:"dst-etcd-ssl-dir"`
 	ExtSourceEtcdSslDir        string                            `default:"/etc/etcd/ssl" json:"src-etcd-ssl-dir"`
 	KubernetesPKISourceDir     string                            `default:"/etc/kubernetes/pki" json:"kubernetes-pki-srcdir"`
@@ -347,6 +349,7 @@ func NewConfig() *Config {
 		KubeConfig:               "",
 		UseExternalEtdc:          false,
 		UseVanillaGrpcProvider:   false,
+		UseControllerManager:     true,
 		ExtDestinationEtcdSslDir: "/etc/etcd/ssl",
 		ExtSourceEtcdSslDir:      "/etc/etcd/ssl",
 		KubernetesPKISourceDir:   "/etc/kubernetes/pki",
@@ -391,6 +394,7 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.Flag("log-level", "Set the level of logging. (default: info, options: panic, debug, info, warning, error, fatal").Default(cfg.LogLevel).EnumVar(&cfg.LogLevel, allLogLevelsAsStrings()...)
 
 	app.Flag("use-vanilla-grpc", "Tell we use vanilla autoscaler externalgrpc cloudprovider").Default("false").BoolVar(&cfg.UseVanillaGrpcProvider)
+	app.Flag("use-controller-manager", "Tell we use vsphere controller manager").Default("true").BoolVar(&cfg.UseControllerManager)
 
 	// External Etcd
 	app.Flag("use-external-etcd", "Tell we use an external etcd service (overriden by config file if defined)").Default("false").BoolVar(&cfg.UseExternalEtdc)
