@@ -180,7 +180,22 @@ func (vm *AutoScalerServerNode) kubeAdmJoin(c types.ClientGenerator) error {
 		return fmt.Errorf("unable to execute command: %s, output: %s, reason:%v", command, out, err)
 	}
 
-	return nil
+	// To be sure, with kubeadm 1.26.1, the kubelet is not correctly restarted
+	time.Sleep(5 * time.Second)
+
+	return utils.PollImmediate(5*time.Second, time.Duration(vm.serverConfig.SSH.WaitSshReadyInSeconds)*time.Second, func() (done bool, err error) {
+		if node, err := c.GetNode(vm.NodeName); err == nil && node != nil {
+			return true, nil
+		}
+
+		glog.Infof("Restart kubelet for node:%s for nodegroup: %s", vm.NodeName, vm.NodeGroupID)
+
+		if out, err := utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, "systemctl restart kubelet"); err != nil {
+			return false, fmt.Errorf("unable to restart kubelet, output: %s, reason:%v", out, err)
+		}
+
+		return false, nil
+	})
 }
 
 func (vm *AutoScalerServerNode) setNodeLabels(c types.ClientGenerator, nodeLabels, systemLabels types.KubernetesLabel) error {
@@ -304,7 +319,7 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 
 		err = fmt.Errorf(constantes.ErrUpdateEtcdSslFailed, vm.NodeName, err)
 
-	} else if err = vm.kubeAdmJoin(); err != nil {
+	} else if err = vm.kubeAdmJoin(c); err != nil {
 
 		err = fmt.Errorf(constantes.ErrKubeAdmJoinFailed, vm.NodeName, err)
 
