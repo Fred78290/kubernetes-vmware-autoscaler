@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/context"
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/apis/nodemanager/v1alpha1"
@@ -210,15 +211,22 @@ func (net *Network) UpdateMacAddressTable(nodeIndex int) {
 	}
 }
 
+var macAddresesLock sync.Mutex
 var macAddreses = make(map[string]string)
 
 func attachMacAddress(netName, address string) {
+	macAddresesLock.Lock()
+	defer macAddresesLock.Unlock()
+
 	macAddreses[netName] = address
 }
 
 func generateMacAddress(netName string) string {
 	var address string
 	var found bool
+
+	macAddresesLock.Lock()
+	defer macAddresesLock.Unlock()
 
 	if address, found = macAddreses[netName]; !found {
 		buf := make([]byte, 3)

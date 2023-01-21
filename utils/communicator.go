@@ -14,33 +14,37 @@ import (
 )
 
 // AuthMethodFromPrivateKeyFile read public key
-func AuthMethodFromPrivateKeyFile(file string) ssh.AuthMethod {
-	if buffer, err := os.ReadFile(file); err == nil {
-		if key, err := ssh.ParsePrivateKey(buffer); err == nil {
-			return ssh.PublicKeys(key)
-		} else {
-			glog.Fatalf("Can't parse key file:%s, reason:%v", file, err)
-		}
+func AuthMethodFromPrivateKeyFile(file string) (ssh.AuthMethod, error) {
+	var buffer []byte
+	var err error
+	var key ssh.Signer
+
+	if buffer, err = os.ReadFile(file); err != nil {
+		glog.Errorf("Can't read key file:%s, reason:%v", file, err)
+	} else if key, err = ssh.ParsePrivateKey(buffer); err != nil {
+		glog.Errorf("Can't parse key file:%s, reason:%v", file, err)
 	} else {
-		glog.Fatalf("Can't read key file:%s, reason:%v", file, err)
+		return ssh.PublicKeys(key), nil
 	}
 
-	return nil
+	return nil, err
 }
 
 // AuthMethodFromPrivateKey read public key
-func AuthMethodFromPrivateKey(key string) ssh.AuthMethod {
-	if pub, err := ssh.ParsePrivateKey([]byte(key)); err == nil {
-		if signer, err := ssh.NewSignerFromKey(pub); err == nil {
-			return ssh.PublicKeys(signer)
-		} else {
-			glog.Fatalf("AuthMethodFromPublicKey fatal error:%v", err)
-		}
+func AuthMethodFromPrivateKey(key string) (ssh.AuthMethod, error) {
+	var pub ssh.Signer
+	var err error
+	var signer ssh.Signer
+
+	if pub, err = ssh.ParsePrivateKey([]byte(key)); err != nil {
+		glog.Errorf("AuthMethodFromPublicKey fatal error:%v", err)
+	} else if signer, err = ssh.NewSignerFromKey(pub); err != nil {
+		glog.Errorf("AuthMethodFromPublicKey fatal error:%v", err)
 	} else {
-		glog.Fatalf("AuthMethodFromPublicKey fatal error:%v", err)
+		return ssh.PublicKeys(signer), nil
 	}
 
-	return nil
+	return nil, err
 }
 
 // Shell execute local command ignore output
@@ -81,29 +85,25 @@ func Scp(connect *types.AutoScalerServerSSH, host, src, dst string) error {
 func Sudo(connect *types.AutoScalerServerSSH, host string, timeoutInSeconds time.Duration, command ...string) (string, error) {
 	var sshConfig *ssh.ClientConfig
 	var err error
+	var method ssh.AuthMethod
 
 	if connect.TestMode {
 		return "", nil
 	}
 
 	if len(connect.Password) > 0 {
-		sshConfig = &ssh.ClientConfig{
-			Timeout:         timeoutInSeconds * time.Second,
-			User:            connect.GetUserName(),
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-			Auth: []ssh.AuthMethod{
-				ssh.Password(connect.Password),
-			},
-		}
-	} else {
-		sshConfig = &ssh.ClientConfig{
-			Timeout:         timeoutInSeconds * time.Second,
-			User:            connect.GetUserName(),
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-			Auth: []ssh.AuthMethod{
-				AuthMethodFromPrivateKeyFile(connect.GetAuthKeys()),
-			},
-		}
+		method = ssh.Password(connect.Password)
+	} else if method, err = AuthMethodFromPrivateKeyFile(connect.GetAuthKeys()); err != nil {
+		return "", err
+	}
+
+	sshConfig = &ssh.ClientConfig{
+		Timeout:         timeoutInSeconds * time.Second,
+		User:            connect.GetUserName(),
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Auth: []ssh.AuthMethod{
+			method,
+		},
 	}
 
 	connection, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", host), sshConfig)

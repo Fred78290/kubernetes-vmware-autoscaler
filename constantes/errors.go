@@ -85,6 +85,9 @@ const (
 	// ErrVMAlreadyCreated error msg
 	ErrVMAlreadyCreated = "unable to launch VM, %s is already created"
 
+	// ErrVMAlreadyExists error msg
+	ErrVMAlreadyExists = "the vm named: %s is already exists"
+
 	// ErrUnableToMountPath error msg
 	ErrUnableToMountPath = "unable to mount host path:%s into guest:%s for node:%s, reason: %v"
 
@@ -234,4 +237,13 @@ const (
 
 	// ErrTimeoutWhenWaitingEvictions err msg
 	ErrTimeoutWhenWaitingEvictions = "timed out waiting for evictions to complete on node: %s"
+
+	// ErrFatalMissingSSHKey err msg
+	ErrFatalMissingSSHKey = "%s ssh key not found"
+
+	// ErrFatalEtcdMissingOrUnreadable err msg
+	ErrFatalEtcdMissingOrUnreadable = "%s etcd certs directory is missing or unreadable"
+
+	// ErrFatalKubernetesPKIMissingOrUnreadable err msg
+	ErrFatalKubernetesPKIMissingOrUnreadable = "%s kubernetes pki directory is missing or unreadable"
 )

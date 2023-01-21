@@ -240,7 +240,7 @@ func (m *baseTest) TaintNode(nodeName string, taints ...apiv1.Taint) error {
 	return nil
 }
 
-func (m *baseTest) WaitNodeToBeReady(nodeName string, timeToWaitInSeconds int) error {
+func (m *baseTest) WaitNodeToBeReady(nodeName string) error {
 	return nil
 }
 
