@@ -19,9 +19,17 @@ func Background() context.Context {
 	return context.Background()
 }
 
-// NewContext return a context. Timeout is in seconds
+// NewContext return a context. Timeout is in seconds, zero means no timeout
 func NewContext(timeout time.Duration) *Context {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)
+	var ctx context.Context
+	var cancel context.CancelFunc
+
+	if timeout == 0 {
+		ctx, cancel = context.WithCancel(context.Background())
+	} else {
+		ctx, cancel = context.WithTimeout(context.Background(), timeout*time.Second)
+	}
+
 	return &Context{
 		ctx:    ctx,
 		cancel: cancel,
