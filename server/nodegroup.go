@@ -250,8 +250,7 @@ func (g *AutoScalerServerNodeGroup) deleteNodes(c types.ClientGenerator, delta i
 
 func (g *AutoScalerServerNodeGroup) addManagedNode(crd *v1alpha1.ManagedNode) (*AutoScalerServerNode, error) {
 	controlPlane := crd.Spec.ControlPlane
-	nodeIndex := g.findNextNodeIndex(true)
-	nodeName := g.nodeName(nodeIndex, controlPlane, true)
+	nodeName, nodeIndex := g.nodeName(g.findNextNodeIndex(true), controlPlane, true)
 
 	// Clone the vsphere config to allow increment IP address
 	if vsphereConfig, err := g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Clone(nodeIndex); err == nil {
@@ -332,6 +331,7 @@ func (g *AutoScalerServerNodeGroup) addManagedNode(crd *v1alpha1.ManagedNode) (*
 
 func (g *AutoScalerServerNodeGroup) prepareNodes(c types.ClientGenerator, delta int) ([]*AutoScalerServerNode, error) {
 	tempNodes := make([]*AutoScalerServerNode, 0, delta)
+	config := g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier)
 
 	if g.Status != NodegroupCreated {
 		glog.Debugf("AutoScalerServerNodeGroup::addNodes, nodeGroupID:%s -> g.status != nodegroupCreated", g.NodeGroupIdentifier)
@@ -339,45 +339,40 @@ func (g *AutoScalerServerNodeGroup) prepareNodes(c types.ClientGenerator, delta 
 	}
 
 	for {
-		nodeIndex := g.findNextNodeIndex(false)
-		nodeName := g.nodeName(nodeIndex, false, false)
+		nodeName, nodeIndex := g.nodeName(g.findNextNodeIndex(false), false, false)
 
 		// Clone the vsphere config to allow increment IP address
-		if vsphereConfig, err := g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier).Clone(nodeIndex); err == nil {
+		if vsphereConfig, err := config.Clone(nodeIndex); err == nil {
 
-			if vsphereConfig.Exists(nodeName) {
-				glog.Warnf(constantes.ErrVMAlreadyExists, nodeName)
-			} else {
-				g.RunningNodes[nodeIndex] = ServerNodeStateCreating
+			g.RunningNodes[nodeIndex] = ServerNodeStateCreating
 
-				extraAnnotations := types.KubernetesLabel{}
-				extraLabels := types.KubernetesLabel{
-					constantes.NodeLabelWorkerRole: "",
-					"worker":                       "true",
-				}
-
-				node := &AutoScalerServerNode{
-					NodeGroupID:      g.NodeGroupIdentifier,
-					NodeName:         nodeName,
-					NodeIndex:        nodeIndex,
-					Memory:           g.Machine.Memory,
-					CPU:              g.Machine.Vcpu,
-					Disk:             g.Machine.Disk,
-					NodeType:         AutoScalerServerNodeAutoscaled,
-					ExtraAnnotations: extraAnnotations,
-					ExtraLabels:      extraLabels,
-					ControlPlaneNode: false,
-					AllowDeployment:  true,
-					VSphereConfig:    vsphereConfig,
-					serverConfig:     g.configuration,
-				}
-
-				tempNodes = append(tempNodes, node)
-
-				g.pendingNodes[node.NodeName] = node
-
-				delta--
+			extraAnnotations := types.KubernetesLabel{}
+			extraLabels := types.KubernetesLabel{
+				constantes.NodeLabelWorkerRole: "",
+				"worker":                       "true",
 			}
+
+			node := &AutoScalerServerNode{
+				NodeGroupID:      g.NodeGroupIdentifier,
+				NodeName:         nodeName,
+				NodeIndex:        nodeIndex,
+				Memory:           g.Machine.Memory,
+				CPU:              g.Machine.Vcpu,
+				Disk:             g.Machine.Disk,
+				NodeType:         AutoScalerServerNodeAutoscaled,
+				ExtraAnnotations: extraAnnotations,
+				ExtraLabels:      extraLabels,
+				ControlPlaneNode: false,
+				AllowDeployment:  true,
+				VSphereConfig:    vsphereConfig,
+				serverConfig:     g.configuration,
+			}
+
+			tempNodes = append(tempNodes, node)
+
+			g.pendingNodes[node.NodeName] = node
+
+			delta--
 
 			if delta == 0 {
 				break
@@ -833,8 +828,9 @@ func (g *AutoScalerServerNodeGroup) getManagedNodePrefix() string {
 	return g.ManagedNodeNamePrefix
 }
 
-func (g *AutoScalerServerNodeGroup) nodeName(vmIndex int, controlplane, managed bool) string {
+func (g *AutoScalerServerNodeGroup) nodeName(vmIndex int, controlplane, managed bool) (string, int) {
 	var start int
+	config := g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier)
 
 	if controlplane {
 		start = 2
@@ -854,17 +850,23 @@ func (g *AutoScalerServerNodeGroup) nodeName(vmIndex int, controlplane, managed 
 		}
 
 		if found := g.findNamedNode(nodeName); found == nil {
-			return nodeName
+			if !config.Exists(nodeName) {
+				return nodeName, vmIndex
+			} else {
+				glog.Warnf(constantes.ErrVMAlreadyExists, nodeName)
+				g.RunningNodes[vmIndex] = ServerNodeStateRunning
+				vmIndex++
+			}
 		}
 	}
 
 	// Should never reach this code
 	if controlplane {
-		return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getControlPlanePrefix(), vmIndex-g.numOfExternalNodes-g.numOfProvisionnedNodes-g.numOfManagedNodes+g.numOfControlPlanes+1)
+		return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getControlPlanePrefix(), vmIndex-g.numOfExternalNodes-g.numOfProvisionnedNodes-g.numOfManagedNodes+g.numOfControlPlanes+1), vmIndex
 	} else if managed {
-		return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getManagedNodePrefix(), vmIndex-g.numOfExternalNodes-g.numOfProvisionnedNodes+1)
+		return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getManagedNodePrefix(), vmIndex-g.numOfExternalNodes-g.numOfProvisionnedNodes+1), vmIndex
 	} else {
-		return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getProvisionnedNodePrefix(), vmIndex-g.numOfExternalNodes-g.numOfManagedNodes+1)
+		return fmt.Sprintf("%s-%s-%02d", g.NodeGroupIdentifier, g.getProvisionnedNodePrefix(), vmIndex-g.numOfExternalNodes-g.numOfManagedNodes+1), vmIndex
 	}
 }
 
