@@ -412,22 +412,22 @@ spec:
         - name: config-cluster-autoscaler
           configMap:
             name: config-cluster-autoscaler
-            defaultMode: 420
+            defaultMode: 0440
         - name: ssl-certs
           hostPath:
             path: /etc/ssl/certs/ca-certificates.crt
         - name: autoscaler-ssh-keys
           secret:
             secretName: autoscaler-ssh-keys
-            defaultMode: 384
+            defaultMode: 0440
         - name: etcd-ssl
           secret:
             secretName: etcd-ssl
-            defaultMode: 384
+            defaultMode: 0440
         - name: kubernetes-pki
           configMap:
             name: kubernetes-pki
-            defaultMode: 420
+            defaultMode: 0440
       initContainers:
         - name: cluster-autoscaler-init
           image: busybox
