@@ -10,8 +10,12 @@ Kubernetes autoscaler for vsphere/esxi including a custom resource controller to
 
 * 1.25.6
     - This version is supported kubernetes v1.25
+* 1.25.7
+    - This version is supported kubernetes v1.25 and support k3s
 * 1.26.1
     - This version is supported kubernetes v1.26
+* 1.26.2
+    - This version is supported kubernetes v1.26 and support k3s
 
 ## How it works
 
@@ -39,6 +43,9 @@ The build process use make file. The simplest way to build is `make container`
 
 # New features
 
+## Use k3s
+
+Instead using **kubeadm** as kubernetes deployment tool, it is possible to use **k3s**
 ## Use the vanilla autoscaler with extern gRPC cloud provider
 
 You can also use the vanilla autoscaler with the [externalgrpc cloud provider](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler/cloudprovider/externalgrpc)
