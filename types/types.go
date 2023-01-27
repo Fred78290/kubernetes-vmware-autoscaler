@@ -46,6 +46,7 @@ type Config struct {
 	KubernetesPKISourceDir   string
 	KubernetesPKIDestDir     string
 	UseExternalEtdc          bool
+	UseK3S                   bool
 	UseVanillaGrpcProvider   bool
 	UseControllerManager     bool
 	RequestTimeout           time.Duration
@@ -142,6 +143,11 @@ type KubeJoinConfig struct {
 	ExtraArguments []string `json:"extras-args,omitempty"`
 }
 
+type K3SJoinConfig struct {
+	ExtraCommands     []string `json:"extras-commands,omitempty"`
+	DatastoreEndpoint string   `json:"datastore-endpoint,omitempty"`
+}
+
 // AutoScalerServerOptionals declare wich features must be optional
 type AutoScalerServerOptionals struct {
 	Pricing                  bool `json:"pricing"`
@@ -212,6 +218,7 @@ type NodeGroupAutoscalingOptions struct {
 // AutoScalerServerConfig is contains configuration
 type AutoScalerServerConfig struct {
 	UseExternalEtdc            *bool                             `json:"use-external-etcd"`
+	UseK3S                     *bool                             `json:"use-k3s"`
 	UseVanillaGrpcProvider     *bool                             `json:"use-vanilla-grpc"`
 	UseControllerManager       *bool                             `json:"use-controller-manager"`
 	ExtDestinationEtcdSslDir   string                            `default:"/etc/etcd/ssl" json:"dst-etcd-ssl-dir"`
@@ -233,6 +240,7 @@ type AutoScalerServerConfig struct {
 	NodePrice                  float64                           `json:"nodePrice"`                                 // Optional, The VM price
 	PodPrice                   float64                           `json:"podPrice"`                                  // Optional, The pod price
 	KubeAdm                    KubeJoinConfig                    `json:"kubeadm"`
+	K3S                        K3SJoinConfig                     `json:"k3s"`
 	DefaultMachineType         string                            `default:"standard" json:"default-machine"`
 	NodeLabels                 KubernetesLabel                   `json:"nodeLabels"`
 	Machines                   map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
@@ -397,6 +405,7 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.Flag("log-format", "The format in which log messages are printed (default: text, options: text, json)").Default(cfg.LogFormat).EnumVar(&cfg.LogFormat, "text", "json")
 	app.Flag("log-level", "Set the level of logging. (default: info, options: panic, debug, info, warning, error, fatal").Default(cfg.LogLevel).EnumVar(&cfg.LogLevel, allLogLevelsAsStrings()...)
 
+	app.Flag("use-k3s", "Tell we use k3s in place of kubeadm").Default("false").BoolVar(&cfg.UseK3S)
 	app.Flag("use-vanilla-grpc", "Tell we use vanilla autoscaler externalgrpc cloudprovider").Default("false").BoolVar(&cfg.UseVanillaGrpcProvider)
 	app.Flag("use-controller-manager", "Tell we use vsphere controller manager").Default("true").BoolVar(&cfg.UseControllerManager)
 
