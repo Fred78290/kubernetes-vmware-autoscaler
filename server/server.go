@@ -1552,6 +1552,10 @@ func StartServer(kubeClient types.ClientGenerator, c *types.Config) {
 		}
 	}
 
+	if config.UseK3S == nil {
+		config.UseK3S = &c.UseK3S
+	}
+
 	if config.UseControllerManager == nil {
 		config.UseControllerManager = &c.UseControllerManager
 	}

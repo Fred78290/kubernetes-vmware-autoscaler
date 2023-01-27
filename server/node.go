@@ -198,6 +198,52 @@ func (vm *AutoScalerServerNode) kubeAdmJoin(c types.ClientGenerator) error {
 	})
 }
 
+func (vm *AutoScalerServerNode) k3sAgentJoin(c types.ClientGenerator) error {
+	kubeAdm := vm.serverConfig.KubeAdm
+	k3s := vm.serverConfig.K3S
+	args := []string{
+		fmt.Sprintf("echo K3S_ARGS='--kubelet-arg=provider-id=%s --node-name=%s --server=https://%s --token=%s' > /etc/systemd/system/k3s.service.env", vm.generateProviderID(), vm.NodeName, kubeAdm.Address, kubeAdm.Token),
+	}
+
+	if vm.ControlPlaneNode {
+		args = append(args, "echo 'K3S_MODE=server' > /etc/default/k3s", "echo K3S_DISABLE_ARGS='--disable-cloud-controller --disable=servicelb --disable=traefik --disable=metrics-server' > /etc/systemd/system/k3s.disabled.env")
+
+		if vm.serverConfig.UseExternalEtdc != nil && *vm.serverConfig.UseExternalEtdc {
+			args = append(args, fmt.Sprintf("echo K3S_SERVER_ARGS='--datastore-endpoint=%s --datastore-cafile=%s/ca.pem --datastore-certfile=%s/etcd.pem --datastore-keyfile=%s/etcd-key.pem' > /etc/systemd/system/k3s.server.env", k3s.DatastoreEndpoint, vm.serverConfig.ExtDestinationEtcdSslDir, vm.serverConfig.ExtDestinationEtcdSslDir, vm.serverConfig.ExtDestinationEtcdSslDir))
+		}
+	}
+
+	// Append extras arguments
+	if len(k3s.ExtraCommands) > 0 {
+		args = append(args, k3s.ExtraCommands...)
+	}
+
+	args = append(args, "systemctl enable k3s.service", "systemctl start k3s.service")
+
+	glog.Infof("Join cluster for node:%s for nodegroup: %s", vm.NodeName, vm.NodeGroupID)
+
+	command := fmt.Sprintf("sh -c \"%s\"", strings.Join(args, " && "))
+	if out, err := utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, command); err != nil {
+		return fmt.Errorf("unable to execute command: %s, output: %s, reason:%v", command, out, err)
+	}
+
+	return utils.PollImmediate(5*time.Second, time.Duration(vm.serverConfig.SSH.WaitSshReadyInSeconds)*time.Second, func() (done bool, err error) {
+		if node, err := c.GetNode(vm.NodeName); err == nil && node != nil {
+			return true, nil
+		}
+
+		return false, nil
+	})
+}
+
+func (vm *AutoScalerServerNode) joinCluster(c types.ClientGenerator) error {
+	if vm.serverConfig.UseK3S != nil && *vm.serverConfig.UseK3S {
+		return vm.k3sAgentJoin(c)
+	} else {
+		return vm.kubeAdmJoin(c)
+	}
+}
+
 func (vm *AutoScalerServerNode) setNodeLabels(c types.ClientGenerator, nodeLabels, systemLabels types.KubernetesLabel) error {
 	labels := utils.MergeKubernetesLabel(nodeLabels, systemLabels, vm.ExtraLabels)
 
@@ -319,7 +365,7 @@ func (vm *AutoScalerServerNode) launchVM(c types.ClientGenerator, nodeLabels, sy
 
 		err = fmt.Errorf(constantes.ErrUpdateEtcdSslFailed, vm.NodeName, err)
 
-	} else if err = vm.kubeAdmJoin(c); err != nil {
+	} else if err = vm.joinCluster(c); err != nil {
 
 		err = fmt.Errorf(constantes.ErrKubeAdmJoinFailed, vm.NodeName, err)
 
@@ -546,7 +592,7 @@ func (vm *AutoScalerServerNode) GetVSphere() *vsphere.Configuration {
 }
 
 func (vm *AutoScalerServerNode) setProviderID(c types.ClientGenerator) error {
-	if vm.serverConfig.UseControllerManager != nil && *vm.serverConfig.UseControllerManager == false {
+	if vm.serverConfig.UseControllerManager != nil && !*vm.serverConfig.UseControllerManager {
 		return c.SetProviderID(vm.NodeName, vm.generateProviderID())
 	}
 
