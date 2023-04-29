@@ -5,8 +5,8 @@ ALL_ARCH = amd64 arm64
 all: $(addprefix build-arch-,$(ALL_ARCH))
 
 VERSION_MAJOR ?= 1
-VERSION_MINOR ?= 26
-VERSION_BUILD ?= 2
+VERSION_MINOR ?= 27
+VERSION_BUILD ?= 1
 TAG?=v$(VERSION_MAJOR).$(VERSION_MINOR).$(VERSION_BUILD)
 FLAGS=
 ENVVAR=CGO_ENABLED=0
@@ -26,7 +26,7 @@ deps:
 build: $(addprefix build-arch-,$(ALL_ARCH))
 
 build-arch-%: deps clean-arch-%
-	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -ldflags="-X main.phVersion=$(TAG) -X main.phBuildDate=$(BUILD_DATE) ${LDFLAGS}" -a -o out/$(GOOS)/$*/vsphere-autoscaler
+	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -buildvcs=false -ldflags="-X main.phVersion=$(TAG) -X main.phBuildDate=$(BUILD_DATE) ${LDFLAGS}" -a -o out/$(GOOS)/$*/vsphere-autoscaler
 
 test-unit: clean build
 	go install github.com/vmware/govmomi/vcsim@v0.30.0
