@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Frédéric Boltz.
+Copyright 2023 Frédéric Boltz.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,8 +33,7 @@ type Interface interface {
 	NodemanagerV1alpha1() nodemanagerv1alpha1.NodemanagerV1alpha1Interface
 }
 
-// Clientset contains the clients for groups. Each group has exactly one
-// version included in a Clientset.
+// Clientset contains the clients for groups.
 type Clientset struct {
 	*discovery.DiscoveryClient
 	nodemanagerV1alpha1 *nodemanagerv1alpha1.NodemanagerV1alpha1Client

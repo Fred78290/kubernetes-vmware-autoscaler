@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Frédéric Boltz.
+Copyright 2023 Frédéric Boltz.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import (
 	v1alpha1 "github.com/Fred78290/kubernetes-vmware-autoscaler/pkg/apis/nodemanager/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
@@ -35,9 +34,9 @@ type FakeManagedNodes struct {
 	Fake *FakeNodemanagerV1alpha1
 }
 
-var managednodesResource = schema.GroupVersionResource{Group: "nodemanager.aldunelabs.com", Version: "v1alpha1", Resource: "managednodes"}
+var managednodesResource = v1alpha1.SchemeGroupVersion.WithResource("managednodes")
 
-var managednodesKind = schema.GroupVersionKind{Group: "nodemanager.aldunelabs.com", Version: "v1alpha1", Kind: "ManagedNode"}
+var managednodesKind = v1alpha1.SchemeGroupVersion.WithKind("ManagedNode")
 
 // Get takes name of the managedNode, and returns the corresponding managedNode object, and an error if there is any.
 func (c *FakeManagedNodes) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.ManagedNode, err error) {
