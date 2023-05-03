@@ -434,7 +434,9 @@ func (g *AutoScalerServerNodeGroup) createNodes(c types.ClientGenerator, nodes [
 			exists := fmt.Sprintf(constantes.ErrVMAlreadyExists, node.NodeName)
 
 			if err.Error() != exists {
-				if status, _ := node.statusVM(); status != AutoScalerServerNodeStateNotCreated {
+				if *g.configuration.DebugMode {
+					glog.Warningf("Debug mode enabled, don't delete VM: %s for inspection", node.NodeName)
+				} else if status, _ := node.statusVM(); status != AutoScalerServerNodeStateNotCreated {
 					if e := node.deleteVM(c); e != nil {
 						glog.Errorf(constantes.ErrUnableToDeleteVM, node.NodeName, e)
 					}
