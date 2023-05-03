@@ -26,7 +26,7 @@ deps:
 build: $(addprefix build-arch-,$(ALL_ARCH))
 
 build-arch-%: deps clean-arch-%
-	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -ldflags="-X main.phVersion=$(TAG) -X main.phBuildDate=$(BUILD_DATE) ${LDFLAGS}" -a -o out/$(GOOS)/$*/vsphere-autoscaler
+	$(ENVVAR) GOOS=$(GOOS) GOARCH=$* go build -buildvcs=false -ldflags="-X main.phVersion=$(TAG) -X main.phBuildDate=$(BUILD_DATE) ${LDFLAGS}" -a -o out/$(GOOS)/$*/vsphere-autoscaler
 
 test-unit: clean build
 	go install github.com/vmware/govmomi/vcsim@v0.30.0
