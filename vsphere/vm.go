@@ -59,7 +59,7 @@ func encodeCloudInit(name string, object interface{}) (string, error) {
 	var out bytes.Buffer
 	var err error
 
-	fmt.Fprintln(&out, "#cloud-init")
+	fmt.Fprintln(&out, "#cloud-config")
 
 	wr := yaml.NewEncoder(&out)
 	err = wr.Encode(object)
