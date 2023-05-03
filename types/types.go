@@ -56,6 +56,7 @@ type Config struct {
 	Config                   string
 	SaveLocation             string
 	DisplayVersion           bool
+	DebugMode                bool
 	LogFormat                string
 	LogLevel                 string
 	MinCpus                  int64
@@ -250,6 +251,7 @@ type AutoScalerServerConfig struct {
 	SSH                        *AutoScalerServerSSH              `json:"ssh-infos"`
 	AutoScalingOptions         *NodeGroupAutoscalingOptions      `json:"autoscaling-options,omitempty"`
 	VMwareInfos                map[string]*vsphere.Configuration `json:"vmware"`
+	DebugMode                  *bool                             `json:"debug,omitempty"`
 }
 
 func (limits *ResourceLimiter) MergeRequestResourceLimiter(limiter *apigrpc.ResourceLimiter) {
@@ -404,6 +406,8 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 
 	app.Flag("log-format", "The format in which log messages are printed (default: text, options: text, json)").Default(cfg.LogFormat).EnumVar(&cfg.LogFormat, "text", "json")
 	app.Flag("log-level", "Set the level of logging. (default: info, options: panic, debug, info, warning, error, fatal").Default(cfg.LogLevel).EnumVar(&cfg.LogLevel, allLogLevelsAsStrings()...)
+
+	app.Flag("debug", "Debug mode").Default("false").BoolVar(&cfg.DebugMode)
 
 	app.Flag("use-k3s", "Tell we use k3s in place of kubeadm").Default("false").BoolVar(&cfg.UseK3S)
 	app.Flag("use-vanilla-grpc", "Tell we use vanilla autoscaler externalgrpc cloudprovider").Default("false").BoolVar(&cfg.UseVanillaGrpcProvider)
