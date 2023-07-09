@@ -3,10 +3,14 @@ package vsphere
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -16,6 +20,7 @@ import (
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25"
+	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v2"
 
 	"github.com/vmware/govmomi/vim25/mo"
@@ -104,18 +109,38 @@ func encodeObject(name string, object interface{}) (string, error) {
 	return result, err
 }
 
-func buildVendorData(userName, authKey string) interface{} {
-	tz, _ := time.Now().Zone()
+func generatePublicKey(authKey string) (publicKey string, err error) {
+	var priv []byte
+	var key *rsa.PrivateKey
+	var publicRsaKey ssh.PublicKey
 
-	return map[string]interface{}{
-		"package_update":  true,
-		"package_upgrade": true,
+	if priv, err = os.ReadFile(authKey); err != nil {
+		glog.Errorf("unable to read:%s, reason: %v", authKey, err)
+	} else {
+		block, _ := pem.Decode([]byte(priv))
+
+		if block == nil || block.Type != "RSA PRIVATE KEY" {
+			glog.Errorf("failed to decode PEM block containing public key")
+		} else if key, err = x509.ParsePKCS1PrivateKey(block.Bytes); err != nil {
+			glog.Errorf("unable to parse private key:%s, reason: %v", authKey, err)
+		} else if publicRsaKey, err = ssh.NewPublicKey(&key.PublicKey); err != nil {
+			glog.Errorf("unable to generate public key:%s, reason: %v", authKey, err)
+		} else {
+			publicKey = string(ssh.MarshalAuthorizedKey(publicRsaKey))
+		}
+	}
+
+	return
+}
+
+func buildVendorData(userName, authKey string, allowUpgrade bool) interface{} {
+	tz, _ := time.Now().Zone()
+	vendorData := map[string]interface{}{
+		"package_update":  allowUpgrade,
+		"package_upgrade": allowUpgrade,
 		"timezone":        tz,
 		"users": []string{
 			"default",
-		},
-		"ssh_authorized_keys": []string{
-			authKey,
 		},
 		"system_info": map[string]interface{}{
 			"default_user": map[string]string{
@@ -123,6 +148,14 @@ func buildVendorData(userName, authKey string) interface{} {
 			},
 		},
 	}
+
+	if pubKey, err := generatePublicKey(authKey); err == nil {
+		vendorData["ssh_authorized_keys"] = []string{
+			pubKey,
+		}
+	}
+
+	return vendorData
 }
 
 func (g GuestInfos) isEmpty() bool {
@@ -306,7 +339,7 @@ func (vm *VirtualMachine) addOrExpandHardDrive(ctx *context.Context, virtualMach
 }
 
 // Configure set characteristic of VM a virtual machine
-func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey string, cloudInit interface{}, network *Network, annotation string, expandHardDrive bool, memory, cpus, disk, nodeIndex int) error {
+func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey string, cloudInit interface{}, network *Network, annotation string, expandHardDrive bool, memory, cpus, disk, nodeIndex int, allowUpgrade bool) error {
 	var devices object.VirtualDeviceList
 	var err error
 	var task *object.Task
@@ -333,7 +366,7 @@ func (vm *VirtualMachine) Configure(ctx *context.Context, userName, authKey stri
 
 		err = fmt.Errorf(constantes.ErrUnableToCreateDeviceChangeOp, vm.Name, err)
 
-	} else if vmConfigSpec.ExtraConfig, err = vm.cloudInit(ctx, vm.Name, userName, authKey, cloudInit, network, nodeIndex); err != nil {
+	} else if vmConfigSpec.ExtraConfig, err = vm.cloudInit(ctx, vm.Name, userName, authKey, cloudInit, network, nodeIndex, allowUpgrade); err != nil {
 
 		err = fmt.Errorf(constantes.ErrCloudInitFailCreation, vm.Name, err)
 
@@ -645,7 +678,7 @@ func (vm *VirtualMachine) SetGuestInfo(ctx *context.Context, guestInfos *GuestIn
 	return err
 }
 
-func (vm *VirtualMachine) cloudInit(ctx *context.Context, hostName string, userName, authKey string, cloudInit interface{}, network *Network, nodeIndex int) ([]types.BaseOptionValue, error) {
+func (vm *VirtualMachine) cloudInit(ctx *context.Context, hostName string, userName, authKey string, cloudInit interface{}, network *Network, nodeIndex int, allowUpgrade bool) ([]types.BaseOptionValue, error) {
 	var metadata, userdata, vendordata string
 	var err error
 	var guestInfos GuestInfos
@@ -681,7 +714,7 @@ func (vm *VirtualMachine) cloudInit(ctx *context.Context, hostName string, userN
 		}
 
 		if len(userName) > 0 && len(authKey) > 0 {
-			if vendordata, err = encodeCloudInit("vendordata", buildVendorData(userName, authKey)); err != nil {
+			if vendordata, err = encodeCloudInit("vendordata", buildVendorData(userName, authKey, allowUpgrade)); err != nil {
 				return nil, fmt.Errorf(constantes.ErrUnableToEncodeGuestInfo, "vendordata", err)
 			}
 		} else if vendordata, err = encodeCloudInit("vendordata", map[string]string{}); err != nil {
