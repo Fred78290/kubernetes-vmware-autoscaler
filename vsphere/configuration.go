@@ -26,6 +26,7 @@ type Configuration struct {
 	TemplateName  string        `json:"template-name"`
 	Template      bool          `json:"template"`
 	LinkedClone   bool          `json:"linked"`
+	AllowUpgrade  bool          `json:"allow-upgrade"`
 	Customization string        `json:"customization"`
 	Network       *Network      `json:"network"`
 	TestMode      bool          `json:"-"`
@@ -163,7 +164,7 @@ func (conf *Configuration) CreateWithContext(ctx *context.Context, name string, 
 		if dc, err = client.GetDatacenter(ctx, conf.DataCenter); err == nil {
 			if ds, err = dc.GetDatastore(ctx, conf.DataStore); err == nil {
 				if vm, err = ds.CreateVirtualMachine(ctx, name, conf.TemplateName, conf.VMBasePath, conf.Resource, conf.Template, conf.LinkedClone, network, conf.Customization, nodeIndex); err == nil {
-					err = vm.Configure(ctx, userName, authKey, cloudInit, network, annotation, expandHardDrive, memory, cpus, disk, nodeIndex)
+					err = vm.Configure(ctx, userName, authKey, cloudInit, network, annotation, expandHardDrive, memory, cpus, disk, nodeIndex, conf.AllowUpgrade)
 				}
 			}
 		}
