@@ -348,7 +348,7 @@ func (v *externalgrpcServerApp) NodeGroupNodes(ctx context.Context, request *ext
 		status := externalgrpc.InstanceStatus_unspecified
 
 		switch node.State {
-		case AutoScalerServerNodeStateRunning, AutoScalerServerNodeStateStopped:
+		case AutoScalerServerNodeStateRunning:
 			status = externalgrpc.InstanceStatus_instanceRunning
 		case AutoScalerServerNodeStateCreating:
 			status = externalgrpc.InstanceStatus_instanceCreating
