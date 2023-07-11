@@ -1062,10 +1062,21 @@ func (s *AutoScalerServerApp) Nodes(ctx context.Context, request *apigrpc.NodeGr
 	instances := make([]*apigrpc.Instance, 0, nodeGroup.targetSize())
 
 	for _, node := range nodeGroup.AllNodes() {
+		status := apigrpc.InstanceState_STATE_UNDEFINED
+
+		switch node.State {
+		case AutoScalerServerNodeStateRunning:
+			status = apigrpc.InstanceState_STATE_RUNNING
+		case AutoScalerServerNodeStateCreating:
+			status = apigrpc.InstanceState_STATE_BEING_CREATED
+		case AutoScalerServerNodeStateDeleted:
+			status = apigrpc.InstanceState_STATE_BEING_DELETED
+		}
+
 		instances = append(instances, &apigrpc.Instance{
 			Id: node.generateProviderID(),
 			Status: &apigrpc.InstanceStatus{
-				State:     apigrpc.InstanceState(node.State),
+				State:     status,
 				ErrorInfo: nil,
 			},
 		})
