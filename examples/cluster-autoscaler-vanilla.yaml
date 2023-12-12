@@ -253,7 +253,7 @@ data:
       "controlplane-name-prefix": "master",
       "nodePrice": 0,
       "podPrice": 0,
-      "image": "jammy-kubernetes-cni-flannel-v1.27.1-containerd-amd64",
+      "image": "jammy-kubernetes-cni-flannel-v1.28.4-containerd-amd64",
       "optionals": {
         "pricing": false,
         "getAvailableMachineTypes": false,
@@ -345,7 +345,7 @@ data:
           "resource-pool": "ACME/Resources/FR",
           "vmFolder": "HOME",
           "timeout": 300,
-          "template-name": "jammy-kubernetes-cni-flannel-v1.27.1-containerd-amd64",
+          "template-name": "jammy-kubernetes-cni-flannel-v1.28.4-containerd-amd64",
           "template": false,
           "linked": false,
           "customization": "",
@@ -452,7 +452,7 @@ spec:
               mountPath: /var/run/cluster-autoscaler
       containers:
         - name: vsphere-autoscaler
-          image: fred78290/vsphere-autoscaler:v1.27.1
+          image: fred78290/vsphere-autoscaler:v1.28.4
           command:
             - /usr/local/bin/vsphere-autoscaler
             - "--no-use-external-etcd"
@@ -482,7 +482,7 @@ spec:
             - name: cluster-autoscaler-grpc-client-cert
               mountPath: "/etc/ssl/client-cert"
         - name: cluster-autoscaler
-          image: k8s.gcr.io/autoscaling/cluster-autoscaler:v1.27.1
+          image: k8s.gcr.io/autoscaling/cluster-autoscaler:v1.28.4
           command:
             - ./cluster-autoscaler
             - "--v=1"
