@@ -1,0 +1,76 @@
+{
+    // Utilisez IntelliSense pour en savoir plus sur les attributs possibles.
+    // Pointez pour afficher la description des attributs existants.
+    // Pour plus d'informations, visitez : https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "preLaunchTask": "kubeadm",
+            "name": "kubeadm",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}",
+            "cwd": "${env:HOME}/go/src/github.com/Fred78290/kubernetes-vmware-autoscaler",
+            "args": [
+                "--request-timeout=120s",
+                "--use-vanilla-grpc",
+                "--config=${workspaceFolder}/.config/vmware-ca-k8s/kubernetes-vmware-autoscaler.json",
+                "--save=${workspaceFolder}/.config/vmware-ca-k8s/autoscaler-state.json",
+                "--kubeconfig=${workspaceFolder}/.config/vmware-ca-k8s/config",
+                "--log-level=info"
+            ]
+        },
+        {
+            "preLaunchTask": "k3s",
+            "name": "k3s custom grpc",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}",
+            "cwd": "${env:HOME}/go/src/github.com/Fred78290/kubernetes-vmware-autoscaler",
+            "args": [
+                "--request-timeout=120s",
+                "--no-use-vanilla-grpc",
+                "--config=${workspaceFolder}/.config/vmware-dev-k3s/kubernetes-vmware-autoscaler.json",
+                "--save=${workspaceFolder}/.config/vmware-dev-k3s/autoscaler-state.json",
+                "--kubeconfig=${workspaceFolder}/.config/vmware-dev-k3s/config",
+                "--log-level=info"
+            ]
+        },
+        {
+            "preLaunchTask": "k3s",
+            "name": "k3s external grpc",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}",
+            "cwd": "${env:HOME}/go/src/github.com/Fred78290/kubernetes-vmware-autoscaler",
+            "args": [
+                "--request-timeout=120s",
+                "--use-vanilla-grpc",
+                "--config=${workspaceFolder}/.config/vmware-dev-k3s/kubernetes-vmware-autoscaler.json",
+                "--save=${workspaceFolder}/.config/vmware-dev-k3s/autoscaler-state.json",
+                "--kubeconfig=${workspaceFolder}/.config/vmware-dev-k3s/config",
+                "--log-level=info"
+            ]
+        },
+        {
+            "preLaunchTask": "rke2",
+            "name": "rke2",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}",
+            "cwd": "${env:HOME}/go/src/github.com/Fred78290/kubernetes-vmware-autoscaler",
+            "args": [
+                "--request-timeout=120s",
+                "--use-vanilla-grpc",
+                "--config=${workspaceFolder}/.config/vmware-dev-rke2/kubernetes-vmware-autoscaler.json",
+                "--save=${workspaceFolder}/.config/vmware-dev-rke2/autoscaler-state.json",
+                "--kubeconfig=${workspaceFolder}/.config/vmware-dev-rke2/config",
+                "--log-level=info"
+            ]
+        },
+    ]
+}
