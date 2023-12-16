@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
@@ -1646,8 +1647,16 @@ func StartServer(kubeClient types.ClientGenerator, c *types.Config) {
 		}
 	}
 
-	if config.UseK3S == nil {
-		config.UseK3S = &c.UseK3S
+	if config.Distribution == nil {
+		if c.UseK3S {
+			c.Distribution = "k3s"
+		}
+
+		config.Distribution = &c.Distribution
+	}
+
+	if !slices.Contains([]string{"kubeadm", "k3s", "rke2", "external"}, *config.Distribution) {
+		glog.Fatalf("Unsupported kubernetes distribution: %s", *config.Distribution)
 	}
 
 	if config.DebugMode == nil {
