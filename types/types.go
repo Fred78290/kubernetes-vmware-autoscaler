@@ -45,8 +45,9 @@ type Config struct {
 	ExtSourceEtcdSslDir      string
 	KubernetesPKISourceDir   string
 	KubernetesPKIDestDir     string
+	Distribution             string
 	UseExternalEtdc          bool
-	UseK3S                   bool
+	UseK3S                   bool //Deprecated
 	UseVanillaGrpcProvider   bool
 	UseControllerManager     bool
 	RequestTimeout           time.Duration
@@ -149,6 +150,12 @@ type K3SJoinConfig struct {
 	DatastoreEndpoint string   `json:"datastore-endpoint,omitempty"`
 }
 
+type ExternalJoinConfig struct {
+	JoinCommand string                 `json:"join-command,omitempty"`
+	ConfigPath  string                 `json:"config-path,omitempty"`
+	ExtraConfig map[string]interface{} `json:"extra-config;omitempty"`
+}
+
 // AutoScalerServerOptionals declare wich features must be optional
 type AutoScalerServerOptionals struct {
 	Pricing                  bool `json:"pricing"`
@@ -218,8 +225,8 @@ type NodeGroupAutoscalingOptions struct {
 
 // AutoScalerServerConfig is contains configuration
 type AutoScalerServerConfig struct {
+	Distribution               *string                           `json:"distribution"`
 	UseExternalEtdc            *bool                             `json:"use-external-etcd"`
-	UseK3S                     *bool                             `json:"use-k3s"`
 	UseVanillaGrpcProvider     *bool                             `json:"use-vanilla-grpc"`
 	UseControllerManager       *bool                             `json:"use-controller-manager"`
 	ExtDestinationEtcdSslDir   string                            `default:"/etc/etcd/ssl" json:"dst-etcd-ssl-dir"`
@@ -234,6 +241,7 @@ type AutoScalerServerConfig struct {
 	ServiceIdentifier          string                            `json:"secret"`                                    // Mandatory, secret Identifier, client must match this
 	MinNode                    int                               `json:"minNode"`                                   // Mandatory, Min AutoScaler VM
 	MaxNode                    int                               `json:"maxNode"`                                   // Mandatory, Max AutoScaler VM
+	MaxPods                    int                               `default:"110" json:"maxPods"`                     // Mandatory, Max pod per node
 	MaxCreatedNodePerCycle     int                               `json:"maxNode-per-cycle" default:"2"`             // Optional, the max number VM to create in //
 	ProvisionnedNodeNamePrefix string                            `default:"autoscaled" json:"node-name-prefix"`     // Optional, the created node name prefix
 	ManagedNodeNamePrefix      string                            `default:"worker" json:"managed-name-prefix"`      // Optional, the created node name prefix
@@ -242,6 +250,7 @@ type AutoScalerServerConfig struct {
 	PodPrice                   float64                           `json:"podPrice"`                                  // Optional, The pod price
 	KubeAdm                    KubeJoinConfig                    `json:"kubeadm"`
 	K3S                        K3SJoinConfig                     `json:"k3s"`
+	External                   ExternalJoinConfig                `json:external,omitempty`
 	DefaultMachineType         string                            `default:"standard" json:"default-machine"`
 	NodeLabels                 KubernetesLabel                   `json:"nodeLabels"`
 	Machines                   map[string]*MachineCharacteristic `default:"{\"standard\": {}}" json:"machines"` // Mandatory, Available machines
@@ -360,6 +369,7 @@ func NewConfig() *Config {
 	return &Config{
 		APIServerURL:             "",
 		KubeConfig:               "",
+		Distribution:             "kubeadm",
 		UseExternalEtdc:          false,
 		UseVanillaGrpcProvider:   false,
 		UseControllerManager:     true,
@@ -409,7 +419,8 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 
 	app.Flag("debug", "Debug mode").Default("false").BoolVar(&cfg.DebugMode)
 
-	app.Flag("use-k3s", "Tell we use k3s in place of kubeadm").Default("false").BoolVar(&cfg.UseK3S)
+	app.Flag("use-k3s", "Tell we use k3s in place of kubeadm deprecated").Default("false").BoolVar(&cfg.UseK3S)
+	app.Flag("distribution", "Which kubernetes distribution to use: kubeadm, k3s, rke2, external").Default("kubeadm").StringVar(&cfg.Distribution)
 	app.Flag("use-vanilla-grpc", "Tell we use vanilla autoscaler externalgrpc cloudprovider").Default("false").BoolVar(&cfg.UseVanillaGrpcProvider)
 	app.Flag("use-controller-manager", "Tell we use vsphere controller manager").Default("true").BoolVar(&cfg.UseControllerManager)
 
