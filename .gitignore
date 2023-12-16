@@ -36,3 +36,4 @@ masterkube/bin/govc.defs
 build-dev.sh
 
 .secrets
+.config
