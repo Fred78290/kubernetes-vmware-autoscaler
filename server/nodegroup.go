@@ -321,9 +321,11 @@ func (g *AutoScalerServerNodeGroup) addManagedNode(crd *v1alpha1.ManagedNode) (*
 
 		// Add system labels
 		if controlPlane {
-			node.ExtraLabels[constantes.NodeLabelMasterRole] = annoteMaster
 			node.ExtraLabels[constantes.NodeLabelControlPlaneRole] = annoteMaster
 			node.ExtraLabels["master"] = "true"
+			if *g.configuration.Distribution != "rke2" {
+				node.ExtraLabels[constantes.NodeLabelMasterRole] = annoteMaster
+			}
 		} else {
 			node.ExtraLabels[constantes.NodeLabelWorkerRole] = annoteMaster
 			node.ExtraLabels["worker"] = "true"

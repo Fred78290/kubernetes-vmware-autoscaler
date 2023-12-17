@@ -227,14 +227,14 @@ metadata:
   name: config-cluster-autoscaler
   namespace: kube-system
 data:
-  grpc-config.json: |
-    {
-      "address": "unix:/var/run/cluster-autoscaler/vmware.sock",
-      "secret": "vmware",
-      "timeout": 300
-    }
+  cloud-config: |-
+    address: unix:/var/run/cluster-autoscaler/vmware.sock
+    key: "/etc/ssl/client-cert/tls.key"
+    cert: "/etc/ssl/client-cert/tls.crt"
+    cacert: "/etc/ssl/client-cert/ca.crt"
   kubernetes-vmware-autoscaler.json: |
     {
+      "distribution": "rke2",
       "use-external-etcd": false,
       "src-etcd-ssl-dir": "/etc/etcd/ssl",
       "dst-etcd-ssl-dir": "/etc/kubernetes/pki/etcd",
@@ -242,6 +242,9 @@ data:
       "kubernetes-pki-dstdir": "/etc/kubernetes/pki",
       "network": "unix",
       "listen": "/var/run/cluster-autoscaler/vmware.sock",
+      "cert-private-key": "/etc/ssl/client-cert/tls.key",
+      "cert-public-key": "/etc/ssl/client-cert/tls.crt",
+      "cert-ca": "/etc/ssl/client-cert/ca.crt",
       "secret": "vmware",
       "minNode": 0,
       "maxNode": 9,
@@ -251,7 +254,7 @@ data:
       "controlplane-name-prefix": "master",
       "nodePrice": 0,
       "podPrice": 0,
-      "image": "jammy-kubernetes-cni-flannel-v1.27.1-containerd-amd64",
+      "image": "jammy-kubernetes-cni-flannel-v1.27.8-containerd-amd64",
       "optionals": {
         "pricing": false,
         "getAvailableMachineTypes": false,
@@ -260,13 +263,11 @@ data:
         "createNodeGroup": false,
         "deleteNodeGroup": false
       },
-      "kubeadm": {
+      "rke2": {
         "address": "192.168.1.120:6443",
         "token": "h1g55p.hm4rg52ymloax182",
-        "ca": "sha256:c7a86a7a9a03a628b59207f4f3b3e038ebd03260f3ad5ba28f364d513b01f542",
-        "extras-args": [
-          "--ignore-preflight-errors=All"
-        ]
+        "datastore-endpoint": "",
+        "extras-commands": []
       },
       "default-machine": "large",
       "machines": {
@@ -326,6 +327,12 @@ data:
         "user": "kubernetes",
         "ssh-private-key": "/root/.ssh/id_rsa"
       },
+      "autoscaling-options": {
+        "scaleDownUtilizationThreshold": 0.5,
+        "scaleDownGpuUtilizationThreshold": 0.5,
+        "scaleDownUnneededTime": "1m",
+        "scaleDownUnreadyTime": "1m",
+      },
       "vmware": {
         "vmware-ca-k8s": {
           "url": "https://administrator@acme.com:mySecret@vsphere.acme.com/sdk",
@@ -337,7 +344,7 @@ data:
           "resource-pool": "ACME/Resources/FR",
           "vmFolder": "HOME",
           "timeout": 300,
-          "template-name": "jammy-kubernetes-cni-flannel-v1.27.1-containerd-amd64",
+          "template-name": "jammy-kubernetes-cni-flannel-v1.27.8-containerd-amd64",
           "template": false,
           "linked": false,
           "customization": "",
@@ -428,6 +435,10 @@ spec:
           configMap:
             name: kubernetes-pki
             defaultMode: 420
+        - name: cluster-autoscaler-grpc-client-cert
+          secret:
+            secretName: cluster-autoscaler-grpc-client-cert
+            defaultMode: 0400
       initContainers:
         - name: cluster-autoscaler-init
           image: busybox
@@ -440,7 +451,7 @@ spec:
               mountPath: /var/run/cluster-autoscaler
       containers:
         - name: vsphere-autoscaler
-          image: fred78290/vsphere-autoscaler:v1.27.1
+          image: fred78290/vsphere-autoscaler:v1.27.8
           command:
             - /usr/local/bin/vsphere-autoscaler
             - "--no-use-external-etcd"
@@ -467,15 +478,16 @@ spec:
               mountPath: /etc/etcd/ssl
             - name: kubernetes-pki
               mountPath: /etc/kubernetes/pki
+            - name: cluster-autoscaler-grpc-client-cert
+              mountPath: "/etc/ssl/client-cert"
         - name: cluster-autoscaler
-          image: fred78290/cluster-autoscaler:v1.27.1
+          image: k8s.gcr.io/autoscaling/cluster-autoscaler:v1.27.8
           command:
             - ./cluster-autoscaler
             - "--v=1"
             - "--stderrthreshold=info"
-            - "--cloud-provider=grpc"
-            - "--cloud-config=/etc/cluster/grpc-config.json"
-            - "--nodes=0:9:true/vmware-ca-k8s"
+            - "--cloud-provider=externalgrpc"
+            - "--cloud-config=/etc/cluster/cloud-config"
             - "--max-nodes-total=9"
             - "--cores-total=0:16"
             - "--memory-total=0:48"
@@ -504,6 +516,8 @@ spec:
             - name: config-cluster-autoscaler
               readOnly: true
               mountPath: /etc/cluster
+            - name: cluster-autoscaler-grpc-client-cert
+              mountPath: "/etc/ssl/client-cert"
       restartPolicy: Always
       dnsPolicy: ClusterFirst
       serviceAccountName: cluster-autoscaler

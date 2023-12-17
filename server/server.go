@@ -9,7 +9,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"slices"
 	"time"
 
 	"github.com/Fred78290/kubernetes-vmware-autoscaler/constantes"
@@ -1655,7 +1654,24 @@ func StartServer(kubeClient types.ClientGenerator, c *types.Config) {
 		config.Distribution = &c.Distribution
 	}
 
-	if !slices.Contains([]string{"kubeadm", "k3s", "rke2", "external"}, *config.Distribution) {
+	switch *config.Distribution {
+	case "kubeadm":
+		if config.KubeAdm == nil {
+			glog.Fatal("KubeAdm configuration is not defined")
+		}
+	case "k3s":
+		if config.K3S == nil {
+			glog.Fatal("K3S configuration is not defined")
+		}
+	case "rke2":
+		if config.RKE2 == nil {
+			glog.Fatal("RKE2 configuration is not defined")
+		}
+	case "external":
+		if config.External == nil {
+			glog.Fatal("External configuration is not defined")
+		}
+	default:
 		glog.Fatalf("Unsupported kubernetes distribution: %s", *config.Distribution)
 	}
 

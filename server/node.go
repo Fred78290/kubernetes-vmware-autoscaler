@@ -64,6 +64,9 @@ const (
 	AutoScalerServerNodeManaged
 )
 
+const errWriteFileErrorMsg = "unable to write file: %s, reason: %v"
+const tmpConfigDestinationFile = "/tmp/config.yaml"
+
 // AutoScalerServerNode Describe a AutoScaler VM
 type AutoScalerServerNode struct {
 	NodeGroupID      string                    `json:"group"`
@@ -222,18 +225,14 @@ func (vm *AutoScalerServerNode) kubeAdmJoin(c types.ClientGenerator) error {
 func (vm *AutoScalerServerNode) externalAgentJoin(c types.ClientGenerator) error {
 	var result error
 
-	kubeAdm := vm.serverConfig.KubeAdm
 	external := vm.serverConfig.External
 	config := map[string]interface{}{
-		"kubelet-arg": []string{
-			"cloud-provider=external",
-			"fail-swap-on=false",
-			fmt.Sprintf("provider-id=%s", vm.generateProviderID()),
-			fmt.Sprintf("max-pods=%d", vm.serverConfig.MaxPods),
-		},
-		"node-name": vm.NodeName,
-		"server":    fmt.Sprintf("https://%s", kubeAdm.Address),
-		"token":     kubeAdm.Token,
+		"provider-id":              vm.generateProviderID(),
+		"max-pods":                 vm.serverConfig.MaxPods,
+		"node-name":                vm.NodeName,
+		"server":                   external.Address,
+		"token":                    external.Token,
+		"disable-cloud-controller": vm.ControlPlaneNode && vm.serverConfig.UseControllerManager != nil && *vm.serverConfig.UseControllerManager,
 	}
 
 	if external.ExtraConfig != nil {
@@ -242,17 +241,11 @@ func (vm *AutoScalerServerNode) externalAgentJoin(c types.ClientGenerator) error
 		}
 	}
 
-	if vm.ControlPlaneNode {
-		if vm.serverConfig.UseControllerManager != nil && *vm.serverConfig.UseControllerManager {
-			config["disable-cloud-controller"] = true
-		}
-
-		if vm.serverConfig.UseExternalEtdc != nil && *vm.serverConfig.UseExternalEtdc {
-			config["datastore-endpoint"] = vm.serverConfig.K3S.DatastoreEndpoint
-			config["datastore-cafile"] = fmt.Sprintf("%s/ca.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
-			config["datastore-certfile"] = fmt.Sprintf("%s/etcd.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
-			config["datastore-keyfile"] = fmt.Sprintf("%s/etcd-key.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
-		}
+	if vm.ControlPlaneNode && vm.serverConfig.UseExternalEtdc != nil && *vm.serverConfig.UseExternalEtdc {
+		config["datastore-endpoint"] = vm.serverConfig.K3S.DatastoreEndpoint
+		config["datastore-cafile"] = fmt.Sprintf("%s/ca.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
+		config["datastore-certfile"] = fmt.Sprintf("%s/etcd.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
+		config["datastore-keyfile"] = fmt.Sprintf("%s/etcd-key.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
 	}
 
 	if f, err := os.CreateTemp(os.TempDir(), "config.*.yaml"); err != nil {
@@ -262,29 +255,20 @@ func (vm *AutoScalerServerNode) externalAgentJoin(c types.ClientGenerator) error
 
 		if _, err = f.WriteString(utils.ToYAML(config)); err != nil {
 			f.Close()
-			result = fmt.Errorf("unable to write file: %s, reason: %v", f.Name(), err)
+			result = fmt.Errorf(errWriteFileErrorMsg, f.Name(), err)
 		} else {
 			f.Close()
 
-			if _, err = f.WriteString(utils.ToYAML(config)); err != nil {
-				f.Close()
-				result = fmt.Errorf("unable to write file: %s, reason: %v", f.Name(), err)
+			if err = utils.Scp(vm.serverConfig.SSH, vm.IPAddress, f.Name(), tmpConfigDestinationFile); err != nil {
+				result = fmt.Errorf("unable to transfer file: %s to %s, reason: %v", f.Name(), tmpConfigDestinationFile, err)
 			} else {
-				f.Close()
-
-				const tmpDstFile = "/tmp/config.yaml"
-
-				if err = utils.Scp(vm.serverConfig.SSH, vm.IPAddress, f.Name(), tmpDstFile); err != nil {
-					result = fmt.Errorf("unable to transfer file: %s to %s, reason: %v", f.Name(), tmpDstFile, err)
-				} else {
-					args := []string{
-						fmt.Sprintf("mkdir -p %s", path.Dir(external.ConfigPath)),
-						fmt.Sprintf("cp %s %s", tmpDstFile, external.ConfigPath),
-						external.JoinCommand,
-					}
-
-					result = vm.executeCommands(args, false, c)
+				args := []string{
+					fmt.Sprintf("mkdir -p %s", path.Dir(external.ConfigPath)),
+					fmt.Sprintf("cp %s %s", tmpConfigDestinationFile, external.ConfigPath),
+					external.JoinCommand,
 				}
+
+				result = vm.executeCommands(args, false, c)
 			}
 		}
 	}
@@ -295,8 +279,7 @@ func (vm *AutoScalerServerNode) externalAgentJoin(c types.ClientGenerator) error
 func (vm *AutoScalerServerNode) rke2AgentJoin(c types.ClientGenerator) error {
 	var result error
 
-	kubeAdm := vm.serverConfig.KubeAdm
-	k3s := vm.serverConfig.K3S
+	rke2 := vm.serverConfig.RKE2
 	service := "rke2-server"
 	config := map[string]interface{}{
 		"kubelet-arg": []string{
@@ -306,8 +289,8 @@ func (vm *AutoScalerServerNode) rke2AgentJoin(c types.ClientGenerator) error {
 			fmt.Sprintf("max-pods=%d", vm.serverConfig.MaxPods),
 		},
 		"node-name": vm.NodeName,
-		"server":    fmt.Sprintf("https://%s", kubeAdm.Address),
-		"token":     kubeAdm.Token,
+		"server":    fmt.Sprintf("https://%s", rke2.Address),
+		"token":     rke2.Token,
 	}
 
 	if vm.ControlPlaneNode {
@@ -322,7 +305,7 @@ func (vm *AutoScalerServerNode) rke2AgentJoin(c types.ClientGenerator) error {
 		}
 
 		if vm.serverConfig.UseExternalEtdc != nil && *vm.serverConfig.UseExternalEtdc {
-			config["datastore-endpoint"] = k3s.DatastoreEndpoint
+			config["datastore-endpoint"] = rke2.DatastoreEndpoint
 			config["datastore-cafile"] = fmt.Sprintf("%s/ca.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
 			config["datastore-certfile"] = fmt.Sprintf("%s/etcd.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
 			config["datastore-keyfile"] = fmt.Sprintf("%s/etcd-key.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
@@ -330,8 +313,8 @@ func (vm *AutoScalerServerNode) rke2AgentJoin(c types.ClientGenerator) error {
 	}
 
 	// Append extras arguments
-	if len(k3s.ExtraCommands) > 0 {
-		for _, cmd := range k3s.ExtraCommands {
+	if len(rke2.ExtraCommands) > 0 {
+		for _, cmd := range rke2.ExtraCommands {
 			args := strings.Split(cmd, "=")
 			config[args[0]] = args[1]
 		}
@@ -344,7 +327,6 @@ func (vm *AutoScalerServerNode) rke2AgentJoin(c types.ClientGenerator) error {
 	}
 
 	const dstFile = "/etc/rancher/rke2/config.yaml"
-	const tmpDstFile = "/tmp/config.yaml"
 
 	if f, err := os.CreateTemp(os.TempDir(), "config.*.yaml"); err != nil {
 		result = fmt.Errorf("unable to create %s, reason: %v", dstFile, err)
@@ -353,15 +335,15 @@ func (vm *AutoScalerServerNode) rke2AgentJoin(c types.ClientGenerator) error {
 
 		if _, err = f.WriteString(utils.ToYAML(config)); err != nil {
 			f.Close()
-			result = fmt.Errorf("unable to write file: %s, reason: %v", f.Name(), err)
+			result = fmt.Errorf(errWriteFileErrorMsg, f.Name(), err)
 		} else {
 			f.Close()
 
-			if err = utils.Scp(vm.serverConfig.SSH, vm.IPAddress, f.Name(), tmpDstFile); err != nil {
-				result = fmt.Errorf("unable to transfer file: %s to %s, reason: %v", f.Name(), tmpDstFile, err)
+			if err = utils.Scp(vm.serverConfig.SSH, vm.IPAddress, f.Name(), tmpConfigDestinationFile); err != nil {
+				result = fmt.Errorf("unable to transfer file: %s to %s, reason: %v", f.Name(), tmpConfigDestinationFile, err)
 			} else {
 				args := []string{
-					fmt.Sprintf("cp %s %s", tmpDstFile, dstFile),
+					fmt.Sprintf("cp %s %s", tmpConfigDestinationFile, dstFile),
 					fmt.Sprintf("systemctl enable %s.service", service),
 					fmt.Sprintf("systemctl start %s.service", service),
 				}
@@ -375,10 +357,9 @@ func (vm *AutoScalerServerNode) rke2AgentJoin(c types.ClientGenerator) error {
 }
 
 func (vm *AutoScalerServerNode) k3sAgentJoin(c types.ClientGenerator) error {
-	kubeAdm := vm.serverConfig.KubeAdm
 	k3s := vm.serverConfig.K3S
 	args := []string{
-		fmt.Sprintf("echo K3S_ARGS='--kubelet-arg=provider-id=%s --kubelet-arg=max-pods=%d --node-name=%s --server=https://%s --token=%s' > /etc/systemd/system/k3s.service.env", vm.generateProviderID(), vm.serverConfig.MaxPods, vm.NodeName, kubeAdm.Address, kubeAdm.Token),
+		fmt.Sprintf("echo K3S_ARGS='--kubelet-arg=provider-id=%s --kubelet-arg=max-pods=%d --node-name=%s --server=https://%s --token=%s' > /etc/systemd/system/k3s.service.env", vm.generateProviderID(), vm.serverConfig.MaxPods, vm.NodeName, k3s.Address, k3s.Token),
 	}
 
 	if vm.ControlPlaneNode {
