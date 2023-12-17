@@ -153,11 +153,12 @@ type RancherJoinConfig struct {
 }
 
 type ExternalJoinConfig struct {
-	Address     string                 `json:"address,omitempty"`
-	Token       string                 `json:"token,omitempty"`
-	JoinCommand string                 `json:"join-command,omitempty"`
-	ConfigPath  string                 `json:"config-path,omitempty"`
-	ExtraConfig map[string]interface{} `json:"extra-config,omitempty"`
+	Address           string                 `json:"address,omitempty"`
+	Token             string                 `json:"token,omitempty"`
+	DatastoreEndpoint string                 `json:"datastore-endpoint,omitempty"`
+	JoinCommand       string                 `json:"join-command,omitempty"`
+	ConfigPath        string                 `json:"config-path,omitempty"`
+	ExtraConfig       map[string]interface{} `json:"extra-config,omitempty"`
 }
 
 // AutoScalerServerOptionals declare wich features must be optional
