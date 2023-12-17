@@ -8,18 +8,12 @@ Kubernetes autoscaler for vsphere/esxi including a custom resource controller to
 
 ### Supported releases ###
 
-* 1.25.6
-    - This version is supported kubernetes v1.25
-* 1.25.7
-    - This version is supported kubernetes v1.25 and support k3s
-* 1.26.1
-    - This version is supported kubernetes v1.26
-* 1.26.2
-    - This version is supported kubernetes v1.26 and support k3s
-* 1.27.1
-    - This version is supported kubernetes v1.27 and support k3s
-* 1.28.4
-    - This version is supported kubernetes v1.27 and support k3s
+* 1.26.11
+    - This version is supported kubernetes v1.26 and support k3s, rke2, external kubernetes distribution
+* 1.27.8
+    - This version is supported kubernetes v1.27 and support k3s, rke2, external kubernetes distribution
+* 1.28.1
+    - This version is supported kubernetes v1.28 and support k3s, rke2, external kubernetes distribution
 
 ## How it works
 
@@ -27,7 +21,7 @@ This tool will drive vSphere to deploy VM at the demand. The cluster autoscaler 
 
 This version use grpc to communicate with the cloud provider hosted outside the pod. A docker image is available here [cluster-autoscaler](https://hub.docker.com/r/fred78290/cluster-autoscaler)
 
-A sample of the cluster-autoscaler deployment is available at [examples/cluster-autoscaler.yaml](./examples/cluster-autoscaler.yaml). You must fill value between <>
+A sample of the cluster-autoscaler deployment is available at [examples/cluster-autoscaler.yaml](./examples/kubeadm/cluster-autoscaler.yaml). You must fill value between <>
 
 ### Before you must create a kubernetes cluster on vSphere
 
@@ -37,9 +31,36 @@ You can do it from scrash or you can use script from project [autoscaled-masterk
 
 | Parameter | Description |
 | --- | --- |
-| `version` | Print the version and exit  |
-| `save`  | Tell the tool to save state in this file  |
-| `config`  |The the tool to use config file |
+| `version` | Display version and exit |
+| `save` | Tell the tool to save state in this file |
+| `config` |The the tool to use config file |
+| `log-format` | The format in which log messages are printed (default: text, options: text, json)|
+| `log-level` | Set the level of logging. (default: info, options: panic, debug, info, warning, error, fatal)|
+| `debug` | Debug mode|
+| `distribution` | Which kubernetes distribution to use: kubeadm, k3s, rke2, external|
+| `use-vanilla-grpc` | Tell we use vanilla autoscaler externalgrpc cloudprovider|
+| `use-controller-manager` | Tell we use vsphere controller manager|
+| `use-external-etcd` | Tell we use an external etcd service (overriden by config file if defined)|
+| `src-etcd-ssl-dir` | Locate the source etcd ssl files (overriden by config file if defined)|
+| `dst-etcd-ssl-dir` | Locate the destination etcd ssl files (overriden by config file if defined)|
+| `kubernetes-pki-srcdir` | Locate the source kubernetes pki files (overriden by config file if defined)|
+| `kubernetes-pki-dstdir` | Locate the destination kubernetes pki files (overriden by config file if defined)|
+| `server` | The Kubernetes API server to connect to (default: auto-detect)|
+| `kubeconfig` | Retrieve target cluster configuration from a Kubernetes configuration file (default: auto-detect)|
+| `request-timeout` | Request timeout when calling Kubernetes APIs. 0s means no timeout|
+| `deletion-timeout` | Deletion timeout when delete node. 0s means no timeout|
+| `node-ready-timeout` | Node ready timeout to wait for a node to be ready. 0s means no timeout|
+| `max-grace-period` | Maximum time evicted pods will be given to terminate gracefully.|
+| `min-cpus` | Limits: minimum cpu (default: 1)|
+| `max-cpus` | Limits: max cpu (default: 24)|
+| `min-memory` | Limits: minimum memory in MB (default: 1G)|
+| `max-memory` | Limits: max memory in MB (default: 24G)|
+| `min-managednode-cpus` | Managed node: minimum cpu (default: 2)|
+| `max-managednode-cpus` | Managed node: max cpu (default: 32)|
+| `min-managednode-memory` | Managed node: minimum memory in MB (default: 2G)|
+| `max-managednode-memory` | Managed node: max memory in MB (default: 24G)|
+| `min-managednode-disksize` | Managed node: minimum disk size in MB (default: 10MB)|
+| `max-managednode-disksize` | Managed node: max disk size in MB (default: 1T)|
 
 ## Build
 
@@ -47,14 +68,128 @@ The build process use make file. The simplest way to build is `make container`
 
 # New features
 
-## Use k3s
+## Use k3s, rke2 or external as kubernetes distribution method
 
-Instead using **kubeadm** as kubernetes deployment tool, it is possible to use **k3s**
+Instead using **kubeadm** as kubernetes distribution method, it is possible to use **k3s**, **rke2** or **external**
+
+**external** allow to use custom shell script to join cluster
+
+Samples provided here
+
+* [kubeadm](./examples/kubeadm/cluster-autoscaler.yaml)
+* [rke2](./examples/rke2/cluster-autoscaler.yaml)
+* [k3s](./examples/rke2/cluster-autoscaler.yaml)
+* [external](./examples/external/cluster-autoscaler.yaml)
+
 ## Use the vanilla autoscaler with extern gRPC cloud provider
 
 You can also use the vanilla autoscaler with the [externalgrpc cloud provider](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler/cloudprovider/externalgrpc)
 
-A sample of the cluster-autoscaler deployment with vanilla autoscaler is available at [examples/cluster-autoscaler-vanilla.yaml](./examples/cluster-autoscaler-vanilla.yaml). You must fill value between <>
+Samples of the cluster-autoscaler deployment with vanilla autoscaler. You must fill value between <>
+
+* [kubeadm](./examples/kubeadm/cluster-autoscaler-vanilla.yaml)
+* [rke2](./examples/rke2/cluster-autoscaler-vanilla.yaml)
+* [k3s](./examples/rke2/cluster-autoscaler-vanilla.yaml)
+* [external](./examples/external/cluster-autoscaler-vanilla.yaml)
+
+## Use external kubernetes distribution
+
+When you use a custom method to create your cluster, you must provide a shell script to vmware-autoscaler to join the cluster. The script use a yaml config created by vmware-autscaler at the given path.
+
+config: /etc/default/vmware-autoscaler-config.yaml
+
+```
+provider-id: vsphere://42373f8d-b72d-21c0-4299-a667a18c9fce
+max-pods: 110
+node-name: vmware-dev-rke2-woker-01
+server: 192.168.1.120:9345
+token: K1060b887525bbfa7472036caa8a3c36b550fbf05e6f8e3dbdd970739cbd7373537
+disable-cloud-controller: false
+````
+
+If you declare to use an external etcd service
+
+```
+datastore-endpoint: https://1.2.3.4:2379
+datastore-cafile: /etc/ssl/etcd/ca.pem
+datastore-certfile: /etc/ssl/etcd/etcd.pem
+datastore-keyfile: /etc/ssl/etcd/etcd-key.pem
+```
+
+You can also provide extras config onto this file
+
+```
+"external": {
+  "join-command": "/usr/local/bin/join-cluster.sh"
+  "config-path": "/etc/default/vmware-autoscaler-config.yaml"
+  "extra-config": {
+      "mydata": {
+        "extra": "ball"
+      },
+      "...": "..."
+  }
+},
+```
+
+Your script is responsible to set the correct kubelet flags such as max-pods=110, provider-id=vsphere://42373f8d-b72d-21c0-4299-a667a18c9fce, cloud-provider=external, ...
+
+## Annotations requirements
+
+If you expected to use vmware-autoscaler on already deployed kubernetes cluster, you must add some node annotations to existing node
+
+Also don't forget to create an image usable by vmware-autoscaler to scale up the cluster [create-image.sh](https://raw.githubusercontent.com/Fred78290/autoscaled-masterkube-vmware/master/bin/create-image.sh)
+
+| Annotation | Description | Value |
+| --- | --- | --- |
+| `cluster-autoscaler.kubernetes.io/scale-down-disabled` | Avoid scale down for this node |true|
+| `cluster.autoscaler.nodegroup/name` | Node group name |vmware-dev-rke2|
+| `cluster.autoscaler.nodegroup/autoprovision` | Tell if the node is provisionned by vmware-autoscaler |false|
+| `cluster.autoscaler.nodegroup/instance-id` | The vm UUID |42373f8d-b72d-21c0-4299-a667a18c9fce|
+| `cluster.autoscaler.nodegroup/managed` | Tell if the node is managed by vmware-autoscaler not autoscaled |false|
+| `cluster.autoscaler.nodegroup/node-index` | The node index, will be set if missing |0|
+
+Sample master node
+
+```
+    cluster-autoscaler.kubernetes.io/scale-down-disabled: "true"
+    cluster.autoscaler.nodegroup/autoprovision: "false"
+    cluster.autoscaler.nodegroup/instance-id: 42373f8d-b72d-21c0-4299-a667a18c9fce
+    cluster.autoscaler.nodegroup/managed: "false" 
+    cluster.autoscaler.nodegroup/name: vmware-dev-rke2
+    cluster.autoscaler.nodegroup/node-index: "0"
+```
+
+Sample first worker node
+
+```
+    cluster-autoscaler.kubernetes.io/scale-down-disabled: "true"
+    cluster.autoscaler.nodegroup/autoprovision: "false"
+    cluster.autoscaler.nodegroup/instance-id: 42370879-d4f7-eab0-a1c2-918a97ac6856
+    cluster.autoscaler.nodegroup/managed: "false"
+    cluster.autoscaler.nodegroup/name: vmware-dev-rke2
+    cluster.autoscaler.nodegroup/node-index: "1"
+```
+
+Sample autoscaled worker node
+
+```
+    cluster-autoscaler.kubernetes.io/scale-down-disabled: "false"
+    cluster.autoscaler.nodegroup/autoprovision: "true"
+    cluster.autoscaler.nodegroup/instance-id: 3d25c629-3f1d-46b3-be9f-b95db2a64859
+    cluster.autoscaler.nodegroup/managed: "false"
+    cluster.autoscaler.nodegroup/name: vmware-dev-rke2
+    cluster.autoscaler.nodegroup/node-index: "2"
+```
+
+## Node labels
+
+These labels will be added
+
+| Label | Description | Value |
+| --- | --- | --- |
+|`node-role.kubernetes.io/control-plane`|Tell if the node is control-plane |true|
+|`node-role.kubernetes.io/master`|Tell if the node is master |true|
+|`node-role.kubernetes.io/worker`|Tell if the node is worker |true|
 
 ## Network
 
@@ -63,7 +198,6 @@ Now it's possible to disable dhcp-default routes and custom route
 ## VMWare CPI compliant
 
 Version 1.24.6 and 1.25.2 and above are [vsphere cloud provider](https://github.com/kubernetes/cloud-provider-vsphere) by building provider-id conform to syntax `vsphere://<VM UUID>`
-
 
 ## CRD controller
 
@@ -157,6 +291,7 @@ As example of use generated by autoscaled-masterkube-vmware scripts
   "dst-etcd-ssl-dir": "/etc/kubernetes/pki/etcd",
   "kubernetes-pki-srcdir": "/etc/kubernetes/pki",
   "kubernetes-pki-dstdir": "/etc/kubernetes/pki",
+  "distribution": "rke2",
   "network": "unix",
   "listen": "/var/run/cluster-autoscaler/vmware.sock",
   "cert-private-key": "/etc/ssl/client-cert/tls.key",
@@ -171,7 +306,7 @@ As example of use generated by autoscaled-masterkube-vmware scripts
   "controlplane-name-prefix": "master",
   "nodePrice": 0,
   "podPrice": 0,
-  "image": "jammy-kubernetes-cni-flannel-v1.28.4-containerd-amd64",
+  "image": "jammy-kubernetes-cni-flannel-v1.27.8-containerd-amd64",
   "optionals":
     {
       "pricing": false,
@@ -187,6 +322,19 @@ As example of use generated by autoscaled-masterkube-vmware scripts
       "token": "h1g55p.hm4rg52ymloax182",
       "ca": "sha256:c7a86a7a9a03a628b59207f4f3b3e038ebd03260f3ad5ba28f364d513b01f542",
       "extras-args": ["--ignore-preflight-errors=All"],
+    },
+  "k3s":
+    {
+      "datastore-endpoint": "",
+      "extras-commands": []
+    },
+  "external":
+    {
+      "join-command": "/usr/local/bin/join-cluster.sh"
+      "config-path": "/etc/default/vmware-autoscaler-config.yaml"
+      "extra-config": {
+        "...": "..."
+      }
     },
   "default-machine": "large",
   "machines":
@@ -319,3 +467,9 @@ As example of use generated by autoscaled-masterkube-vmware scripts
     - This version is supported kubernetes v1.24
 * 1.24.6
     - This version is supported kubernetes v1.24
+* 1.25.6
+    - This version is supported kubernetes v1.25
+* 1.25.7
+    - This version is supported kubernetes v1.25 and support k3s
+* 1.26.1
+    - This version is supported kubernetes v1.26

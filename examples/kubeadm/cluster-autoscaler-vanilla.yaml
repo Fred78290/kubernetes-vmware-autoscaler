@@ -234,6 +234,7 @@ data:
     cacert: "/etc/ssl/client-cert/ca.crt"
   kubernetes-vmware-autoscaler.json: |
     {
+      "distribution": "kubeadm",
       "use-external-etcd": false,
       "src-etcd-ssl-dir": "/etc/etcd/ssl",
       "dst-etcd-ssl-dir": "/etc/kubernetes/pki/etcd",
