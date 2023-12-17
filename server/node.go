@@ -242,7 +242,7 @@ func (vm *AutoScalerServerNode) externalAgentJoin(c types.ClientGenerator) error
 	}
 
 	if vm.ControlPlaneNode && vm.serverConfig.UseExternalEtdc != nil && *vm.serverConfig.UseExternalEtdc {
-		config["datastore-endpoint"] = vm.serverConfig.K3S.DatastoreEndpoint
+		config["datastore-endpoint"] = external.DatastoreEndpoint
 		config["datastore-cafile"] = fmt.Sprintf("%s/ca.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
 		config["datastore-certfile"] = fmt.Sprintf("%s/etcd.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
 		config["datastore-keyfile"] = fmt.Sprintf("%s/etcd-key.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
