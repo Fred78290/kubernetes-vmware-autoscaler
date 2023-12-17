@@ -2,6 +2,8 @@ package server
 
 import (
 	"fmt"
+	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -62,6 +64,9 @@ const (
 	AutoScalerServerNodeManaged
 )
 
+const errWriteFileErrorMsg = "unable to write file: %s, reason: %v"
+const tmpConfigDestinationFile = "/tmp/config.yaml"
+
 // AutoScalerServerNode Describe a AutoScaler VM
 type AutoScalerServerNode struct {
 	NodeGroupID      string                    `json:"group"`
@@ -82,6 +87,12 @@ type AutoScalerServerNode struct {
 	VSphereConfig    *vsphere.Configuration    `json:"vmware"`
 	serverConfig     *types.AutoScalerServerConfig
 }
+
+const (
+	joinClusterInfo         = "Join cluster for node:%s for nodegroup: %s"
+	unableToExecuteCmdError = "unable to execute command: %s, output: %s, reason:%v"
+	nodeNameTemplate        = "%s-%s-%02d"
+)
 
 func (s AutoScalerServerNodeState) String() string {
 	return autoScalerServerNodeStateString[s]
@@ -148,6 +159,38 @@ func (vm *AutoScalerServerNode) waitForSshReady() error {
 	})
 }
 
+func (vm *AutoScalerServerNode) executeCommands(args []string, restartKubelet bool, c types.ClientGenerator) error {
+	glog.Infof(joinClusterInfo, vm.NodeName, vm.NodeGroupID)
+
+	command := fmt.Sprintf("sh -c \"%s\"", strings.Join(args, " && "))
+
+	if out, err := utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, command); err != nil {
+		return fmt.Errorf(unableToExecuteCmdError, command, out, err)
+	} else {
+
+		if restartKubelet {
+			// To be sure, with kubeadm 1.26.1, the kubelet is not correctly restarted
+			time.Sleep(5 * time.Second)
+		}
+
+		return utils.PollImmediate(5*time.Second, time.Duration(vm.serverConfig.SSH.WaitSshReadyInSeconds)*time.Second, func() (done bool, err error) {
+			if node, err := c.GetNode(vm.NodeName); err == nil && node != nil {
+				return true, nil
+			}
+
+			if restartKubelet {
+				glog.Infof("Restart kubelet for node:%s for nodegroup: %s", vm.NodeName, vm.NodeGroupID)
+
+				if out, err := utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, "systemctl restart kubelet"); err != nil {
+					return false, fmt.Errorf("unable to restart kubelet, output: %s, reason:%v", out, err)
+				}
+			}
+
+			return false, nil
+		})
+	}
+}
+
 func (vm *AutoScalerServerNode) kubeAdmJoin(c types.ClientGenerator) error {
 	kubeAdm := vm.serverConfig.KubeAdm
 
@@ -172,37 +215,151 @@ func (vm *AutoScalerServerNode) kubeAdmJoin(c types.ClientGenerator) error {
 		args = append(args, kubeAdm.ExtraArguments...)
 	}
 
-	command := strings.Join(args, " ")
-
-	glog.Infof("Join cluster for node:%s for nodegroup: %s", vm.NodeName, vm.NodeGroupID)
-
-	if out, err := utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, command); err != nil {
-		return fmt.Errorf("unable to execute command: %s, output: %s, reason:%v", command, out, err)
+	command := []string{
+		strings.Join(args, " "),
 	}
 
-	// To be sure, with kubeadm 1.26.1, the kubelet is not correctly restarted
-	time.Sleep(5 * time.Second)
+	return vm.executeCommands(command, true, c)
+}
 
-	return utils.PollImmediate(5*time.Second, time.Duration(vm.serverConfig.SSH.WaitSshReadyInSeconds)*time.Second, func() (done bool, err error) {
-		if node, err := c.GetNode(vm.NodeName); err == nil && node != nil {
-			return true, nil
+func (vm *AutoScalerServerNode) externalAgentJoin(c types.ClientGenerator) error {
+	var result error
+
+	external := vm.serverConfig.External
+	config := map[string]interface{}{
+		"provider-id":              vm.generateProviderID(),
+		"max-pods":                 vm.serverConfig.MaxPods,
+		"node-name":                vm.NodeName,
+		"server":                   external.Address,
+		"token":                    external.Token,
+		"disable-cloud-controller": vm.ControlPlaneNode && vm.serverConfig.UseControllerManager != nil && *vm.serverConfig.UseControllerManager,
+	}
+
+	if external.ExtraConfig != nil {
+		for k, v := range external.ExtraConfig {
+			config[k] = v
+		}
+	}
+
+	if vm.ControlPlaneNode && vm.serverConfig.UseExternalEtdc != nil && *vm.serverConfig.UseExternalEtdc {
+		config["datastore-endpoint"] = vm.serverConfig.K3S.DatastoreEndpoint
+		config["datastore-cafile"] = fmt.Sprintf("%s/ca.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
+		config["datastore-certfile"] = fmt.Sprintf("%s/etcd.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
+		config["datastore-keyfile"] = fmt.Sprintf("%s/etcd-key.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
+	}
+
+	if f, err := os.CreateTemp(os.TempDir(), "config.*.yaml"); err != nil {
+		result = fmt.Errorf("unable to create %s, reason: %v", external.ConfigPath, err)
+	} else {
+		defer os.Remove(f.Name())
+
+		if _, err = f.WriteString(utils.ToYAML(config)); err != nil {
+			f.Close()
+			result = fmt.Errorf(errWriteFileErrorMsg, f.Name(), err)
+		} else {
+			f.Close()
+
+			if err = utils.Scp(vm.serverConfig.SSH, vm.IPAddress, f.Name(), tmpConfigDestinationFile); err != nil {
+				result = fmt.Errorf("unable to transfer file: %s to %s, reason: %v", f.Name(), tmpConfigDestinationFile, err)
+			} else {
+				args := []string{
+					fmt.Sprintf("mkdir -p %s", path.Dir(external.ConfigPath)),
+					fmt.Sprintf("cp %s %s", tmpConfigDestinationFile, external.ConfigPath),
+					external.JoinCommand,
+				}
+
+				result = vm.executeCommands(args, false, c)
+			}
+		}
+	}
+
+	return result
+}
+
+func (vm *AutoScalerServerNode) rke2AgentJoin(c types.ClientGenerator) error {
+	var result error
+
+	rke2 := vm.serverConfig.RKE2
+	service := "rke2-server"
+	config := map[string]interface{}{
+		"kubelet-arg": []string{
+			"cloud-provider=external",
+			"fail-swap-on=false",
+			fmt.Sprintf("provider-id=%s", vm.generateProviderID()),
+			fmt.Sprintf("max-pods=%d", vm.serverConfig.MaxPods),
+		},
+		"node-name": vm.NodeName,
+		"server":    fmt.Sprintf("https://%s", rke2.Address),
+		"token":     rke2.Token,
+	}
+
+	if vm.ControlPlaneNode {
+		if vm.serverConfig.UseControllerManager != nil && *vm.serverConfig.UseControllerManager {
+			config["disable-cloud-controller"] = true
+			config["cloud-provider-name"] = "external"
 		}
 
-		glog.Infof("Restart kubelet for node:%s for nodegroup: %s", vm.NodeName, vm.NodeGroupID)
-
-		if out, err := utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, "systemctl restart kubelet"); err != nil {
-			return false, fmt.Errorf("unable to restart kubelet, output: %s, reason:%v", out, err)
+		config["disable"] = []string{
+			"rke2-ingress-nginx",
+			"rke2-metrics-server",
 		}
 
-		return false, nil
-	})
+		if vm.serverConfig.UseExternalEtdc != nil && *vm.serverConfig.UseExternalEtdc {
+			config["datastore-endpoint"] = rke2.DatastoreEndpoint
+			config["datastore-cafile"] = fmt.Sprintf("%s/ca.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
+			config["datastore-certfile"] = fmt.Sprintf("%s/etcd.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
+			config["datastore-keyfile"] = fmt.Sprintf("%s/etcd-key.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
+		}
+	}
+
+	// Append extras arguments
+	if len(rke2.ExtraCommands) > 0 {
+		for _, cmd := range rke2.ExtraCommands {
+			args := strings.Split(cmd, "=")
+			config[args[0]] = args[1]
+		}
+	}
+
+	if vm.ControlPlaneNode {
+		service = "rke2-server"
+	} else {
+		service = "rke2-agent"
+	}
+
+	const dstFile = "/etc/rancher/rke2/config.yaml"
+
+	if f, err := os.CreateTemp(os.TempDir(), "config.*.yaml"); err != nil {
+		result = fmt.Errorf("unable to create %s, reason: %v", dstFile, err)
+	} else {
+		defer os.Remove(f.Name())
+
+		if _, err = f.WriteString(utils.ToYAML(config)); err != nil {
+			f.Close()
+			result = fmt.Errorf(errWriteFileErrorMsg, f.Name(), err)
+		} else {
+			f.Close()
+
+			if err = utils.Scp(vm.serverConfig.SSH, vm.IPAddress, f.Name(), tmpConfigDestinationFile); err != nil {
+				result = fmt.Errorf("unable to transfer file: %s to %s, reason: %v", f.Name(), tmpConfigDestinationFile, err)
+			} else {
+				args := []string{
+					fmt.Sprintf("cp %s %s", tmpConfigDestinationFile, dstFile),
+					fmt.Sprintf("systemctl enable %s.service", service),
+					fmt.Sprintf("systemctl start %s.service", service),
+				}
+
+				result = vm.executeCommands(args, false, c)
+			}
+		}
+	}
+
+	return result
 }
 
 func (vm *AutoScalerServerNode) k3sAgentJoin(c types.ClientGenerator) error {
-	kubeAdm := vm.serverConfig.KubeAdm
 	k3s := vm.serverConfig.K3S
 	args := []string{
-		fmt.Sprintf("echo K3S_ARGS='--kubelet-arg=provider-id=%s --node-name=%s --server=https://%s --token=%s' > /etc/systemd/system/k3s.service.env", vm.generateProviderID(), vm.NodeName, kubeAdm.Address, kubeAdm.Token),
+		fmt.Sprintf("echo K3S_ARGS='--kubelet-arg=provider-id=%s --kubelet-arg=max-pods=%d --node-name=%s --server=https://%s --token=%s' > /etc/systemd/system/k3s.service.env", vm.generateProviderID(), vm.serverConfig.MaxPods, vm.NodeName, k3s.Address, k3s.Token),
 	}
 
 	if vm.ControlPlaneNode {
@@ -224,28 +381,21 @@ func (vm *AutoScalerServerNode) k3sAgentJoin(c types.ClientGenerator) error {
 
 	args = append(args, "systemctl enable k3s.service", "systemctl start k3s.service")
 
-	glog.Infof("Join cluster for node:%s for nodegroup: %s", vm.NodeName, vm.NodeGroupID)
-
-	command := fmt.Sprintf("sh -c \"%s\"", strings.Join(args, " && "))
-	if out, err := utils.Sudo(vm.serverConfig.SSH, vm.IPAddress, vm.VSphereConfig.Timeout, command); err != nil {
-		return fmt.Errorf("unable to execute command: %s, output: %s, reason:%v", command, out, err)
-	}
-
-	return utils.PollImmediate(5*time.Second, time.Duration(vm.serverConfig.SSH.WaitSshReadyInSeconds)*time.Second, func() (done bool, err error) {
-		if node, err := c.GetNode(vm.NodeName); err == nil && node != nil {
-			return true, nil
-		}
-
-		return false, nil
-	})
+	return vm.executeCommands(args, false, c)
 }
 
 func (vm *AutoScalerServerNode) joinCluster(c types.ClientGenerator) error {
-	if vm.serverConfig.UseK3S != nil && *vm.serverConfig.UseK3S {
-		return vm.k3sAgentJoin(c)
-	} else {
-		return vm.kubeAdmJoin(c)
+	if vm.serverConfig.Distribution != nil {
+		if *vm.serverConfig.Distribution == "k3s" {
+			return vm.k3sAgentJoin(c)
+		} else if *vm.serverConfig.Distribution == "rke2" {
+			return vm.rke2AgentJoin(c)
+		} else if *vm.serverConfig.Distribution == "external" {
+			return vm.externalAgentJoin(c)
+		}
 	}
+
+	return vm.kubeAdmJoin(c)
 }
 
 func (vm *AutoScalerServerNode) setNodeLabels(c types.ClientGenerator, nodeLabels, systemLabels types.KubernetesLabel) error {

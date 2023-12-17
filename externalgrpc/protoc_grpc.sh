@@ -1,12 +1,12 @@
 #/bin/bash
 CURDIR=$(dirname $0)
-PB_RELEASE="21.12"
+PB_RELEASE="25.1"
 PB_REL="https://github.com/protocolbuffers/protobuf/releases"
 
 pushd $CURDIR
 
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
 
 export GOPATH="/tmp/protoc-${RANDOM}"
 export GO111MODULE=on

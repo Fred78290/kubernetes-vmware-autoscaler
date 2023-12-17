@@ -1,6 +1,6 @@
 #/bin/bash
 CURDIR=$(dirname $0)
-PB_RELEASE="21.12"
+PB_RELEASE="25.1"
 PB_REL="https://github.com/protocolbuffers/protobuf/releases"
 
 export PROTOC_DIR="/tmp/protoc-${PB_RELEASE}"
@@ -12,8 +12,8 @@ mkdir -p $PROTOC_DIR
 
 pushd $PROTOC_DIR
 
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
 
 if [ "$(uname)" = "Darwin" ]; then
     curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-osx-universal_binary.zip
