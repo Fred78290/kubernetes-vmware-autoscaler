@@ -21,7 +21,7 @@ This tool will drive vSphere to deploy VM at the demand. The cluster autoscaler 
 
 This version use grpc to communicate with the cloud provider hosted outside the pod. A docker image is available here [cluster-autoscaler](https://hub.docker.com/r/fred78290/cluster-autoscaler)
 
-A sample of the cluster-autoscaler deployment is available at [examples/cluster-autoscaler.yaml](./examples/cluster-autoscaler.yaml). You must fill value between <>
+A sample of the cluster-autoscaler deployment is available at [examples/cluster-autoscaler.yaml](./examples/kubeadm/cluster-autoscaler.yaml). You must fill value between <>
 
 ### Before you must create a kubernetes cluster on vSphere
 
@@ -71,6 +71,7 @@ The build process use make file. The simplest way to build is `make container`
 ## Use k3s, rke2 or external as kubernetes distribution method
 
 Instead using **kubeadm** as kubernetes distribution method, it is possible to use **k3s**, **rke2** or **external**
+
 **external** allow to use custom shell script to join cluster
 
 Samples provided here
@@ -91,7 +92,7 @@ Samples of the cluster-autoscaler deployment with vanilla autoscaler. You must f
 * [k3s](./examples/rke2/cluster-autoscaler-vanilla.yaml)
 * [external](./examples/external/cluster-autoscaler-vanilla.yaml)
 
-## External kubernetes distribution
+## Use external kubernetes distribution
 
 When you use a custom method to create your cluster, you must provide a shell script to vmware-autoscaler to join the cluster. The script use a yaml config created by vmware-autscaler at the given path.
 
@@ -182,7 +183,7 @@ Sample autoscaled worker node
 
 ## Node labels
 
-These annotations will be added on node except for rke2
+These labels will be added
 
 | Label | Description | Value |
 | --- | --- | --- |
