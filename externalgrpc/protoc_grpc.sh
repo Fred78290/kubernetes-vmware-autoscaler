@@ -1,69 +1,26 @@
 #/bin/bash
 CURDIR=$(dirname $0)
-PB_RELEASE="25.1"
-PB_REL="https://github.com/protocolbuffers/protobuf/releases"
 
 pushd $CURDIR
 
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.31.0
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
-
-export GOPATH="/tmp/protoc-${RANDOM}"
-export GO111MODULE=on
-export PATH=$GOPATH/bin:$PATH
-
-mkdir -p $GOPATH
-
-pushd $GOPATH
-
-if [ "$(uname)" = "Darwin" ]; then
-    curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-osx-universal_binary.zip
-    unzip protoc-${PB_RELEASE}-osx-universal_binary.zip
-else
-    curl -sLO ${PB_REL}/download/v${PB_RELEASE}/protoc-${PB_RELEASE}-osx-linux-x86_64.zip
-    unzip protoc-${PB_RELEASE}-osx-linux-x86_64.zip
-fi
-
-mkdir -p src/k8s.io
-
-pushd src/k8s.io
-
-git clone https://github.com/kubernetes/autoscaler.git
-
-pushd autoscaler/cluster-autoscaler
-go mod tidy
-go mod vendor
-popd
-
-popd
-popd
-
-#sed -i'' 's/option go_package = "cluster-autoscaler\/cloudprovider\/externalgrpc\/protos"/option go_package = "externalgrpc"/' \
-#    ${GOPATH}/src/k8s.io/autoscaler/cluster-autoscaler/cloudprovider/externalgrpc/protos/externalgrpc.proto
-
-#sed -e 's/package clusterautoscaler\.cloudprovider\.v1\.externalgrpc/package externalgrpc/' \
-#    -e '/option go_package = "cluster-autoscaler\/cloudprovider\/externalgrpc\/protos"*/d' \
-#    ${GOPATH}/src/k8s.io/autoscaler/cluster-autoscaler/cloudprovider/externalgrpc/protos/externalgrpc.proto > ${GOPATH}/src/k8s.io/autoscaler/cluster-autoscaler/externalgrpc.proto
-
-#sed -i'' -e 's/package clusterautoscaler\.cloudprovider\.v1\.externalgrpc/package externalgrpc/' \
-#    ${GOPATH}/src/k8s.io/autoscaler/cluster-autoscaler/cloudprovider/externalgrpc/protos/externalgrpc.proto
-
-$GOPATH/bin/protoc \
-  -I ${GOPATH}/src/k8s.io/autoscaler/cluster-autoscaler \
-  -I ${GOPATH}/src/k8s.io/autoscaler/cluster-autoscaler/vendor \
-  --go_out=. \
-  --go-grpc_out=. \
-  ${GOPATH}/src/k8s.io/autoscaler/cluster-autoscaler/cloudprovider/externalgrpc/protos/externalgrpc.proto
-
 rm -rf *.go
-mv cluster-autoscaler/cloudprovider/externalgrpc/protos/*.go .
-rm -rf cluster-autoscaler
 
-for FILE in *.go
+RELEASE=1.26.6
+AUTOSCALER_PATH="/tmp/autoscaler-cluster-autoscaler-${RELEASE}/cluster-autoscaler"
+
+rm -rf /tmp/autoscaler-cluster-autoscaler-${RELEASE}
+
+pushd /tmp
+    curl -Ls https://github.com/kubernetes/autoscaler/archive/refs/tags/cluster-autoscaler-${RELEASE}.tar.gz -O cluster-autoscaler-${RELEASE}.tar.gz
+popd
+
+tar zxvf /tmp/cluster-autoscaler-${RELEASE}.tar.gz autoscaler-cluster-autoscaler-${RELEASE}/cluster-autoscaler/cloudprovider/externalgrpc/protos
+
+for FILE in autoscaler-cluster-autoscaler-${RELEASE}/cluster-autoscaler/cloudprovider/externalgrpc/protos/*.go
 do
-    sed -i'' -e 's/package protos/package externalgrpc/' $FILE
+    cat ${FILE} | sed 's/package protos/package externalgrpc/' > $(basename $FILE)
 done
 
-popd
+rm -rf /tmp/cluster-autoscaler-${RELEASE}.tar.gz autoscaler-cluster-autoscaler-${RELEASE}
 
-sudo rm -rf $GOPATH
+popd
