@@ -148,14 +148,15 @@ func (s *AutoScalerServerApp) createNodeGroup(nodeGroupID string) (*AutoScalerSe
 	}
 
 	if nodeGroup.Status == NodegroupNotCreated {
+		numberOfNodesToCreate := nodeGroup.MinNodeSize - len(nodeGroup.Nodes)
 		nodeGroup.Status = NodegroupCreated
 
 		// Must launch minNode VM
-		if nodeGroup.MinNodeSize > 0 {
+		if numberOfNodesToCreate > 0 {
 
 			glog.Infof("Create node group, ID:%s", nodeGroupID)
 
-			if _, err := nodeGroup.addNodes(s.kubeClient, nodeGroup.MinNodeSize); err != nil {
+			if _, err := nodeGroup.addNodes(s.kubeClient, numberOfNodesToCreate); err != nil {
 				glog.Errorf(err.Error())
 
 				nodeGroup.Status = NodegroupNotCreated
