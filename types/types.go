@@ -145,11 +145,17 @@ type KubeJoinConfig struct {
 	ExtraArguments []string `json:"extras-args,omitempty"`
 }
 
-type RancherJoinConfig struct {
+type K3SJoinConfig struct {
 	Address           string   `json:"address,omitempty"`
 	Token             string   `json:"token,omitempty"`
 	ExtraCommands     []string `json:"extras-commands,omitempty"`
 	DatastoreEndpoint string   `json:"datastore-endpoint,omitempty"`
+}
+
+type RKE2JoinConfig struct {
+	Address       string   `json:"address,omitempty"`
+	Token         string   `json:"token,omitempty"`
+	ExtraCommands []string `json:"extras-commands,omitempty"`
 }
 
 type ExternalJoinConfig struct {
@@ -254,8 +260,8 @@ type AutoScalerServerConfig struct {
 	NodePrice                  float64                           `json:"nodePrice"`                                 // Optional, The VM price
 	PodPrice                   float64                           `json:"podPrice"`                                  // Optional, The pod price
 	KubeAdm                    *KubeJoinConfig                   `json:"kubeadm"`
-	K3S                        *RancherJoinConfig                `json:"k3s,omitempty"`
-	RKE2                       *RancherJoinConfig                `json:"rke2,omitempty"`
+	K3S                        *K3SJoinConfig                    `json:"k3s,omitempty"`
+	RKE2                       *RKE2JoinConfig                   `json:"rke2,omitempty"`
 	External                   *ExternalJoinConfig               `json:"external,omitempty"`
 	DefaultMachineType         string                            `default:"standard" json:"default-machine"`
 	NodeLabels                 KubernetesLabel                   `json:"nodeLabels"`
