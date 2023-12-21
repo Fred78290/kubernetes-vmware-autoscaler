@@ -303,13 +303,6 @@ func (vm *AutoScalerServerNode) rke2AgentJoin(c types.ClientGenerator) error {
 			"rke2-ingress-nginx",
 			"rke2-metrics-server",
 		}
-
-		if vm.serverConfig.UseExternalEtdc != nil && *vm.serverConfig.UseExternalEtdc {
-			config["datastore-endpoint"] = rke2.DatastoreEndpoint
-			config["datastore-cafile"] = fmt.Sprintf("%s/ca.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
-			config["datastore-certfile"] = fmt.Sprintf("%s/etcd.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
-			config["datastore-keyfile"] = fmt.Sprintf("%s/etcd-key.pem", vm.serverConfig.ExtDestinationEtcdSslDir)
-		}
 	}
 
 	// Append extras arguments
