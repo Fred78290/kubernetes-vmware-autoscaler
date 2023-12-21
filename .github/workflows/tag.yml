@@ -66,6 +66,12 @@ jobs:
           cp out/linux/amd64/vsphere-autoscaler vsphere-autoscaler-amd64
           cp out/linux/arm64/vsphere-autoscaler vsphere-autoscaler-arm64
 
+      - name: Remove same release
+        uses: liudonghua123/delete-release-action@v1
+        with:
+          release_name: ${{ steps.prep.outputs.tag }}
+          suppress_errors: true
+
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
