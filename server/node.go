@@ -107,7 +107,7 @@ func (vm *AutoScalerServerNode) waitReady(c types.ClientGenerator) error {
 func (vm *AutoScalerServerNode) recopyEtcdSslFilesIfNeeded() error {
 	var err error
 
-	if *vm.serverConfig.Distribution != types.RKE2DistributionName && (vm.ControlPlaneNode || *vm.serverConfig.UseExternalEtdc) {
+	if (vm.serverConfig.Distribution == nil || *vm.serverConfig.Distribution != types.RKE2DistributionName) && (vm.ControlPlaneNode || *vm.serverConfig.UseExternalEtdc) {
 		glog.Infof("Recopy etcd certs for node:%s for nodegroup: %s", vm.NodeName, vm.NodeGroupID)
 
 		if err = utils.Scp(vm.serverConfig.SSH, vm.IPAddress, vm.serverConfig.ExtSourceEtcdSslDir, "."); err != nil {
@@ -127,7 +127,7 @@ func (vm *AutoScalerServerNode) recopyEtcdSslFilesIfNeeded() error {
 func (vm *AutoScalerServerNode) recopyKubernetesPKIIfNeeded() error {
 	var err error
 
-	if *vm.serverConfig.Distribution != types.RKE2DistributionName && vm.ControlPlaneNode {
+	if (vm.serverConfig.Distribution == nil || *vm.serverConfig.Distribution != types.RKE2DistributionName) && vm.ControlPlaneNode {
 		glog.Infof("Recopy pki kubernetes certs for node:%s for nodegroup: %s", vm.NodeName, vm.NodeGroupID)
 
 		if err = utils.Scp(vm.serverConfig.SSH, vm.IPAddress, vm.serverConfig.KubernetesPKISourceDir, "."); err != nil {
