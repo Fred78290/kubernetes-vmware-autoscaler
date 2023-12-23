@@ -35,6 +35,13 @@ const (
 	ManagedNodeMaxDiskSize = 1024 * 1024
 )
 
+const (
+	RKE2DistributionName     = "rke2"
+	K3SDistributionName      = "k3s"
+	KubeAdmDistributionName  = "kubeadm"
+	ExternalDistributionName = "external"
+)
+
 // KubernetesLabel labels
 type KubernetesLabel map[string]string
 
@@ -146,16 +153,18 @@ type KubeJoinConfig struct {
 }
 
 type K3SJoinConfig struct {
-	Address           string   `json:"address,omitempty"`
-	Token             string   `json:"token,omitempty"`
-	ExtraCommands     []string `json:"extras-commands,omitempty"`
-	DatastoreEndpoint string   `json:"datastore-endpoint,omitempty"`
+	Address                   string   `json:"address,omitempty"`
+	Token                     string   `json:"token,omitempty"`
+	ExtraCommands             []string `json:"extras-commands,omitempty"`
+	DatastoreEndpoint         string   `json:"datastore-endpoint,omitempty"`
+	DeleteCredentialsProvider bool     `json:"delete-credentials-provider,omitempty"`
 }
 
 type RKE2JoinConfig struct {
-	Address       string   `json:"address,omitempty"`
-	Token         string   `json:"token,omitempty"`
-	ExtraCommands []string `json:"extras-commands,omitempty"`
+	Address                   string   `json:"address,omitempty"`
+	Token                     string   `json:"token,omitempty"`
+	ExtraCommands             []string `json:"extras-commands,omitempty"`
+	DeleteCredentialsProvider bool     `json:"delete-credentials-provider,omitempty"`
 }
 
 type ExternalJoinConfig struct {
@@ -381,7 +390,7 @@ func NewConfig() *Config {
 	return &Config{
 		APIServerURL:             "",
 		KubeConfig:               "",
-		Distribution:             "kubeadm",
+		Distribution:             KubeAdmDistributionName,
 		UseExternalEtdc:          false,
 		UseVanillaGrpcProvider:   false,
 		UseControllerManager:     true,
@@ -432,7 +441,7 @@ func (cfg *Config) ParseFlags(args []string, version string) error {
 	app.Flag("debug", "Debug mode").Default("false").BoolVar(&cfg.DebugMode)
 
 	app.Flag("use-k3s", "Tell we use k3s in place of kubeadm (deprecated, use distribution flag)").Default("false").BoolVar(&cfg.UseK3S)
-	app.Flag("distribution", "Which kubernetes distribution to use: kubeadm, k3s, rke2, external").Default("kubeadm").EnumVar(&cfg.Distribution, "kubeadm", "k3s", "rke2", "external")
+	app.Flag("distribution", "Which kubernetes distribution to use: kubeadm, k3s, rke2, external").Default(K3SDistributionName).EnumVar(&cfg.Distribution, KubeAdmDistributionName, K3SDistributionName, RKE2DistributionName, ExternalDistributionName)
 	app.Flag("use-vanilla-grpc", "Tell we use vanilla autoscaler externalgrpc cloudprovider").Default("false").BoolVar(&cfg.UseVanillaGrpcProvider)
 	app.Flag("use-controller-manager", "Tell we use vsphere controller manager").Default("true").BoolVar(&cfg.UseControllerManager)
 
