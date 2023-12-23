@@ -315,7 +315,7 @@ func (g *AutoScalerServerNodeGroup) addManagedNode(crd *v1alpha1.ManagedNode) (*
 
 		annoteMaster := ""
 
-		if g.configuration.Distribution != nil && *g.configuration.Distribution != "kubeadm" {
+		if g.configuration.Distribution != nil && *g.configuration.Distribution != types.KubeAdmDistributionName {
 			annoteMaster = "true"
 		}
 
@@ -342,7 +342,7 @@ func (g *AutoScalerServerNodeGroup) prepareNodes(c types.ClientGenerator, delta 
 	config := g.configuration.GetVSphereConfiguration(g.NodeGroupIdentifier)
 	annoteMaster := ""
 
-	if g.configuration.Distribution != nil && *g.configuration.Distribution != "kubeadm" {
+	if g.configuration.Distribution != nil && *g.configuration.Distribution != types.KubeAdmDistributionName {
 		annoteMaster = "true"
 	}
 
