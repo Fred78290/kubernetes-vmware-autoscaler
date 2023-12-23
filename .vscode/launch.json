@@ -6,7 +6,24 @@
     "configurations": [
         {
             "preLaunchTask": "kubeadm",
-            "name": "kubeadm",
+            "name": "kubeadm custom grpc",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}",
+            "cwd": "${env:HOME}/go/src/github.com/Fred78290/kubernetes-vmware-autoscaler",
+            "args": [
+                "--request-timeout=120s",
+                "--no-use-vanilla-grpc",
+                "--config=${workspaceFolder}/.config/vmware-ca-k8s/kubernetes-vmware-autoscaler.json",
+                "--save=${workspaceFolder}/.config/vmware-ca-k8s/autoscaler-state.json",
+                "--kubeconfig=${workspaceFolder}/.config/vmware-ca-k8s/config",
+                "--log-level=info"
+            ]
+        },
+        {
+            "preLaunchTask": "kubeadm",
+            "name": "kubeadm external grpc",
             "type": "go",
             "request": "launch",
             "mode": "auto",
