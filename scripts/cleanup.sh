@@ -18,5 +18,6 @@ if [ -n "${CONFIG}" ]; then
 	cat ${AUTOSCALER_VMWARE}/config/${CONFIG}/config/kubernetes-vmware-autoscaler.json | jq \
 		--arg ETCD_SSL_DIR "${AUTOSCALER_VMWARE}/cluster/${CONFIG}/etcd" \
 		--arg PKI_DIR "${AUTOSCALER_VMWARE}/cluster/${CONFIG}/kubernetes/pki" \
-		'. | .listen = "/var/run/cluster-autoscaler/vmware.sock" | .network = "unix" | ."src-etcd-ssl-dir" = $ETCD_SSL_DIR | ."kubernetes-pki-srcdir" = $PKI_DIR' > ${CONFIG_DIR}/kubernetes-vmware-autoscaler.json
+		--arg SSH_KEY "${HOME}/.ssh/id_rsa" \
+		'. | .listen = "/var/run/cluster-autoscaler/vmware.sock" | .network = "unix" | ."src-etcd-ssl-dir" = $ETCD_SSL_DIR | ."kubernetes-pki-srcdir" = $PKI_DIR | ."ssh-infos"."ssh-private-key" = $SSH_KEY' > ${CONFIG_DIR}/kubernetes-vmware-autoscaler.json
 fi

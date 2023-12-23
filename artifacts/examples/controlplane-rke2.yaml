@@ -1,0 +1,27 @@
+apiVersion: "nodemanager.aldunelabs.com/v1alpha1"
+kind: "ManagedNode"
+metadata:
+  name: "vmware-dev-rke2-master-02"
+spec:
+  nodegroup: vmware-dev-rke2
+  controlPlane: true
+  allowDeployment: false
+  vcpus: 4
+  memorySizeInMb: 4096
+  diskSizeInMb: 20480
+  labels:
+  - demo-label.aldunelabs.com=demo
+  - sample-label.aldunelabs.com=sample
+  annotations:
+  - demo-annotation.aldunelabs.com=demo
+  - sample-annotation.aldunelabs.com=sample
+  networks:
+    -
+      network: "VM Network"
+      address: 10.0.0.121
+      netmask: 255.255.255.0
+      gateway: 10.0.0.1
+    -
+      network: "VM Private"
+      address: 192.168.1.121
+      netmask: 255.255.255.0
