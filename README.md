@@ -10,9 +10,9 @@ Kubernetes autoscaler for vsphere/esxi including a custom resource controller to
 
 * 1.26.11
   * This version is supported kubernetes v1.26 and support k3s, rke2, external kubernetes distribution
-* 1.27.9
+* 1.27.8
   * This version is supported kubernetes v1.27 and support k3s, rke2, external kubernetes distribution
-* 1.28.4
+* 1.28.1
   * This version is supported kubernetes v1.28 and support k3s, rke2, external kubernetes distribution
 * 1.29.0
   * This version is supported kubernetes v1.29 and support k3s, rke2, external kubernetes distribution
