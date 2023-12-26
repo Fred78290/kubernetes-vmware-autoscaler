@@ -13,8 +13,9 @@
 # limitations under the License.
 
 #ARG BASEIMAGE=gcr.io/distroless/static:latest-amd64
-ARG BASEIMAGE=gcr.io/distroless/static:nonroot
-FROM alpine AS builder
+#ARG BASEIMAGE=gcr.io/distroless/static:nonroot
+ARG BASEIMAGE=alpine:3.19
+FROM alpine:3.19 AS builder
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 
@@ -24,25 +25,22 @@ RUN ls / ; mv /$TARGETPLATFORM/vsphere-autoscaler /vsphere-autoscaler ; chmod uo
 FROM $BASEIMAGE
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
+ARG USER=default
+
+ENV HOME /home/$USER
 
 LABEL maintainer="Frederic Boltz <frederic.boltz@gmail.com>"
 
 COPY --from=builder /vsphere-autoscaler /usr/local/bin/vsphere-autoscaler
 
-# On arm64 the ubuntu image have some missing binaries need by dpkg
-#RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-#    ln -s /usr/bin/tar /usr/sbin/tar ; \
-#    ln -s /usr/bin/rm /usr/sbin/rm ; \
-#    ln -s /usr/bin/dpkg-split /usr/sbin/dpkg-split ; \
-#    ln -s /usr/bin/dpkg-deb /usr/sbin/dpkg-deb; \
-#fi
+# add new user
+RUN apk update \
+	&& apk add --no-cache sudo openssh \
+	&& adduser -D $USER -u 65532 \
+	&& echo "$USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$USER \
+	&& chmod 0440 /etc/sudoers.d/$USER
 
-# For ubuntu
-#RUN apt update \
-#    && apt -y dist-upgrade \
-#    && apt install -y ssh-tools \
-#    && rm -rf /var/lib/apt/lists/* \
-#    && chmod uog+x /usr/local/bin/vsphere-autoscaler
+USER $USER
 
 EXPOSE 5200
 
